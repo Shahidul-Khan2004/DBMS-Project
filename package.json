@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "backend": "cd Backend && node src/app.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.20.0",
+    "zod": "^4.3.6"
+  }
+}
