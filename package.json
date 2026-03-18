@@ -1,7 +1,10 @@
 {
+  "name": "dbms-project",
+  "private": true,
   "type": "module",
   "scripts": {
-    "backend": "cd Backend && node src/app.js"
+    "dev:backend": "cd backend && node src/app.js",
+    "dev:frontend": "next dev frontend"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -9,6 +12,20 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.20.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^16.0.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.0.0"
   }
 }
