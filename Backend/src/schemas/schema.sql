@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
+    public_uuid CHAR(36) NOT NULL UNIQUE,
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
