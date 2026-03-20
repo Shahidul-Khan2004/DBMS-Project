@@ -5,15 +5,15 @@ import {
   registerUser,
 } from '../middlewares/auth.js';
 import {
-  validateLoginUser,
+  validateUserRegistration,
+  validateUserLogin,
   validateRefreshToken,
-  validateRegisterUser,
 } from '../validators/auth.js';
 
 const router = express.Router();
 
-router.post('/register', validateRegisterUser, registerUser);
-router.post('/login', validateLoginUser, loginUser);
+router.post('/register', validateUserRegistration, registerUser);
+router.post('/login', validateUserLogin, loginUser);
 router.post('/refresh', validateRefreshToken, refreshAccessToken);
 
 export default router;

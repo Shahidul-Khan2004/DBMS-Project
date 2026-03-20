@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { query } from "../../config/db.js";
+import BackendError from "../../lib/BackendError.js";
 
 const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "1h";
 const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
@@ -98,114 +99,99 @@ function extractBearerToken(req) {
 }
 
 export async function registerUser(req, res) {
-  try {
-    const { email, fullName, password } = req.body;
-    const publicUuid = randomUUID();
+  const { email, fullName, password } = req.body;
+  const publicUuid = randomUUID();
 
-    const userExists = await query("SELECT id FROM users WHERE email = ?", [
-      email,
-    ]);
-    if (userExists.rows.length > 0) {
-      return res.status(409).json({ error: "Email already in use" });
-    }
-
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    const insertQuery = `
-      INSERT INTO users (public_uuid, email, full_name, password_hash) 
-      VALUES (?, ?, ?, ?)
-    `;
-    await query(insertQuery, [
-      publicUuid,
-      email,
-      fullName,
-      passwordHash,
-    ]);
-    const user = await getUserByPublicUuid(publicUuid);
-    const accessToken = signAccessToken(user);
-    const refreshToken = signRefreshToken(user);
-
-    res.status(201).json({
-      message: "User registered successfully",
-      accessToken,
-      refreshToken,
-      user: toPublicUser(user),
-    });
-  } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  const userExists = await query("SELECT id FROM users WHERE email = ?", [
+    email,
+  ]);
+  if (userExists.rows.length > 0) {
+    throw new BackendError(409, "EXISTING_EMAIL", "Email already in use");
   }
+
+  const saltRounds = 10;
+  const passwordHash = await bcrypt.hash(password, saltRounds);
+
+  const insertQuery = `
+    INSERT INTO users (public_uuid, email, full_name, password_hash) 
+    VALUES (?, ?, ?, ?)
+  `;
+  await query(insertQuery, [
+    publicUuid,
+    email,
+    fullName,
+    passwordHash,
+  ]);
+  const user = await getUserByPublicUuid(publicUuid);
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+
+  res.status(201).json({
+    message: "User registered successfully",
+    accessToken,
+    refreshToken,
+    user: toPublicUser(user),
+  });
 }
 
 export async function loginUser(req, res) {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const result = await query(
-      `
-        SELECT public_uuid, email, full_name, password_hash, created_at
-        FROM users
-        WHERE email = ?
-      `,
-      [email]
-    );
+  const result = await query(
+    `
+      SELECT public_uuid, email, full_name, password_hash, created_at
+      FROM users
+      WHERE email = ?
+    `,
+    [email]
+  );
 
-    const user = result.rows[0];
+  const user = result.rows[0];
 
-    if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-    const accessToken = signAccessToken(user);
-    const refreshToken = signRefreshToken(user);
-
-    res.status(200).json({
-      message: "Login successful",
-      accessToken,
-      refreshToken,
-      user: toPublicUser(user),
-    });
-  } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  if (!user) {
+    throw new BackendError(403, "INVALID_CREDENTIALS", "User with this email does not exist");
   }
+
+  const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+  if (!isPasswordValid) {
+    throw new BackendError(401, "INVALID_CREDENTIALS", "Password is incorrect");
+  }
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+
+  res.status(200).json({
+    message: "Login successful",
+    accessToken,
+    refreshToken,
+    user: toPublicUser(user),
+  });
 }
 
 export async function refreshAccessToken(req, res) {
-  try {
-    const { refreshToken } = req.body;
-    const { refreshSecret } = ensureJwtSecrets();
-    const payload = jwt.verify(refreshToken, refreshSecret);
+  const { refreshToken } = req.body;
+  const { refreshSecret } = ensureJwtSecrets();
+  const payload = jwt.verify(refreshToken, refreshSecret);
 
-    if (payload.type !== "refresh") {
-      return res.status(401).json({ error: "Invalid refresh token" });
-    }
-
-    const user = await getUserByPublicUuid(payload.sub);
-
-    if (!user) {
-      return res.status(401).json({ error: "Invalid refresh token" });
-    }
-
-    const nextAccessToken = signAccessToken(user);
-    const nextRefreshToken = signRefreshToken(user);
-
-    res.status(200).json({
-      message: "Token refreshed successfully",
-      accessToken: nextAccessToken,
-      refreshToken: nextRefreshToken,
-      user: toPublicUser(user),
-    });
-  } catch (error) {
-    console.error("Refresh Token Error:", error);
-    res.status(401).json({ error: "Invalid or expired refresh token" });
+  if (payload.type !== "refresh") {
+    throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Provided token is not a refresh token");
   }
+
+  const user = await getUserByPublicUuid(payload.sub);
+
+  if (!user) {
+    throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+  }
+
+  const nextAccessToken = signAccessToken(user);
+  const nextRefreshToken = signRefreshToken(user);
+
+  res.status(200).json({
+    message: "Token refreshed successfully",
+    accessToken: nextAccessToken,
+    refreshToken: nextRefreshToken,
+    user: toPublicUser(user),
+  });
 }
 
 export async function requireAuth(req, res, next) {
@@ -213,28 +199,35 @@ export async function requireAuth(req, res, next) {
     const accessToken = extractBearerToken(req);
 
     if (!accessToken) {
-      return res.status(401).json({ error: "Missing or invalid Authorization header" });
+      return next(
+        new BackendError(401, "AUTH_HEADER_INVALID", "Missing or invalid Authorization header")
+      );
     }
 
     const { accessSecret } = ensureJwtSecrets();
     const payload = jwt.verify(accessToken, accessSecret);
 
     if (payload.type !== "access") {
-      return res.status(401).json({ error: "Invalid access token" });
+      return next(new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token"));
     }
 
     const user = await getUserByPublicUuid(payload.sub);
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid access token" });
+      return next(new BackendError(401, "INVALID_ACCESS_TOKEN", "Not user's access token"));
     }
 
     req.auth = payload;
     req.user = toPublicUser(user);
     next();
   } catch (error) {
-    console.error("Authorization Error:", error);
-    res.status(401).json({ error: "Invalid or expired access token" });
+    if (
+      error.name === "TokenExpiredError" || error.name === "JsonWebTokenError"
+    ) {
+      return next(new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid or expired access token"));
+    }
+
+    next(error);
   }
 }
 
