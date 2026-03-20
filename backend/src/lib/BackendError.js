@@ -1,9 +1,9 @@
 export default class BackendError extends Error {
-  constructor(code, type, message, details) {
+  constructor(statusCode, code, message, details) {
     super(message);
     this.name = "BackendError";
+    this.statusCode = statusCode;
     this.code = code;
-    this.type = type;
     this.details = details;
   }
 }
