@@ -1,30 +1,29 @@
-import BackendError from "../../lib/BackendError";
+import BackendError from "../../lib/BackendError.js";
 
 export function notFound(req, res, next) {
-    next(
-        new BackendError(
-            404,
-            "Not Found",
-            `Route ${req.originalUrl} not found while using ${req.method} method.`
-        )
-    );
+  next(
+    new BackendError(
+      404,
+      "ROUTE_NOT_FOUND",
+      `Route ${req.method} ${req.originalUrl} not found`
+    )
+  );
 }
 
 export function errorHandler(err, req, res, next) {
     if (res.headersSent) return next(err);
 
-    const name = err.name || "Undefined Error";
-    const code = Number.isInteger(err.code) ? err.code : 500;
-    const type = err.type || "Internal Server Error";
+    const statusCode = Number.isInteger(err.statusCode) ? err.statusCode : 500;
+    const code = err.code || "INTERNAL_SERVER_ERROR";
     let message = err.message || "An unexpected error occurred.";
 
-    if (code >= 500) {
+    if (statusCode >= 500) {
         message = "internal server error";
         console.error(err);
     }
 
-    const body = { [name]: { type, message } };
-    if (err.details) body[name].details = err.details;
+    const body = { error: { code, message } };
+    if (err.details) body.error.details = err.details;
 
-    res.status(code).json(body);
+    res.status(statusCode).json(body);
 }
