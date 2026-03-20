@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import BackendError from '../../lib/BackendError';
 
 export const registerUserSchema = z
   .object({

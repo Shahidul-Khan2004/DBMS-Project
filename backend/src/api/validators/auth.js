@@ -1,6 +1,6 @@
-import { registerUserSchema, loginUserSchema, refreshTokenSchema } from "./validationSchemas";
-import validate from "./validator";
+import { registerUserSchema, loginUserSchema, refreshTokenSchema } from "./validationSchemas.js";
+import validate from "./validator.js";
 
-export const validateUserRegistration = validate(registerUserSchema);
-export const validateUserLogin = validate(loginUserSchema);
-export const validateRefreshToken = validate(refreshTokenSchema);
+export const validateUserRegistration = validate("registration", registerUserSchema);
+export const validateUserLogin = validate("login", loginUserSchema);
+export const validateRefreshToken = validate("refresh token", refreshTokenSchema);
