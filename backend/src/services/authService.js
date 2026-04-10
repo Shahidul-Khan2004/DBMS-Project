@@ -18,11 +18,14 @@ export function toPublicUser(user) {
     id: user.public_uuid,
     email: user.email,
     full_name: user.full_name,
+    phone_number: user.phone_number,
+    is_active: user.is_active,
     created_at: user.created_at,
+    updated_at: user.updated_at,
   };
 }
 
-export async function registerUser({ email, fullName, password }) {
+export async function registerUser({ email, fullName, phoneNumber, password }) {
   const existingUser = await findUserByEmail(email);
 
   if (existingUser) {
@@ -32,7 +35,13 @@ export async function registerUser({ email, fullName, password }) {
   const publicUuid = randomUUID();
   const passwordHash = await bcrypt.hash(password, 10);
 
-  await createUser({ publicUuid, email, fullName, passwordHash });
+  await createUser({
+    publicUuid,
+    email,
+    fullName,
+    phoneNumber,
+    passwordHash,
+  });
 
   const user = await findUserByPublicUuid(publicUuid);
 
@@ -50,6 +59,10 @@ export async function loginUser({ email, password }) {
     throw new BackendError(401, "INVALID_CREDENTIALS", "Invalid email or password");
   }
 
+  if (!user.is_active) {
+    throw new BackendError(403, "USER_INACTIVE", "User account is inactive");
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isPasswordValid) {
@@ -64,24 +77,36 @@ export async function loginUser({ email, password }) {
 }
 
 export async function refreshAccessToken({ refreshToken }) {
-  const payload = verifyRefreshToken(refreshToken);
+  try {
+    const payload = verifyRefreshToken(refreshToken);
 
-  if (payload.type !== "refresh") {
-    throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Provided token is not a refresh token");
+    if (payload.type !== "refresh") {
+      throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Provided token is not a refresh token");
+    }
+
+    const user = await findUserByPublicUuid(payload.sub);
+
+    if (!user || !user.is_active) {
+      throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+    }
+
+    return {
+      user: toPublicUser(user),
+      accessToken: signAccessToken(user),
+      refreshToken: signRefreshToken(user),
+    };
+  } catch (error) {
+    if (
+      error.name === "TokenExpiredError" ||
+      error.name === "JsonWebTokenError"
+    ) {
+      throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Invalid or expired refresh token");
+    }
+
+    throw error;
   }
-
-  const user = await findUserByPublicUuid(payload.sub);
-
-  if (!user) {
-    throw new BackendError(401, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
-  }
-
-  return {
-    user: toPublicUser(user),
-    accessToken: signAccessToken(user),
-    refreshToken: signRefreshToken(user),
-  };
 }
+
 
 export async function authenticateAccessToken(accessToken) {
   try {
@@ -93,7 +118,7 @@ export async function authenticateAccessToken(accessToken) {
 
     const user = await findUserByPublicUuid(payload.sub);
 
-    if (!user) {
+    if (!user || !user.is_active) {
       throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
     }
 
