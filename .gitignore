@@ -163,3 +163,6 @@ vite.config.ts.timestamp-*
 
 # typescript
 next-env.d.ts
+
+# codex
+.codex
