@@ -3,7 +3,7 @@ import {
   loginUser,
   refreshAccessToken,
   registerUser,
-} from '../middlewares/auth.js';
+} from "../controllers/auth.js";
 import {
   validateUserRegistration,
   validateUserLogin,
