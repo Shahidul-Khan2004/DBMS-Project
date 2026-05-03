@@ -6,6 +6,8 @@ import {
   findUserByPublicUuid,
   createUser,
 } from "../repositories/userRepo.js";
+import { assignRoleToUser, findRoleByCode } from "../repositories/rbacRepo.js";
+import { resolveAuthorizationContext, ROLE_CODES } from "./rbacService.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -55,11 +57,29 @@ export async function registerUser({ email, fullName, phoneNumber, password }) {
   }
 
   const user = await findUserByPublicUuid(publicUuid);
+  const defaultRole = await findRoleByCode(ROLE_CODES.CITIZEN);
+
+  if (defaultRole) {
+    try {
+      await assignRoleToUser({
+        userId: user.id,
+        roleId: defaultRole.id,
+        assignedByUserId: null,
+      });
+    } catch (error) {
+      if (error.code !== "ER_DUP_ENTRY") {
+        throw error;
+      }
+    }
+  }
+
+  const authz = await resolveAuthorizationContext(user.id);
 
   return {
     user: toPublicUser(user),
     accessToken: signAccessToken(user),
     refreshToken: signRefreshToken(user),
+    authz,
   };
 }
 
@@ -88,10 +108,13 @@ export async function loginUser({ email, password }) {
     );
   }
 
+  const authz = await resolveAuthorizationContext(user.id);
+
   return {
     user: toPublicUser(user),
     accessToken: signAccessToken(user),
     refreshToken: signRefreshToken(user),
+    authz,
   };
 }
 
@@ -117,10 +140,13 @@ export async function refreshAccessToken({ refreshToken }) {
       );
     }
 
+    const authz = await resolveAuthorizationContext(user.id);
+
     return {
       user: toPublicUser(user),
       accessToken: signAccessToken(user),
       refreshToken: signRefreshToken(user),
+      authz,
     };
   } catch (error) {
     if (
@@ -160,9 +186,13 @@ export async function authenticateAccessToken(accessToken) {
       );
     }
 
+    const authz = await resolveAuthorizationContext(user.id);
+
     return {
       auth: payload,
       user: toPublicUser(user),
+      authz,
+      actorUserId: user.id,
     };
   } catch (error) {
     if (

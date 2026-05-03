@@ -1,8 +1,8 @@
 import BackendError from "../../lib/BackendError.js";
 
-export default function validate(schemaName, schema) {
+export default function validate(schemaName, schema, requestProperty = "body") {
   return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse(req[requestProperty]);
 
     if (!result.success) {
       return next(
@@ -18,7 +18,7 @@ export default function validate(schemaName, schema) {
       );
     }
 
-    req.body = result.data;
+    req[requestProperty] = result.data;
     next();
   };
 }

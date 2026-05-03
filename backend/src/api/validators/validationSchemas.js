@@ -26,3 +26,15 @@ export const loginUserSchema = z.object({
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, "Refresh token is required"),
 });
+
+export const userRoleAssignmentSchema = z.object({
+  roleCode: z
+    .string()
+    .trim()
+    .min(1, "Role code is required")
+    .transform((value) => value.toLowerCase()),
+});
+
+export const userRoleAssignmentParamsSchema = z.object({
+  userId: z.uuid({ message: "Invalid user id" }),
+});

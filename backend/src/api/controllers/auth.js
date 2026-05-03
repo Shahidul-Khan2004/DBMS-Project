@@ -8,6 +8,7 @@ export async function registerUser(req, res) {
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     user: result.user,
+    authz: result.authz,
   });
 }
 
@@ -19,12 +20,14 @@ export async function loginUser(req, res) {
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     user: result.user,
+    authz: result.authz,
   });
 }
 
 export function getCurrentUser(req, res) {
   res.status(200).json({
     user: req.user,
+    authz: req.authz,
   });
 }
 
@@ -36,6 +39,7 @@ export async function refreshAccessToken(req, res) {
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     user: result.user,
+    authz: result.authz,
   });
 }
 
