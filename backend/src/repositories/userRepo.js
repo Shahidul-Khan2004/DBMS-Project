@@ -1,5 +1,9 @@
 import pool, { query } from "../config/db.js";
 
+// New users are inserted with this status so they can log in immediately. The `users` table default
+// in schema.sql is `pending_verification`; change this constant (and docs) if you require activation first.
+const REGISTRATION_ACCOUNT_STATUS = "active";
+
 const userSelect = `
   SELECT
     u.id,
@@ -27,11 +31,6 @@ export async function findUserByPublicUuid(publicUuid) {
   return result.rows[0] || null;
 }
 
-export async function findUserById(userId) {
-  const result = await query(`${userSelect} WHERE u.id = ?`, [userId]);
-  return result.rows[0] || null;
-}
-
 export async function createUser({ publicUuid, email, fullName, phoneNumber, passwordHash }) {
   const conn = await pool.getConnection();
   try {
@@ -39,9 +38,9 @@ export async function createUser({ publicUuid, email, fullName, phoneNumber, pas
     const [userResult] = await conn.execute(
       `
         INSERT INTO users (public_uuid, email, password_hash, account_status)
-        VALUES (?, ?, ?, 'active')
+        VALUES (?, ?, ?, ?)
       `,
-      [publicUuid, email, passwordHash]
+      [publicUuid, email, passwordHash, REGISTRATION_ACCOUNT_STATUS]
     );
     const userId = userResult.insertId;
     await conn.execute(
