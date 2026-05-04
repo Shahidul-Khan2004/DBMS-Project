@@ -38,6 +38,12 @@ All API errors return this structure:
 
 `details` is optional and usually present for validation errors.
 
+### User object (`user` in auth and `/users/me`)
+
+- **`account_status`** comes from the `users.account_status` column (`active` \| `suspended` \| `disabled` \| `pending_verification`). This is the source of truth for lifecycle.
+- **`is_active`** is not a database column. It is always `account_status === "active"` so clients can keep a simple boolean if they prefer.
+- **`full_name`** and **`phone_number`** come from `user_profiles` (joined in the repository), not from `users`.
+
 ---
 
 ## 1) Health Check
@@ -73,7 +79,9 @@ No request body.
 
 ### POST `/auth/register`
 
-Creates a new user and returns JWT tokens + authorization context.
+Creates a new user and returns access and refresh tokens plus the public `user` object.
+
+Registration inserts `users.account_status` as **`active`** so the account can log in and use tokens immediately. The SQL schema default for that column is `pending_verification`; the app overrides it on purpose for this MVP flow. To require email verification first, change the registration insert (and tests) to use `pending_verification` and add an activation path.
 
 #### Headers
 
@@ -105,13 +113,10 @@ Content-Type: application/json
     "email": "john@example.com",
     "full_name": "John Doe",
     "phone_number": "01700000000",
+    "account_status": "active",
     "is_active": true,
     "created_at": "2026-05-03T16:00:00.000Z",
     "updated_at": "2026-05-03T16:00:00.000Z"
-  },
-  "authz": {
-    "roleCodes": ["citizen"],
-    "permissions": []
   }
 }
 ```
@@ -133,7 +138,7 @@ Content-Type: application/json
 
 ### POST `/auth/login`
 
-Authenticates user credentials and returns JWT tokens + authorization context.
+Authenticates user credentials and returns access and refresh tokens plus the public `user` object.
 
 #### Headers
 
@@ -162,13 +167,10 @@ Content-Type: application/json
     "email": "john@example.com",
     "full_name": "John Doe",
     "phone_number": "01700000000",
+    "account_status": "active",
     "is_active": true,
     "created_at": "2026-05-03T16:00:00.000Z",
     "updated_at": "2026-05-03T16:00:00.000Z"
-  },
-  "authz": {
-    "roleCodes": ["citizen"],
-    "permissions": []
   }
 }
 ```
@@ -218,13 +220,10 @@ Content-Type: application/json
     "email": "john@example.com",
     "full_name": "John Doe",
     "phone_number": "01700000000",
+    "account_status": "active",
     "is_active": true,
     "created_at": "2026-05-03T16:00:00.000Z",
     "updated_at": "2026-05-03T16:00:00.000Z"
-  },
-  "authz": {
-    "roleCodes": ["citizen"],
-    "permissions": []
   }
 }
 ```
@@ -246,7 +245,7 @@ Content-Type: application/json
 
 ### GET `/users/me`
 
-Returns profile + RBAC context of the authenticated user.
+Returns the authenticated user profile (same `user` shape as auth endpoints).
 
 #### Headers
 
@@ -268,20 +267,10 @@ No request body.
     "email": "john@example.com",
     "full_name": "John Doe",
     "phone_number": "01700000000",
+    "account_status": "active",
     "is_active": true,
     "created_at": "2026-05-03T16:00:00.000Z",
     "updated_at": "2026-05-03T16:00:00.000Z"
-  },
-  "authz": {
-    "roleCodes": ["dispatcher"],
-    "permissions": [
-      "incident.create",
-      "incident.classify",
-      "incident.assign_agency",
-      "incident.update_status",
-      "dispatch.create",
-      "dispatch.update_status"
-    ]
   }
 }
 ```
