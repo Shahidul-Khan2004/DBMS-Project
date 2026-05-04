@@ -21,7 +21,7 @@ export function toPublicUser(user) {
     email: user.email,
     full_name: user.full_name,
     phone_number: user.phone_number,
-    is_active: user.is_active,
+    is_active: user.account_status === "active",
     created_at: user.created_at,
     updated_at: user.updated_at,
   };
@@ -94,7 +94,7 @@ export async function loginUser({ email, password }) {
     );
   }
 
-  if (!user.is_active) {
+  if (user.account_status !== "active") {
     throw new BackendError(403, "USER_INACTIVE", "User account is inactive");
   }
 
@@ -132,7 +132,7 @@ export async function refreshAccessToken({ refreshToken }) {
 
     const user = await findUserByPublicUuid(payload.sub);
 
-    if (!user || !user.is_active) {
+    if (!user || user.account_status !== "active") {
       throw new BackendError(
         401,
         "INVALID_REFRESH_TOKEN",
@@ -178,7 +178,7 @@ export async function authenticateAccessToken(accessToken) {
 
     const user = await findUserByPublicUuid(payload.sub);
 
-    if (!user || !user.is_active) {
+    if (!user || user.account_status !== "active") {
       throw new BackendError(
         401,
         "INVALID_ACCESS_TOKEN",

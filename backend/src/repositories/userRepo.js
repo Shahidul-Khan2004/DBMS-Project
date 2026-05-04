@@ -1,102 +1,61 @@
-import { query } from "../config/db.js";
-import pool from "../config/db.js";
+import pool, { query } from "../config/db.js";
+
+const userSelect = `
+  SELECT
+    u.id,
+    u.public_uuid,
+    u.email,
+    u.password_hash,
+    u.account_status,
+    u.created_at,
+    u.updated_at,
+    up.full_name,
+    up.phone_number
+  FROM users u
+  LEFT JOIN user_profiles up ON up.user_id = u.id
+`;
 
 export async function findUserByEmail(email) {
-  const result = await query(
-    `
-      SELECT
-        u.id,
-        u.public_uuid,
-        u.email,
-        up.full_name,
-        u.password_hash,
-        up.phone_number,
-        (u.account_status = 'active') AS is_active,
-        u.created_at,
-        u.updated_at
-      FROM users u
-      LEFT JOIN user_profiles up ON up.user_id = u.id
-      WHERE u.email = ?
-    `,
-    [email]
-  );
-
+  const result = await query(`${userSelect} WHERE u.email = ?`, [email]);
   return result.rows[0] || null;
 }
 
 export async function findUserByPublicUuid(publicUuid) {
-  const result = await query(
-    `
-      SELECT
-        u.id,
-        u.public_uuid,
-        u.email,
-        up.full_name,
-        u.password_hash,
-        up.phone_number,
-        (u.account_status = 'active') AS is_active,
-        u.created_at,
-        u.updated_at
-      FROM users u
-      LEFT JOIN user_profiles up ON up.user_id = u.id
-      WHERE u.public_uuid = ?
-    `,
-    [publicUuid]
-  );
-
+  const result = await query(`${userSelect} WHERE u.public_uuid = ?`, [
+    publicUuid,
+  ]);
   return result.rows[0] || null;
 }
 
 export async function findUserById(userId) {
-  const result = await query(
-    `
-      SELECT
-        u.id,
-        u.public_uuid,
-        u.email,
-        up.full_name,
-        u.password_hash,
-        up.phone_number,
-        (u.account_status = 'active') AS is_active,
-        u.created_at,
-        u.updated_at
-      FROM users u
-      LEFT JOIN user_profiles up ON up.user_id = u.id
-      WHERE u.id = ?
-    `,
-    [userId]
-  );
-
+  const result = await query(`${userSelect} WHERE u.id = ?`, [userId]);
   return result.rows[0] || null;
 }
 
 export async function createUser({ publicUuid, email, fullName, phoneNumber, passwordHash }) {
-  const connection = await pool.getConnection();
-
+  const conn = await pool.getConnection();
   try {
-    await connection.beginTransaction();
-
-    const [userInsertResult] = await connection.query(
+    await conn.beginTransaction();
+    const [userResult] = await conn.execute(
       `
         INSERT INTO users (public_uuid, email, password_hash, account_status)
         VALUES (?, ?, ?, 'active')
       `,
       [publicUuid, email, passwordHash]
     );
-
-    await connection.query(
+    const userId = userResult.insertId;
+    await conn.execute(
       `
         INSERT INTO user_profiles (user_id, full_name, phone_number)
         VALUES (?, ?, ?)
       `,
-      [userInsertResult.insertId, fullName, phoneNumber ?? null]
+      [userId, fullName, phoneNumber ?? null]
     );
-
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
   } finally {
-    connection.release();
+    conn.release();
   }
 }
