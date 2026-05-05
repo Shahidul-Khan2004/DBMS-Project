@@ -13,7 +13,12 @@ import {
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const CLASSIFIABLE_STATUSES = new Set(["received", "under_review"]);
+const SERVICE_CASE_CLASSIFIABLE_STATUSES = new Set(["received", "under_review"]);
+const EMERGENCY_CLASSIFIABLE_STATUSES = new Set([
+  "received",
+  "under_review",
+  "linked_to_case",
+]);
 
 function assertValidReportPublicUuid(reportPublicUuid) {
   if (!UUID_REGEX.test(reportPublicUuid)) {
@@ -54,13 +59,13 @@ export async function createIntakeReportForUser(actorPublicUuid, body) {
   });
 }
 
-async function loadIntakeForClassification(reportPublicUuid) {
+async function loadIntakeForClassification(reportPublicUuid, allowedStatuses) {
   assertValidReportPublicUuid(reportPublicUuid);
   const intake = await findIntakeReportByPublicUuid(reportPublicUuid);
   if (!intake) {
     throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
   }
-  if (!CLASSIFIABLE_STATUSES.has(intake.intake_status)) {
+  if (!allowedStatuses.has(intake.intake_status)) {
     throw new BackendError(
       409,
       "INTAKE_NOT_CLASSIFIABLE",
@@ -76,7 +81,10 @@ export async function classifyIntakeAsServiceCase(actorPublicUuid, reportPublicU
     throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
   }
 
-  const intake = await loadIntakeForClassification(reportPublicUuid);
+  const intake = await loadIntakeForClassification(
+    reportPublicUuid,
+    SERVICE_CASE_CLASSIFIABLE_STATUSES,
+  );
 
   if (intake.reporter_user_id == null) {
     throw new BackendError(
@@ -111,7 +119,10 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
     throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
   }
 
-  const intake = await loadIntakeForClassification(reportPublicUuid);
+  const intake = await loadIntakeForClassification(
+    reportPublicUuid,
+    EMERGENCY_CLASSIFIABLE_STATUSES,
+  );
 
   const incidentPublicUuid = randomUUID();
   const incidentCode = generateCode("EMI");

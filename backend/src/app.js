@@ -1,4 +1,5 @@
 import "dotenv/config";
+import cors from "cors";
 import express from "express";
 import healthRouter from "./api/routes/health.js";
 import authRouter from "./api/routes/auth.js";
@@ -11,6 +12,11 @@ const app = express();
 
 const PORT = process.env.PORT || 8080;
 
+app.use(
+  cors({
+    origin: "http://localhost:3000"
+  }),
+);
 app.use(express.json());
 
 app.use("/", healthRouter);

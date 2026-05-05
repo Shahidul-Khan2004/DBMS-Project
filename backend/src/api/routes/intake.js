@@ -7,8 +7,9 @@ import {
 import {
   forbidEmergencyUrgencyWithoutIncidentClassify,
   requireAuth,
-  requirePermission,
+  requireRole,
 } from "../middlewares/auth.js";
+import { ROLE_CODES } from "../../services/rbacService.js";
 import {
   validateClassifyEmergency999,
   validateClassifyServiceCase,
@@ -25,14 +26,17 @@ router.post(
   forbidEmergencyUrgencyWithoutIncidentClassify,
   createIntakeReport,
 );
+const operatorRoles = [ROLE_CODES.DISPATCHER, ROLE_CODES.SYSTEM_ADMIN];
+
 router.post(
   "/reports/:reportPublicUuid/classify/service-case",
+  requireRole(...operatorRoles),
   validateClassifyServiceCase,
   classifyServiceCase,
 );
 router.post(
   "/reports/:reportPublicUuid/classify/emergency",
-  requirePermission("incident.create"),
+  requireRole(...operatorRoles),
   validateClassifyEmergency999,
   classifyEmergency999,
 );
