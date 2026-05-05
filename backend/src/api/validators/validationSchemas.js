@@ -32,6 +32,15 @@ const locationSourceEnum = z.enum([
   "manual_entry",
 ]);
 
+const locationObjectSchema = z.object({
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
+  address_text: z.string().trim().min(1),
+  place_name: z.string().trim().optional(),
+  admin_area_id: z.number().int().positive().optional(),
+  source: locationSourceEnum.optional(),
+});
+
 export const createIntakeReportSchema = z.object({
   channelCode: z.string().trim().min(1, "channelCode is required"),
   categoryCode: z.string().trim().min(1, "categoryCode is required"),
@@ -43,16 +52,7 @@ export const createIntakeReportSchema = z.object({
   description: z.string().optional(),
   urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
   reportedAt: z.iso.datetime({ offset: true }).optional(),
-  location: z
-    .object({
-      latitude: z.number().gte(-90).lte(90),
-      longitude: z.number().gte(-180).lte(180),
-      address_text: z.string().trim().min(1),
-      place_name: z.string().trim().optional(),
-      admin_area_id: z.number().int().positive().optional(),
-      source: locationSourceEnum.optional(),
-    })
-    .optional(),
+  location: z.union([z.string().trim().min(1), locationObjectSchema]).optional(),
 });
 
 export const classifyServiceCaseSchema = z.object({
