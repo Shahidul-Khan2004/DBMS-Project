@@ -116,10 +116,18 @@ export async function bootstrapDevelopmentSystemAdmin() {
   const email = process.env.SYSTEM_ADMIN__EMAIL;
   const password = process.env.SYSTEM_ADMIN_PASSWORD;
   const fullName = process.env.SYSTEM_ADMIN_NAME;
+  const phoneNumber = process.env.SYSTEM_ADMIN_PHONE;
 
-  if (!email || !password || !fullName) {
+  if (!email || !password || !fullName || !phoneNumber) {
     console.warn(
-      "Skipping system admin bootstrap. Please set SYSTEM_ADMIN__EMAIL, SYSTEM_ADMIN_PASSWORD, and SYSTEM_ADMIN_NAME."
+      "Skipping system admin bootstrap. Please set SYSTEM_ADMIN__EMAIL, SYSTEM_ADMIN_PASSWORD, SYSTEM_ADMIN_NAME, and SYSTEM_ADMIN_PHONE."
+    );
+    return;
+  }
+
+  if (!/^\d{11}$/.test(phoneNumber)) {
+    console.warn(
+      "Skipping system admin bootstrap. SYSTEM_ADMIN_PHONE must be exactly 11 digits."
     );
     return;
   }
@@ -134,7 +142,7 @@ export async function bootstrapDevelopmentSystemAdmin() {
       publicUuid,
       email,
       fullName,
-      phoneNumber: null,
+      phoneNumber,
       passwordHash,
     });
 
