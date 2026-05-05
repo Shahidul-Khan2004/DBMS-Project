@@ -254,7 +254,7 @@ CREATE TABLE locations (
 CREATE TABLE user_profiles (
     user_id BIGINT UNSIGNED NOT NULL,
     full_name VARCHAR(150) NOT NULL,
-    phone_number VARCHAR(30) NULL,
+    phone_number VARCHAR(30) NOT NULL,
     preferred_language ENUM('bn','en') NOT NULL DEFAULT 'bn',
     address_location_id BIGINT UNSIGNED NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

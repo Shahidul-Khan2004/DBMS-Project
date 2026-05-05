@@ -48,7 +48,7 @@ export async function createUser({ publicUuid, email, fullName, phoneNumber, pas
         INSERT INTO user_profiles (user_id, full_name, phone_number)
         VALUES (?, ?, ?)
       `,
-      [userId, fullName, phoneNumber ?? null]
+      [userId, fullName, phoneNumber]
     );
     await conn.commit();
   } catch (err) {
