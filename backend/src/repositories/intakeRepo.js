@@ -57,6 +57,18 @@ export async function createIntakeReport(params) {
 
     let reportedLocationId = null;
     if (params.location) {
+      const normalizedLocation =
+        typeof params.location === "string"
+          ? {
+              admin_area_id: null,
+              latitude: 0,
+              longitude: 0,
+              address_text: params.location,
+              place_name: null,
+              source: "manual_entry",
+            }
+          : params.location;
+
       const [locationResult] = await conn.execute(
         `
           INSERT INTO locations (
@@ -71,12 +83,12 @@ export async function createIntakeReport(params) {
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
         [
-          params.location.admin_area_id ?? null,
-          params.location.latitude,
-          params.location.longitude,
-          params.location.address_text,
-          params.location.place_name ?? null,
-          params.location.source ?? "user_shared",
+          normalizedLocation.admin_area_id ?? null,
+          normalizedLocation.latitude,
+          normalizedLocation.longitude,
+          normalizedLocation.address_text,
+          normalizedLocation.place_name ?? null,
+          normalizedLocation.source ?? "user_shared",
           params.reporterUserId ?? null,
         ],
       );
