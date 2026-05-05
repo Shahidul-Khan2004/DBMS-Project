@@ -17,7 +17,8 @@ DROP VIEW IF EXISTS vw_response_pipeline_timing;
 DROP VIEW IF EXISTS vw_escalation_comparison;
 DROP VIEW IF EXISTS vw_emergency_call_heatmap;
 DROP VIEW IF EXISTS vw_false_alarm_by_area;
-DROP VIEW IF EXISTS vw_call_taker_performance;
+DROP VIEW IF EXISTS vw_dispatcher_performance;
+DROP VIEW IF EXISTS vw_intake_operator_performance;
 DROP VIEW IF EXISTS vw_duplicate_emergency_call_clusters;
 DROP VIEW IF EXISTS vw_admin_case_queue;
 DROP VIEW IF EXISTS vw_user_case_dashboard;
@@ -420,7 +421,7 @@ CREATE TABLE intake_report_attachments (
 CREATE TABLE emergency_calls (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     intake_report_id BIGINT UNSIGNED NOT NULL,
-    call_taker_user_id BIGINT UNSIGNED NOT NULL,
+    dispatcher_id BIGINT UNSIGNED NOT NULL,
     caller_phone_number VARCHAR(30) NULL,
     call_started_at TIMESTAMP NOT NULL,
     call_ended_at TIMESTAMP NULL,
@@ -431,11 +432,11 @@ CREATE TABLE emergency_calls (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_emergency_calls_intake_report (intake_report_id),
-    KEY idx_emergency_calls_taker (call_taker_user_id),
+    KEY idx_emergency_calls_dispatcher (dispatcher_id),
     KEY idx_emergency_calls_started (call_started_at),
     KEY idx_emergency_calls_status (call_status),
     CONSTRAINT fk_emergency_calls_intake_report FOREIGN KEY (intake_report_id) REFERENCES intake_reports(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT fk_emergency_calls_taker FOREIGN KEY (call_taker_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_emergency_calls_dispatcher FOREIGN KEY (dispatcher_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_emergency_calls_end_after_start CHECK (call_ended_at IS NULL OR call_ended_at >= call_started_at),
     CONSTRAINT chk_emergency_calls_triaged_after_start CHECK (triaged_at IS NULL OR triaged_at >= call_started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -1026,7 +1027,7 @@ CREATE TABLE response_logs (
 CREATE TABLE operator_shifts (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
-    shift_role ENUM('call_taker','case_admin','dispatcher','disaster_coordinator') NOT NULL,
+    shift_role ENUM('case_admin','dispatcher','disaster_coordinator') NOT NULL,
     starts_at TIMESTAMP NOT NULL,
     ends_at TIMESTAMP NOT NULL,
     shift_status ENUM('scheduled','active','completed','cancelled') NOT NULL DEFAULT 'scheduled',
@@ -1873,9 +1874,7 @@ CREATE TABLE audit_logs (
 
 INSERT INTO roles (role_code, name, description, is_system_role) VALUES
 ('citizen','Citizen','Registered public user', TRUE),
-('admin','Admin','Case and system admin', TRUE),
-('call_taker','Call Taker','999/emergency call intake operator', TRUE),
-('dispatcher','Dispatcher','Emergency dispatch operator', TRUE),
+('dispatcher','Dispatcher','999 call intake, triage, incident coordination, and dispatch', TRUE),
 ('agency_representative','Agency Representative','Agency-side user', TRUE),
 ('system_admin','System Admin','Full system administrator', TRUE);
 
@@ -2247,17 +2246,17 @@ JOIN incident_report_links irl ON irl.incident_id = ei.id
 JOIN emergency_calls ec ON ec.intake_report_id = irl.intake_report_id
 GROUP BY ei.id, ei.incident_code, ei.title;
 
-CREATE VIEW vw_call_taker_performance AS
+CREATE VIEW vw_dispatcher_performance AS
 SELECT
-    ec.call_taker_user_id,
-    up.full_name AS call_taker_name,
+    ec.dispatcher_id,
+    up.full_name AS dispatcher_name,
     COUNT(ec.id) AS total_calls,
     AVG(TIMESTAMPDIFF(SECOND, ec.call_started_at, ei.created_at)) AS avg_seconds_call_to_incident
 FROM emergency_calls ec
 LEFT JOIN incident_report_links irl ON irl.intake_report_id = ec.intake_report_id
 LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
-LEFT JOIN user_profiles up ON up.user_id = ec.call_taker_user_id
-GROUP BY ec.call_taker_user_id, up.full_name;
+LEFT JOIN user_profiles up ON up.user_id = ec.dispatcher_id
+GROUP BY ec.dispatcher_id, up.full_name;
 
 CREATE VIEW vw_false_alarm_by_area AS
 SELECT

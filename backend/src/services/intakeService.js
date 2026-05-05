@@ -130,7 +130,7 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
     intakeReportPublicUuid: reportPublicUuid,
     actorUserId: userRow.id,
     emergencyCall: {
-      callTakerUserId: userRow.id,
+      dispatcherId: userRow.id,
       callerPhoneNumber: body.callerPhoneNumber ?? null,
       callStartedAt,
       callEndedAt: null,

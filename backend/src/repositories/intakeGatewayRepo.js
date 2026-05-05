@@ -239,7 +239,7 @@ export async function createEmergency999PathFromIntake(params) {
       `
         INSERT INTO emergency_calls (
           intake_report_id,
-          call_taker_user_id,
+          dispatcher_id,
           caller_phone_number,
           call_started_at,
           call_ended_at,
@@ -250,7 +250,7 @@ export async function createEmergency999PathFromIntake(params) {
       `,
       [
         params.intake.id,
-        params.emergencyCall.callTakerUserId,
+        params.emergencyCall.dispatcherId,
         params.emergencyCall.callerPhoneNumber ?? null,
         params.emergencyCall.callStartedAt,
         params.emergencyCall.callEndedAt ?? null,
@@ -351,7 +351,7 @@ export async function createEmergency999PathFromIntake(params) {
         SELECT
           id,
           intake_report_id,
-          call_taker_user_id,
+          dispatcher_id,
           caller_phone_number,
           call_started_at,
           call_ended_at,
