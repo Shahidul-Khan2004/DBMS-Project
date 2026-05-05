@@ -3,6 +3,7 @@ import express from "express";
 import healthRouter from "./api/routes/health.js";
 import authRouter from "./api/routes/auth.js";
 import usersRouter from "./api/routes/users.js";
+import intakeRouter from "./api/routes/intake.js";
 import { errorHandler, notFound } from "./api/middlewares/error.js";
 import { bootstrapDevelopmentSystemAdmin } from "./services/bootstrapService.js";
 
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use("/", healthRouter);
 app.use("/auth", authRouter);
 app.use("/users", usersRouter);
+app.use("/intake", intakeRouter);
 
 app.use(notFound);
 
