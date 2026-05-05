@@ -66,7 +66,8 @@ const ROLE_DEFINITIONS = [
   {
     roleCode: ROLE_CODES.DISPATCHER,
     name: "Dispatcher",
-    description: "Handles incidents, agency assignment, and dispatch progress",
+    description:
+      "Handles emergency call intake and triage, incidents, agency assignment, and dispatch progress",
     isSystemRole: true,
   },
 ];
