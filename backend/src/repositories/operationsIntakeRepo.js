@@ -1,0 +1,143 @@
+import BackendError from "../lib/BackendError.js";
+import { query } from "../config/db.js";
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+
+function buildListWhere(filters, params) {
+  const clauses = [];
+
+  if (filters.intake_status) {
+    clauses.push("ir.intake_status = ?");
+    params.push(filters.intake_status);
+  }
+  if (filters.urgency_type) {
+    clauses.push("ir.urgency_type = ?");
+    params.push(filters.urgency_type);
+  }
+  if (filters.categoryCode) {
+    clauses.push("rcat.category_code = ?");
+    params.push(filters.categoryCode);
+  }
+
+  const whereSql = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  return whereSql;
+}
+
+const INTAKE_SELECT = `
+  SELECT
+    ir.public_uuid AS public_uuid,
+    ir.report_code AS report_code,
+    ir.reporter_user_id AS reporter_user_id,
+    ir.urgency_type AS urgency_type,
+    ir.summary AS summary,
+    ir.description AS description,
+    ir.intake_status AS intake_status,
+    ir.final_disposition AS final_disposition,
+    ir.reported_at AS reported_at,
+    ir.created_at AS created_at,
+    ir.updated_at AS updated_at,
+    rc.channel_code AS channel_code,
+    rcat.category_code AS category_code,
+    EXISTS (
+      SELECT 1 FROM service_cases sc WHERE sc.intake_report_id = ir.id
+    ) AS has_service_case,
+    EXISTS (
+      SELECT 1 FROM incident_report_links irl WHERE irl.intake_report_id = ir.id
+    ) AS has_incident
+`;
+
+const INTAKE_FROM = `
+  FROM intake_reports ir
+  INNER JOIN report_channels rc ON rc.id = ir.channel_id AND rc.is_active = TRUE
+  INNER JOIN report_categories rcat ON rcat.id = ir.category_id AND rcat.is_active = TRUE
+`;
+
+/**
+ * Paginated dispatcher queue view of intake reports.
+ */
+export async function listIntakeReportsForOperations(filters) {
+  const limit = Math.min(
+    Math.max(Number(filters.limit) || DEFAULT_LIMIT, 1),
+    MAX_LIMIT,
+  );
+  const offset = Math.max(Number(filters.offset) || 0, 0);
+
+  const filterParams = [];
+  const whereSql = buildListWhere(filters, filterParams);
+
+  const orderSql =
+    filters.sort === "reported_at_asc" ? "ir.reported_at ASC" : "ir.reported_at DESC";
+
+  const countSql = `
+    SELECT COUNT(*) AS cnt
+    ${INTAKE_FROM}
+    ${whereSql}
+  `;
+
+  const listSql = `
+    ${INTAKE_SELECT}
+    ${INTAKE_FROM}
+    ${whereSql}
+    ORDER BY ${orderSql}
+    LIMIT ?
+    OFFSET ?
+  `;
+
+  const countResult = await query(countSql, filterParams);
+  const listResult = await query(listSql, [...filterParams, limit, offset]);
+  const countRows = countResult.rows;
+
+  const total =
+    typeof countRows[0]?.cnt === "bigint"
+      ? Number(countRows[0].cnt)
+      : Number(countRows[0]?.cnt || 0);
+  const rows = listResult.rows;
+
+  return {
+    intake_reports: rows.map(formatIntakeRow),
+    pagination: { limit, offset, total },
+  };
+}
+
+function formatIntakeRow(row) {
+  return {
+    public_uuid: row.public_uuid,
+    report_code: row.report_code,
+    reporter_user_id: row.reporter_user_id != null ? String(row.reporter_user_id) : null,
+    urgency_type: row.urgency_type,
+    summary: row.summary,
+    description: row.description,
+    intake_status: row.intake_status,
+    final_disposition: row.final_disposition,
+    channel_code: row.channel_code,
+    category_code: row.category_code,
+    has_service_case: Boolean(row.has_service_case),
+    has_incident: Boolean(row.has_incident),
+    reported_at: row.reported_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function findIntakeReportDetailForOperations(publicUuid) {
+  const { rows } = await query(
+    `
+      ${INTAKE_SELECT}
+      ${INTAKE_FROM}
+      WHERE ir.public_uuid = ?
+      LIMIT 1
+    `,
+    [publicUuid],
+  );
+
+  if (!rows[0]) {
+    throw new BackendError(
+      404,
+      "INTAKE_REPORT_NOT_FOUND",
+      "Intake report not found",
+    );
+  }
+
+  return formatIntakeRow(rows[0]);
+}
