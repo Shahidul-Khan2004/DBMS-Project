@@ -61,6 +61,7 @@ export default function AdminDashboard() {
             <p className="text-gray-600">
               Name: <span className="font-medium">{user?.full_name}</span>
             </p>
+            <p className="mt-2 text-sm text-gray-500">User ID: {user?.id}</p>
             <p className="mt-2 text-sm text-gray-500">{user?.email}</p>
             <p className="mt-2 text-sm text-green-600 font-medium">
               Full administrative access
@@ -120,7 +121,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Role Assignment */}
         <div className="md:col-span-3">
           <RoleAssignmentForm />
         </div>
