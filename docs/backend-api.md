@@ -101,6 +101,8 @@ Content-Type: application/json
 }
 ```
 
+- `phoneNumber` is required and must be 11 digits.
+
 #### Success Response (201)
 
 ```json
@@ -358,6 +360,209 @@ Required env vars:
 - `SYSTEM_ADMIN__EMAIL`
 - `SYSTEM_ADMIN_PASSWORD`
 - `SYSTEM_ADMIN_NAME`
+- `SYSTEM_ADMIN_PHONE` (must be exactly 11 digits)
 
 If no current `system_admin` assignment exists and these env vars are set, the app will create/find the user and assign `system_admin`.
+
+---
+
+## 7) Create Intake Report
+
+### POST `/intake/reports`
+
+Creates an `intake_reports` row for the authenticated user (reporter). Intended permissions when RBAC is enforced: authenticated **citizen** (or any role allowed to submit portal reports).
+
+Repository SQL is tracked in **INTAKE-001** (`docs/tickets-intake-gateway-fe-db.md`). Until implemented, the handler responds with **501** and `INTAKE_REPOSITORY_PENDING`.
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Body
+
+```json
+{
+  "channelCode": "web_portal",
+  "categoryCode": "relief_request",
+  "summary": "Road blocked by fallen tree",
+  "description": "Optional longer text",
+  "urgencyType": "non_emergency",
+  "reportedAt": "2026-05-04T12:00:00.000Z",
+  "location": {
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "address_text": "Dhaka",
+    "place_name": "Optional label",
+    "admin_area_id": 1,
+    "source": "user_shared"
+  }
+}
+```
+
+- `urgencyType`: `non_emergency` | `emergency` | `unknown` (optional; default `unknown`). **Portal / citizen callers must not send `emergency`:** only users with permission `incident.classify` (e.g. **dispatcher**, **system_admin** per bootstrap) may set that value. Everyone else should use `unknown` or `non_emergency`; an operator promotes the report to the emergency path using `POST /intake/reports/:reportPublicUuid/classify/emergency` when appropriate.
+- `reportedAt`: optional ISO datetime.
+- `location`: optional on create, but **required** if the same report will later take the emergency classification path (`current_location_id` on `emergency_incidents` is NOT NULL).
+
+#### Success Response (201)
+
+Shape depends on repository return value; minimally:
+
+```json
+{
+  "message": "Intake report created",
+  "intake": {
+    "public_uuid": "…",
+    "report_code": "IR-…",
+    "intake_status": "received",
+    "urgency_type": "non_emergency",
+    "reported_at": "2026-05-04T12:00:00.000Z"
+  }
+}
+```
+
+#### Example Error (501 — repository not wired)
+
+```json
+{
+  "error": {
+    "code": "INTAKE_REPOSITORY_PENDING",
+    "message": "createIntakeReport is not implemented; complete INTAKE-001 in docs/tickets-intake-gateway-fe-db.md"
+  }
+}
+```
+
+#### Example Error (422)
+
+Validation failures use `VALIDATION_ERROR` with `details` (standard shape).
+
+#### Example Error (403 — emergency urgency not allowed for portal user)
+
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Missing required permission"
+  }
+}
+```
+
+Sent when `urgencyType` is `emergency` but the token does not include `incident.classify`.
+
+---
+
+## 8) Classify Intake → Service Case (Non-Emergency)
+
+### POST `/intake/reports/:reportPublicUuid/classify/service-case`
+
+Branches an existing intake into a **service case**. Intended permission when RBAC is enforced: `case.create`.
+
+SQL: **INTAKE-002** in `docs/tickets-intake-gateway-fe-db.md`. Until implemented: **501** `INTAKE_GATEWAY_REPOSITORY_PENDING`.
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Path Params
+
+- `reportPublicUuid` — intake `public_uuid` (UUID).
+
+#### Body
+
+```json
+{
+  "title": "Optional override title",
+  "description": "Optional",
+  "priorityLevel": "medium"
+}
+```
+
+If `title` is omitted, the service uses the intake `summary`.
+
+#### Success Response (201)
+
+```json
+{
+  "message": "Intake classified as service case",
+  "service_case": {},
+  "intake": {}
+}
+```
+
+(Exact fields follow repository implementation.)
+
+#### Example Error (409)
+
+```json
+{
+  "error": {
+    "code": "INTAKE_NOT_CLASSIFIABLE",
+    "message": "Intake report cannot be classified in its current status"
+  }
+}
+```
+
+#### Example Error (422)
+
+`SERVICE_CASE_REQUIRES_REPORTER_USER` if the intake has no `reporter_user_id` (schema requires it on `service_cases`).
+
+---
+
+## 9) Classify Intake → Emergency Path (999)
+
+### POST `/intake/reports/:reportPublicUuid/classify/emergency`
+
+Branches an intake into the **999 / emergency** path: creates `emergency_calls`, `emergency_incidents`, and `incident_report_links`, and moves intake to `linked_to_incident`. **Required permission:** `incident.create`. This is **not** available to default **citizen** accounts; use a **dispatcher** or **system_admin** token (see bootstrap role grants). Web-portal citizens cannot open the emergency incident path themselves.
+
+SQL: **INTAKE-003** in `docs/tickets-intake-gateway-fe-db.md`. Until implemented: **501** `INTAKE_GATEWAY_REPOSITORY_PENDING`.
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Path Params
+
+- `reportPublicUuid` — intake `public_uuid` (UUID).
+
+#### Body
+
+```json
+{
+  "severityCode": "high",
+  "incidentTitle": "Optional override",
+  "incidentDescription": "Optional",
+  "callerPhoneNumber": "01700000000",
+  "callStartedAt": "2026-05-04T12:05:00.000Z"
+}
+```
+
+- `severityCode`: `low` | `medium` | `high` | `critical` (matches `incident_severity_levels.severity_code` seeds).
+
+#### Success Response (201)
+
+```json
+{
+  "message": "Intake classified on emergency (999) path",
+  "emergency_call": {},
+  "emergency_incident": {},
+  "incident_report_link": {},
+  "intake": {}
+}
+```
+
+#### Example Error (422)
+
+`EMERGENCY_INCIDENT_REQUIRES_LOCATION` when the intake has no `reported_location_id`.
+
+#### Example Error (403)
+
+`FORBIDDEN` / `Missing required permission` when the token lacks `incident.create`.
 
