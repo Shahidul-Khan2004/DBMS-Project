@@ -1,5 +1,6 @@
 import pool, { query } from "../config/db.js";
 import BackendError from "../lib/BackendError.js";
+import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 
 function isDuplicateIntakeIdentityError(error) {
   return (
@@ -126,7 +127,7 @@ export async function createIntakeReport(params) {
         params.summary,
         params.description ?? null,
         params.receivedByUserId ?? null,
-        params.reportedAt ?? null,
+        toMySqlDateTimeOrNull(params.reportedAt),
       ],
     );
 

@@ -477,7 +477,7 @@ Sent when `urgencyType` is `emergency` but the token does not include `incident.
 
 ### POST `/intake/reports/:reportPublicUuid/classify/service-case`
 
-Branches an existing intake into a **service case**. Intended permission when RBAC is enforced: `case.create`.
+Branches an existing intake into a **service case**. **Required role:** `dispatcher` or `system_admin` (citizens cannot call this endpoint).
 
 SQL: **INTAKE-002** in `docs/tickets-intake-gateway-fe-db.md`. Until implemented: **501** `INTAKE_GATEWAY_REPOSITORY_PENDING`.
 
@@ -531,13 +531,26 @@ If `title` is omitted, the service uses the intake `summary`.
 
 `SERVICE_CASE_REQUIRES_REPORTER_USER` if the intake has no `reporter_user_id` (schema requires it on `service_cases`).
 
+#### Example Error (403)
+
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Missing required role"
+  }
+}
+```
+
+Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
+
 ---
 
 ## 9) Classify Intake → Emergency Path (999)
 
 ### POST `/intake/reports/:reportPublicUuid/classify/emergency`
 
-Branches an intake into the **999 / emergency** path: creates `emergency_calls`, `emergency_incidents`, and `incident_report_links`, and moves intake to `linked_to_incident`. **Required permission:** `incident.create`. This is **not** available to default **citizen** accounts; use a **dispatcher** or **system_admin** token (see bootstrap role grants). Web-portal citizens cannot open the emergency incident path themselves.
+Branches an intake into the **999 / emergency** path: creates `emergency_calls`, `emergency_incidents`, and `incident_report_links`, and moves intake to `linked_to_incident`. **Required role:** `dispatcher` or `system_admin` only (not merely `incident.create`; citizens and other roles cannot call this even if they somehow hold other permissions). Same roles apply when escalating an intake already `linked_to_case` to the emergency path.
 
 SQL: **INTAKE-003** in `docs/tickets-intake-gateway-fe-db.md`. Until implemented: **501** `INTAKE_GATEWAY_REPOSITORY_PENDING`.
 
@@ -584,5 +597,14 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 #### Example Error (403)
 
-`FORBIDDEN` / `Missing required permission` when the token lacks `incident.create`.
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Missing required role"
+  }
+}
+```
+
+Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
 

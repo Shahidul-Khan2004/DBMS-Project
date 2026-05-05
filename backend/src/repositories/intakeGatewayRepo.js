@@ -1,4 +1,5 @@
 import BackendError from "../lib/BackendError.js";
+import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import pool from "../config/db.js";
 
 async function findCaseStatusId(conn, statusCode) {
@@ -252,9 +253,9 @@ export async function createEmergency999PathFromIntake(params) {
         params.intake.id,
         params.emergencyCall.dispatcherId,
         params.emergencyCall.callerPhoneNumber ?? null,
-        params.emergencyCall.callStartedAt,
-        params.emergencyCall.callEndedAt ?? null,
-        params.emergencyCall.triagedAt ?? null,
+        toMySqlDateTimeOrNull(params.emergencyCall.callStartedAt),
+        toMySqlDateTimeOrNull(params.emergencyCall.callEndedAt),
+        toMySqlDateTimeOrNull(params.emergencyCall.triagedAt),
       ],
     );
 
@@ -287,7 +288,7 @@ export async function createEmergency999PathFromIntake(params) {
         params.incident.title,
         params.incident.description ?? null,
         params.actorUserId,
-        params.incident.reportedAt ?? null,
+        toMySqlDateTimeOrNull(params.incident.reportedAt),
       ],
     );
 
