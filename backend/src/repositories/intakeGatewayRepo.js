@@ -50,7 +50,13 @@ async function findSeverityLevelId(conn, severityCode) {
   return rows[0].id;
 }
 
-async function updateIntakeStatus(conn, intakeReportId, status, actorUserId, note) {
+export async function updateIntakeReportStatusInTransaction(
+  conn,
+  intakeReportId,
+  status,
+  actorUserId,
+  note,
+) {
   await conn.execute(
     `
       UPDATE intake_reports
@@ -138,7 +144,7 @@ export async function createServiceCaseFromIntake(params) {
       ],
     );
 
-    await updateIntakeStatus(
+    await updateIntakeReportStatusInTransaction(
       conn,
       params.intake.id,
       "linked_to_case",
@@ -330,7 +336,7 @@ export async function createEmergency999PathFromIntake(params) {
       ],
     );
 
-    await updateIntakeStatus(
+    await updateIntakeReportStatusInTransaction(
       conn,
       params.intake.id,
       "linked_to_incident",
