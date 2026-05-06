@@ -120,6 +120,50 @@ function formatIntakeRow(row) {
   };
 }
 
+const PENDING_CLASSIFICATION_CLAUSE = "ir.intake_status IN ('received', 'under_review')";
+
+/** Intake reports awaiting classification/triage for dispatcher dashboard counts. */
+export async function countIntakeReportsPendingClassification() {
+  const { rows } = await query(
+    `
+      SELECT COUNT(*) AS cnt
+      ${INTAKE_FROM}
+      WHERE ${PENDING_CLASSIFICATION_CLAUSE}
+    `,
+    [],
+  );
+  const cnt = rows[0]?.cnt;
+  return typeof cnt === "bigint" ? Number(cnt) : Number(cnt ?? 0);
+}
+
+/**
+ * Recent pending-classification intake rows for dispatcher overview merge.
+ */
+export async function listRecentIntakeReportsPendingClassification(limit) {
+  const capped = Math.min(Math.max(Number(limit) || 10, 1), 50);
+
+  const { rows } = await query(
+    `
+      ${INTAKE_SELECT},
+      TIMESTAMPDIFF(MINUTE, ir.reported_at, CURRENT_TIMESTAMP) AS age_minutes
+      ${INTAKE_FROM}
+      WHERE ${PENDING_CLASSIFICATION_CLAUSE}
+      ORDER BY ir.reported_at DESC
+      LIMIT ?
+    `,
+    [capped],
+  );
+
+  return rows.map((row) => ({
+    public_uuid: row.public_uuid,
+    summary: row.summary,
+    intake_status: row.intake_status,
+    category_code: row.category_code,
+    reported_at: row.reported_at,
+    age_minutes: Number(row.age_minutes ?? 0),
+  }));
+}
+
 export async function findIntakeReportDetailForOperations(publicUuid) {
   const { rows } = await query(
     `

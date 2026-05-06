@@ -26,10 +26,17 @@ import {
   validateOperationsPromoteEmergency,
   validateOperationsReportUuidParam,
 } from "../validators/operations.js";
+import { getOperationsDispatcherOverview } from "../controllers/operationsDispatcherOverview.js";
 
 const router = express.Router();
 
 router.use(requireAuth);
+
+router.get(
+  "/dispatcher/overview",
+  requirePermission("incident.classify"),
+  getOperationsDispatcherOverview,
+);
 
 router.get(
   "/intake-reports",
