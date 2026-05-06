@@ -12,9 +12,48 @@ interface RegisterFormProps {
   onSuccess?: (data: RegisterResponse) => void;
 }
 
+function PasswordToggleIcon({ visible }: { visible: boolean }) {
+  if (visible) {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-5 w-5"
+      >
+        <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M4 4l16 16" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -107,20 +146,44 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
 
       <Input
         label="Password"
-        type="password"
+        type={showPassword ? "text" : "password"}
         placeholder="Create a password"
         {...register("password")}
         error={errors.password?.message}
         helpText="Minimum 8 characters."
+        endElement={
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            aria-pressed={showPassword}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            title={showPassword ? "Hide password" : "Show password"}
+            className="inline-flex items-center justify-center text-black transition-colors hover:text-gray-800"
+          >
+            <PasswordToggleIcon visible={showPassword} />
+          </button>
+        }
         required
       />
 
       <Input
         label="Confirm Password"
-        type="password"
+        type={showConfirmPassword ? "text" : "password"}
         placeholder="Confirm your password"
         {...register("rePassword")}
         error={errors.rePassword?.message}
+        endElement={
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword((current) => !current)}
+            aria-pressed={showConfirmPassword}
+            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+            title={showConfirmPassword ? "Hide password" : "Show password"}
+            className="inline-flex items-center justify-center text-black transition-colors hover:text-gray-800"
+          >
+            <PasswordToggleIcon visible={showConfirmPassword} />
+          </button>
+        }
         required
       />
 
