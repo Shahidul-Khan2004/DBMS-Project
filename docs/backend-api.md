@@ -388,7 +388,7 @@ Option A (recommended for now): send a typed address string.
 ```json
 {
   "channelCode": "web_portal",
-  "categoryCode": "relief_request",
+  "categoryCode": "medical",
   "summary": "Road blocked by fallen tree",
   "description": "Optional longer text",
   "urgencyType": "non_emergency",
@@ -402,7 +402,7 @@ Option B: send the structured location object (existing format).
 ```json
 {
   "channelCode": "web_portal",
-  "categoryCode": "relief_request",
+  "categoryCode": "medical",
   "summary": "Road blocked by fallen tree",
   "description": "Optional longer text",
   "urgencyType": "non_emergency",
@@ -473,7 +473,80 @@ Sent when `urgencyType` is `emergency` but the token does not include `incident.
 
 ---
 
-## 8) Classify Intake → Service Case (Non-Emergency)
+## 8) Get My Intake Reports
+
+### GET `/intake/reports/my`
+
+Returns all intake reports created by the authenticated user (newest first).
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Body
+
+No request body.
+
+#### Success Response (200)
+
+```json
+{
+  "reports": [
+    {
+      "public_uuid": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
+      "report_code": "IR-MA4SJP2K-9C2E2EAA",
+      "summary": "Road blocked by fallen tree",
+      "description": "Optional longer text",
+      "urgency_type": "non_emergency",
+      "intake_status": "received",
+      "final_disposition": null,
+      "reported_at": "2026-05-04T12:00:00.000Z",
+      "created_at": "2026-05-04T12:00:00.000Z",
+      "channel_code": "web_portal",
+      "category_code": "medical",
+      "location_text": "House 12, Road 3, Dhanmondi, Dhaka"
+    }
+  ]
+}
+```
+
+---
+
+## 9) Get My Intake Report Stats
+
+### GET `/intake/reports/my/stats`
+
+Returns dashboard counters for the authenticated user.
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Body
+
+No request body.
+
+#### Success Response (200)
+
+```json
+{
+  "stats": {
+    "totalReports": 5,
+    "pendingReports": 3,
+    "resolvedReports": 2
+  }
+}
+```
+
+---
+
+## 10) Classify Intake → Service Case (Non-Emergency)
 
 ### POST `/intake/reports/:reportPublicUuid/classify/service-case`
 
@@ -546,7 +619,7 @@ Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
 
 ---
 
-## 9) Classify Intake → Emergency Path (999)
+## 11) Classify Intake → Emergency Path (999)
 
 ### POST `/intake/reports/:reportPublicUuid/classify/emergency`
 
@@ -607,4 +680,3 @@ Authorization: Bearer <ACCESS_TOKEN>
 ```
 
 Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
-

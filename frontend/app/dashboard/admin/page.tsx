@@ -69,6 +69,25 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
+        <div className="md:col-span-3">
+          <RoleAssignmentForm />
+        </div>
+
+        {/* Admin Actions */}
+        <Card className="shadow-md md:col-span-3">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Management</h2>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button>Manage Users</Button>
+              <Button>Assign Roles</Button>
+              <Button variant="secondary">View System Logs</Button>
+              <Button variant="secondary">System Settings</Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* System Stats */}
         <Card className="shadow-md">
           <CardHeader>
@@ -105,25 +124,6 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Admin Actions */}
-        <Card className="shadow-md md:col-span-3">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Management</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button>Manage Users</Button>
-              <Button>Assign Roles</Button>
-              <Button variant="secondary">View System Logs</Button>
-              <Button variant="secondary">System Settings</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="md:col-span-3">
-          <RoleAssignmentForm />
-        </div>
       </div>
     </DashboardLayout>
   );

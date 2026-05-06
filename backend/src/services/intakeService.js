@@ -4,6 +4,8 @@ import { findUserByPublicUuid } from "../repositories/userRepo.js";
 import {
   createIntakeReport,
   findIntakeReportByPublicUuid,
+  getIntakeReportStatsByReporterUserId,
+  listIntakeReportsByReporterUserId,
 } from "../repositories/intakeRepo.js";
 import {
   createEmergency999PathFromIntake,
@@ -161,4 +163,22 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
       linkType: "primary_report",
     },
   });
+}
+
+export async function listMyIntakeReports(actorPublicUuid) {
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+
+  return listIntakeReportsByReporterUserId(userRow.id);
+}
+
+export async function getMyIntakeReportStats(actorPublicUuid) {
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+
+  return getIntakeReportStatsByReporterUserId(userRow.id);
 }

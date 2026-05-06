@@ -8,6 +8,20 @@ export async function createIntakeReport(req, res) {
   });
 }
 
+export async function getMyIntakeReports(req, res) {
+  const reports = await intakeService.listMyIntakeReports(req.user.id);
+  res.status(200).json({
+    reports,
+  });
+}
+
+export async function getMyIntakeReportStats(req, res) {
+  const stats = await intakeService.getMyIntakeReportStats(req.user.id);
+  res.status(200).json({
+    stats,
+  });
+}
+
 export async function classifyServiceCase(req, res) {
   const result = await intakeService.classifyIntakeAsServiceCase(
     req.user.id,
