@@ -53,6 +53,7 @@ All API errors return this structure:
 - `GET /intake/reports/my` · `GET /intake/reports/my/stats`
 - `POST /intake/reports/:reportPublicUuid/classify/service-case`
 - `POST /intake/reports/:reportPublicUuid/classify/emergency`
+- `GET /operations/dispatcher/overview`
 - `GET /operations/intake-reports`
 - `GET /operations/intake-reports/:reportPublicUuid`
 - `POST /operations/intake-reports/:reportPublicUuid/promote/emergency`
@@ -694,7 +695,69 @@ Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
 
 ---
 
-## 12) List Intake Reports (Operations Queue)
+## 12) Dispatcher Overview (operations dashboard)
+
+### GET `/operations/dispatcher/overview`
+
+Read-only rollup for dispatcher UIs: summary **counts** and a **recent** timeline merged from intake reports pending classification, non-terminal emergency incidents, and open service cases. **Required permission:** `incident.classify` (dispatcher and system administrator roles receive this permission in seeded RBAC).
+
+#### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+#### Count semantics (`counts`)
+
+| Field | Predicate |
+| --- | --- |
+| `intake_reports_pending_classification` | `intake_reports.intake_status` is `received` **or** `under_review`. |
+| `incidents_active` | Current `incident_statuses.is_terminal` is `FALSE`. |
+| `service_cases_open` | Current `case_statuses.is_terminal` is `FALSE` (aligned with queue logic used by `vw_admin_case_queue`). |
+
+#### Recent timeline (`recent`)
+
+Each source loads up to **10** newest rows (`reported_at` for intakes/incidents; `created_at` for service cases). The backend merges rows by **`occurred_at`** descending (ISO 8601) and returns at most **15** items.
+
+Every element:
+
+| Field | Notes |
+| --- | --- |
+| `kind` | `intake_report` \| `incident` \| `service_case`. |
+| `public_uuid` | Public identifier for correlation with other `/operations/*` payloads. |
+| `summary` | Intake summary, incident title, or service-case title (empty string allowed). |
+| `status` | Intake uses `intake_status`; incidents use incident `status_code`; service cases use case `status_code`. |
+| `category` | `report_categories.category_code` for each entity. |
+| `occurred_at` | Canonical sort key normalized to UTC ISO timestamps. |
+| `age_minutes` | Whole minutes elapsed between `TIMESTAMPDIFF` anchors used in repositories (reported versus created timestamps per kind). |
+
+#### Success Response (200)
+
+```json
+{
+  "counts": {
+    "intake_reports_pending_classification": 2,
+    "incidents_active": 5,
+    "service_cases_open": 4
+  },
+  "recent": [
+    {
+      "kind": "incident",
+      "public_uuid": "f3c2bb6c-1111-4a2e-9c61-aaaaaaaaaaaa",
+      "summary": "Power line down",
+      "status": "reported",
+      "category": "infrastructure_emergency",
+      "occurred_at": "2026-05-06T07:41:03.000Z",
+      "age_minutes": 18
+    }
+  ]
+}
+```
+
+---
+
+## 13) List Intake Reports (Operations Queue)
 
 ### GET `/operations/intake-reports`
 
@@ -751,7 +814,7 @@ Missing `incident.classify`: `FORBIDDEN` / `Missing required permission`.
 
 ---
 
-## 13) Get Intake Report (Operations)
+## 14) Get Intake Report (Operations)
 
 ### GET `/operations/intake-reports/:reportPublicUuid`
 
@@ -791,7 +854,7 @@ Single intake row in the same shape as list items. **Required permission:** `inc
 
 ---
 
-## 14) Promote Intake to Emergency (Operations)
+## 15) Promote Intake to Emergency (Operations)
 
 ### POST `/operations/intake-reports/:reportPublicUuid/promote/emergency`
 
@@ -850,7 +913,7 @@ Returns the created incident snapshot (`mapIncidentDetail` shape):
 
 ---
 
-## 15) Create Emergency Incident (Operations)
+## 16) Create Emergency Incident (Operations)
 
 ### POST `/operations/incidents`
 
@@ -891,7 +954,7 @@ Location object matches intake create: `latitude`, `longitude`, `address_text`, 
 
 ---
 
-## 16) List Emergency Incidents (Operations)
+## 17) List Emergency Incidents (Operations)
 
 ### GET `/operations/incidents`
 
@@ -936,7 +999,7 @@ Results are ordered by `reported_at` descending.
 
 ---
 
-## 17) Get Emergency Incident (Operations)
+## 18) Get Emergency Incident (Operations)
 
 ### GET `/operations/incidents/:incidentPublicUuid`
 
@@ -978,7 +1041,7 @@ Results are ordered by `reported_at` descending.
 
 ---
 
-## 18) Patch Emergency Incident Status (Operations)
+## 19) Patch Emergency Incident Status (Operations)
 
 ### PATCH `/operations/incidents/:incidentPublicUuid/status`
 
@@ -1016,7 +1079,7 @@ Updates current status with server-side transition rules. **Required permission:
 
 ---
 
-## 19) Add Operator Note to Incident (Operations)
+## 20) Add Operator Note to Incident (Operations)
 
 ### POST `/operations/incidents/:incidentPublicUuid/notes`
 

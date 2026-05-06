@@ -543,6 +543,60 @@ function mapIncidentListRow(row) {
   };
 }
 
+const ACTIVE_INCIDENT_BASE = `
+  FROM emergency_incidents ei
+  INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+  INNER JOIN report_categories rcat ON rcat.id = ei.category_id AND rcat.is_active = TRUE
+  INNER JOIN incident_severity_levels sev ON sev.id = ei.severity_level_id
+`;
+
+/** Incidents whose current incident_status is non-terminal (dispatcher overview count). */
+export async function countActiveIncidentsForOperations() {
+  const { rows } = await query(
+    `
+      SELECT COUNT(*) AS cnt
+      ${ACTIVE_INCIDENT_BASE}
+      WHERE ist.is_terminal = FALSE
+    `,
+    [],
+  );
+  const cnt = rows[0]?.cnt;
+  return typeof cnt === "bigint" ? Number(cnt) : Number(cnt ?? 0);
+}
+
+/**
+ * Recent active incidents for dispatcher overview merge (age from reported_at).
+ */
+export async function listRecentActiveIncidentsForOverview(limit) {
+  const capped = Math.min(Math.max(Number(limit) || 10, 1), 50);
+
+  const { rows } = await query(
+    `
+      SELECT
+        ei.public_uuid AS public_uuid,
+        ei.title AS title,
+        ist.status_code AS status_code,
+        rcat.category_code AS category_code,
+        ei.reported_at AS reported_at,
+        TIMESTAMPDIFF(MINUTE, ei.reported_at, CURRENT_TIMESTAMP) AS age_minutes
+      ${ACTIVE_INCIDENT_BASE}
+      WHERE ist.is_terminal = FALSE
+      ORDER BY ei.reported_at DESC
+      LIMIT ?
+    `,
+    [capped],
+  );
+
+  return rows.map((row) => ({
+    public_uuid: row.public_uuid,
+    title: row.title,
+    status_code: row.status_code,
+    category_code: row.category_code,
+    reported_at: row.reported_at,
+    age_minutes: Number(row.age_minutes ?? 0),
+  }));
+}
+
 async function loadIncidentDetailRow(conn, publicUuid) {
   const [rows] = await conn.execute(
     `
