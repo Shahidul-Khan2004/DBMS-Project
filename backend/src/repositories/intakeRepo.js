@@ -223,3 +223,65 @@ export async function findIntakeReportByPublicUuid(publicUuid) {
 
   return result.rows[0] || null;
 }
+
+export async function listIntakeReportsByReporterUserId(reporterUserId) {
+  const result = await query(
+    `
+      SELECT
+        ir.public_uuid,
+        ir.report_code,
+        ir.summary,
+        ir.description,
+        ir.urgency_type,
+        ir.intake_status,
+        ir.final_disposition,
+        ir.reported_at,
+        ir.created_at,
+        rc.channel_code,
+        rcat.category_code,
+        l.address_text AS location_text
+      FROM intake_reports ir
+      INNER JOIN report_channels rc ON rc.id = ir.channel_id
+      INNER JOIN report_categories rcat ON rcat.id = ir.category_id
+      LEFT JOIN locations l ON l.id = ir.reported_location_id
+      WHERE ir.reporter_user_id = ?
+      ORDER BY ir.created_at DESC
+    `,
+    [reporterUserId],
+  );
+
+  return result.rows;
+}
+
+export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
+  const result = await query(
+    `
+      SELECT
+        COUNT(*) AS total_reports,
+        SUM(
+          CASE
+            WHEN intake_status IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
+            THEN 1
+            ELSE 0
+          END
+        ) AS pending_reports,
+        SUM(
+          CASE
+            WHEN intake_status IN ('duplicate', 'false_report', 'closed')
+            THEN 1
+            ELSE 0
+          END
+        ) AS resolved_reports
+      FROM intake_reports
+      WHERE reporter_user_id = ?
+    `,
+    [reporterUserId],
+  );
+
+  const row = result.rows[0] || {};
+  return {
+    totalReports: Number(row.total_reports || 0),
+    pendingReports: Number(row.pending_reports || 0),
+    resolvedReports: Number(row.resolved_reports || 0),
+  };
+}

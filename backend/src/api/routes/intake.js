@@ -3,6 +3,8 @@ import {
   classifyEmergency999,
   classifyServiceCase,
   createIntakeReport,
+  getMyIntakeReports,
+  getMyIntakeReportStats,
 } from "../controllers/intake.js";
 import {
   forbidEmergencyUrgencyWithoutIncidentClassify,
@@ -19,6 +21,9 @@ import {
 const router = express.Router();
 
 router.use(requireAuth);
+
+router.get("/reports/my", getMyIntakeReports);
+router.get("/reports/my/stats", getMyIntakeReportStats);
 
 router.post(
   "/reports",
