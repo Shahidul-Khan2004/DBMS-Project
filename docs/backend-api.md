@@ -875,7 +875,16 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 #### Body
 
-Same validation shape as **`POST /intake/reports/:reportPublicUuid/classify/emergency`**: required `severityCode`; optional `incidentTitle`, `incidentDescription`, `callerPhoneNumber`, `callStartedAt`, **`reportedAt`** (operators may override reported time).
+```json
+{
+  "severityCode": "high",
+  "incidentTitle": "Unconscious patient near gate 2",
+  "incidentDescription": "Security team found a person unresponsive and requested ambulance support.",
+  "callerPhoneNumber": "+8801700000000",
+  "callStartedAt": "2026-05-04T12:03:00.000Z",
+  "reportedAt": "2026-05-04T12:05:00.000Z"
+}
+```
 
 #### Success Response (201)
 
@@ -933,7 +942,18 @@ Creates a standalone **or** intake-linked emergency incident. **Required permiss
 }
 ```
 
-**B — Standalone incident** (no intake): provide **`categoryCode`**, **`location`** (non-empty string or structured location object), **`severityCode`**, and **`title`** (required when not linking an intake). Optional `description`, `reportedAt`.
+**B — Standalone incident** (no intake):
+
+```json
+{
+  "categoryCode": "medical",
+  "severityCode": "high",
+  "title": "Worker collapsed near loading dock",
+  "description": "On-site medic requested immediate ambulance dispatch.",
+  "reportedAt": "2026-05-04T12:00:00.000Z",
+  "location": "House 12, Road 3, Dhanmondi, Dhaka"
+}
+```
 
 Location object matches intake create: `latitude`, `longitude`, `address_text`, optional `place_name`, `admin_area_id`, optional `source` (`user_shared` \| `dispatcher_selected` \| `api_geocoded` \| `manual_entry`).
 
