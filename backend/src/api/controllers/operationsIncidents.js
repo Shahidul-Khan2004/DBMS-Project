@@ -12,9 +12,10 @@ export async function createOperationsIncident(req, res) {
 }
 
 export async function promoteIntakeToEmergency(req, res) {
+  const params = req.validated?.params ?? req.params;
   const incident = await incidentOperationsService.operationsPromoteIntakeEmergency(
     req.actorUserId,
-    req.params.reportPublicUuid,
+    params.reportPublicUuid,
     req.body,
   );
   res.status(201).json({
@@ -24,21 +25,24 @@ export async function promoteIntakeToEmergency(req, res) {
 }
 
 export async function listOperationsIncidents(req, res) {
-  const result = await incidentOperationsService.operationsListIncidents(req.query);
+  const query = req.validated?.query ?? req.query;
+  const result = await incidentOperationsService.operationsListIncidents(query);
   res.status(200).json(result);
 }
 
 export async function getOperationsIncident(req, res) {
+  const params = req.validated?.params ?? req.params;
   const result = await incidentOperationsService.operationsGetIncident(
-    req.params.incidentPublicUuid,
+    params.incidentPublicUuid,
   );
   res.status(200).json(result);
 }
 
 export async function patchOperationsIncidentStatus(req, res) {
+  const params = req.validated?.params ?? req.params;
   const incident = await incidentOperationsService.operationsPatchIncidentStatus(
     req.actorUserId,
-    req.params.incidentPublicUuid,
+    params.incidentPublicUuid,
     req.body,
   );
   res.status(200).json({
@@ -48,9 +52,10 @@ export async function patchOperationsIncidentStatus(req, res) {
 }
 
 export async function postOperationsIncidentNote(req, res) {
+  const params = req.validated?.params ?? req.params;
   const note = await incidentOperationsService.operationsAddIncidentNote(
     req.actorUserId,
-    req.params.incidentPublicUuid,
+    params.incidentPublicUuid,
     req.body,
   );
   res.status(201).json({

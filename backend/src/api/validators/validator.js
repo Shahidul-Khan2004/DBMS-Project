@@ -18,7 +18,8 @@ export default function validate(schemaName, schema, requestProperty = "body") {
       );
     }
 
-    req[requestProperty] = result.data;
+    req.validated ??= {};
+    req.validated[requestProperty] = result.data;
     next();
   };
 }
