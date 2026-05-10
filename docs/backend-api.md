@@ -399,21 +399,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 #### Body
 
-Option A (recommended for now): send a typed address string.
-
-```json
-{
-  "channelCode": "web_portal",
-  "categoryCode": "medical",
-  "summary": "Road blocked by fallen tree",
-  "description": "Optional longer text",
-  "urgencyType": "non_emergency",
-  "reportedAt": "2026-05-04T12:00:00.000Z",
-  "location": "House 12, Road 3, Dhanmondi, Dhaka"
-}
-```
-
-Option B: send the structured location object (existing format).
+Structured `location` (omit `location` and `locationId` entirely if the reporter has no coordinates yet):
 
 ```json
 {
@@ -426,7 +412,7 @@ Option B: send the structured location object (existing format).
   "location": {
     "latitude": 23.8103,
     "longitude": 90.4125,
-    "address_text": "Dhaka",
+    "address_text": "House 12, Road 3, Dhanmondi, Dhaka",
     "place_name": "Optional label",
     "admin_area_id": 1,
     "source": "user_shared"
@@ -434,13 +420,23 @@ Option B: send the structured location object (existing format).
 }
 ```
 
+Or reference a row created earlier with **`POST /locations`** (citizen-owned `locations.public_uuid`):
+
+```json
+{
+  "channelCode": "web_portal",
+  "categoryCode": "medical",
+  "summary": "Road blocked by fallen tree",
+  "locationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
 - `urgencyType`: `non_emergency` | `emergency` | `unknown` (optional; default `unknown`). **Portal / citizen callers must not send `emergency`:** only users with permission `incident.classify` (e.g. **dispatcher**, **system_admin** per bootstrap) may set that value. Everyone else should use `unknown` or `non_emergency`; an operator promotes the report to the emergency path using `POST /intake/reports/:reportPublicUuid/classify/emergency` when appropriate.
 - `reportedAt`: optional ISO datetime.
-- `location`: optional on create, accepts either:
-  - a non-empty string (typed by citizen/dispatcher), or
-  - an object with `latitude`, `longitude`, `address_text`, optional `place_name`, optional `admin_area_id`, optional `source`.
-- If `location` is provided as a string, backend currently stores it as `locations.address_text` and uses temporary `0/0` coordinates until map integration is added.
-- `location` should be provided if the report may later take the emergency classification path (`current_location_id` on `emergency_incidents` is NOT NULL).
+- **`location`**: optional object with `latitude`, `longitude`, `address_text` (required, non-blank), optional `place_name`, optional `admin_area_id`, optional `source` (`user_shared` \| `dispatcher_selected` \| `api_geocoded` \| `manual_entry`). **Do not send** `location` and **`locationId`** together.
+- **`locationId`**: optional UUID — must match `locations.public_uuid` and belong to the reporter.
+- Plain string **`location`** is **not** accepted (validation requires the structured object).
+- Provide a real location (inline or `locationId`) if the report may later take the emergency classification path (`reported_location_id` is required for those flows).
 
 #### Success Response (201)
 
