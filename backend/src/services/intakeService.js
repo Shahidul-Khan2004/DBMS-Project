@@ -57,6 +57,7 @@ export async function createIntakeReportForUser(actorPublicUuid, body) {
     reportedAt: body.reportedAt ?? null,
     receivedByUserId: null,
     location: body.location ?? null,
+    locationId: body.locationId ?? null,
     createdByUserPublicUuid: actorPublicUuid,
   });
 }
