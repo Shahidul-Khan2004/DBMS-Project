@@ -34,14 +34,31 @@ export interface IntakeReportStatsResponse {
   stats: IntakeReportStats;
 }
 
+export type IntakeLocationSource =
+  | "user_shared"
+  | "dispatcher_selected"
+  | "api_geocoded"
+  | "manual_entry";
+
+/** Structured `location` on create intake / operations (matches backend `locationObjectSchema`). */
+export interface IntakeStructuredLocation {
+  latitude: number;
+  longitude: number;
+  address_text: string;
+  place_name?: string;
+  admin_area_id?: number;
+  source?: IntakeLocationSource;
+}
+
 export interface CreateIntakeReportRequest {
   channelCode: string;
   categoryCode: string;
   summary: string;
   description?: string;
-  urgencyType?: "non_emergency" | "unknown";
+  urgencyType?: "non_emergency" | "emergency" | "unknown";
   reportedAt?: string;
-  location?: string;
+  location?: IntakeStructuredLocation;
+  locationId?: string;
 }
 
 export interface CreateIntakeReportResponse {
