@@ -16,9 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-gray-50 antialiased`}>
-        <main className="flex-1 overflow-auto bg-gray-50 p-6">{children}</main>
+    <html lang="en" className="min-h-screen">
+      <body
+        className={`${inter.className} min-h-screen bg-gray-50 antialiased`}
+      >
+        <main className="min-h-screen bg-gray-50">{children}</main>
       </body>
     </html>
   );
