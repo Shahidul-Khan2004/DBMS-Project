@@ -154,6 +154,22 @@ export default function DispatcherDashboard() {
             </p>
             <p className="mt-2 text-sm text-gray-500">User ID: {user?.id}</p>
             <p className="mt-2 text-sm text-gray-500">{user?.email}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => router.push("/dashboard/dispatcher/intake-reports")}
+              >
+                View Intake Reports
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => router.push("/dashboard/dispatcher/incidents")}
+              >
+                View Incidents
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
