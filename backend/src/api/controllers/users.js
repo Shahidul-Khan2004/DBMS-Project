@@ -1,7 +1,8 @@
 import { assignRoleToUserByPublicId } from "../../services/rbacService.js";
 
 export async function assignRoleToUser(req, res) {
-  const { userId } = req.params;
+  const params = req.validated?.params ?? req.params;
+  const { userId } = params;
   const { roleCode } = req.body;
 
   const result = await assignRoleToUserByPublicId({
