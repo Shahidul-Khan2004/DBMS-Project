@@ -1,7 +1,7 @@
 import pool, { query } from "../config/db.js";
 
 // New users are inserted with this status so they can log in immediately. The `users` table default
-// in schema.sql is `pending_verification`; change this constant (and docs) if you require activation first.
+// in docker-init seed is `pending_verification`; change this constant (and docs) if you require activation first.
 const REGISTRATION_ACCOUNT_STATUS = "active";
 
 const userSelect = `
