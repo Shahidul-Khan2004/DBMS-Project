@@ -1,6 +1,12 @@
 import pool, { query } from "../config/db.js";
 import BackendError from "../lib/BackendError.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
+import {
+  requireAdministrativeAreaInTransaction,
+  requireReporterOwnedLocationId,
+} from "../domain/locationAccess.js";
+import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
+import { insertLocationInTransaction } from "./locationRepo.js";
 
 function isDuplicateIntakeIdentityError(error) {
   return (
@@ -49,6 +55,17 @@ async function findReportCategoryId(conn, categoryCode) {
  * @returns {Promise<{ public_uuid: string, report_code: string, id: bigint }>}
  */
 export async function createIntakeReport(params) {
+  let gpsResolvedAdminAreaId = null;
+  if (params.location && !params.locationId && params.location.admin_area_id == null) {
+    const r = await resolveAdminAreaIdForLocationPayload({
+      explicitAdminAreaId: null,
+      latitude: params.location.latitude,
+      longitude: params.location.longitude,
+      pool,
+    });
+    gpsResolvedAdminAreaId = r.adminAreaId;
+  }
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -57,43 +74,32 @@ export async function createIntakeReport(params) {
     const categoryId = await findReportCategoryId(conn, params.categoryCode);
 
     let reportedLocationId = null;
-    if (params.location) {
-      const normalizedLocation =
-        typeof params.location === "string"
-          ? {
-              admin_area_id: null,
-              latitude: 0,
-              longitude: 0,
-              address_text: params.location,
-              place_name: null,
-              source: "manual_entry",
-            }
-          : params.location;
-
-      const [locationResult] = await conn.execute(
-        `
-          INSERT INTO locations (
-            admin_area_id,
-            latitude,
-            longitude,
-            address_text,
-            place_name,
-            source,
-            created_by_user_id
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          normalizedLocation.admin_area_id ?? null,
-          normalizedLocation.latitude,
-          normalizedLocation.longitude,
-          normalizedLocation.address_text,
-          normalizedLocation.place_name ?? null,
-          normalizedLocation.source ?? "user_shared",
-          params.reporterUserId ?? null,
-        ],
+    if (params.locationId) {
+      reportedLocationId = await requireReporterOwnedLocationId(
+        conn,
+        params.locationId,
+        params.reporterUserId,
       );
-      reportedLocationId = locationResult.insertId;
+    } else if (params.location) {
+      const normalizedLocation = {
+        ...params.location,
+        source: params.location.source ?? "user_shared",
+      };
+      const adminAreaIdToUse =
+        normalizedLocation.admin_area_id ?? gpsResolvedAdminAreaId ?? null;
+      if (adminAreaIdToUse != null) {
+        await requireAdministrativeAreaInTransaction(conn, adminAreaIdToUse);
+      }
+      const inserted = await insertLocationInTransaction(conn, {
+        admin_area_id: adminAreaIdToUse,
+        latitude: normalizedLocation.latitude,
+        longitude: normalizedLocation.longitude,
+        address_text: normalizedLocation.address_text,
+        place_name: normalizedLocation.place_name ?? null,
+        source: normalizedLocation.source,
+        created_by_user_id: params.reporterUserId ?? null,
+      });
+      reportedLocationId = Number(inserted.id);
     }
 
     const [intakeResult] = await conn.execute(

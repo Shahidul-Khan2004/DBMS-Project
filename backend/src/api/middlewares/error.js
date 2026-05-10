@@ -18,8 +18,12 @@ export function errorHandler(err, req, res, next) {
     let message = err.message || "An unexpected error occurred.";
 
     if (statusCode >= 500) {
+      const barikoiOpsError =
+        typeof err.code === "string" && err.code.startsWith("BARIKOI_");
+      if (!barikoiOpsError) {
         message = "internal server error";
-        console.error(err);
+      }
+      console.error(err);
     }
 
     const body = { error: { code, message } };

@@ -90,6 +90,7 @@ export async function operationsCreateStandaloneIncident(actorUserId, body) {
     title: body.title ?? null,
     description: body.description ?? null,
     location: body.location ?? null,
+    locationId: body.locationId ?? null,
     reportedAt: body.reportedAt ?? null,
     intakeReportPublicUuid: body.intakeReportPublicUuid ?? null,
   });

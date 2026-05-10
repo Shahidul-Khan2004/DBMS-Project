@@ -4,6 +4,12 @@ import pool from "../config/db.js";
 import { query } from "../config/db.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import { updateIntakeReportStatusInTransaction } from "./intakeGatewayRepo.js";
+import {
+  requireAdministrativeAreaInTransaction,
+  requireLocationIdByPublicUuid,
+} from "../domain/locationAccess.js";
+import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
+import { insertLocationInTransaction } from "./locationRepo.js";
 
 const DEFAULT_INCIDENT_LIMIT = 50;
 const MAX_INCIDENT_LIMIT = 100;
@@ -79,49 +85,6 @@ async function findOutcomeId(conn, outcomeCode) {
   return rows[0].id;
 }
 
-/**
- * @param {import("mysql2/promise").PoolConnection} conn
- * @param {number | null} createdByUserId
- */
-async function insertLocationFromPayload(conn, createdByUserId, location) {
-  const normalizedLocation =
-    typeof location === "string"
-      ? {
-          admin_area_id: null,
-          latitude: 0,
-          longitude: 0,
-          address_text: location,
-          place_name: null,
-          source: "manual_entry",
-        }
-      : location;
-
-  const [locationResult] = await conn.execute(
-    `
-      INSERT INTO locations (
-        admin_area_id,
-        latitude,
-        longitude,
-        address_text,
-        place_name,
-        source,
-        created_by_user_id
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      normalizedLocation.admin_area_id ?? null,
-      normalizedLocation.latitude,
-      normalizedLocation.longitude,
-      normalizedLocation.address_text,
-      normalizedLocation.place_name ?? null,
-      normalizedLocation.source ?? "dispatcher_selected",
-      createdByUserId ?? null,
-    ],
-  );
-  return locationResult.insertId;
-}
-
 const EMERGENCY_CLASSIFIABLE_STATUSES = new Set([
   "received",
   "under_review",
@@ -162,6 +125,22 @@ async function loadIntakeRowByPublicUuid(conn, publicUuid) {
 }
 
 export async function createIncidentAdminStandalone(params) {
+  let gpsResolvedAdminAreaId = null;
+  if (
+    params.location &&
+    !params.locationId &&
+    !params.intakeReportPublicUuid &&
+    params.location.admin_area_id == null
+  ) {
+    const r = await resolveAdminAreaIdForLocationPayload({
+      explicitAdminAreaId: null,
+      latitude: params.location.latitude,
+      longitude: params.location.longitude,
+      pool,
+    });
+    gpsResolvedAdminAreaId = r.adminAreaId;
+  }
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -202,15 +181,37 @@ export async function createIncidentAdminStandalone(params) {
       if (!params.categoryCode) {
         throw new BackendError(422, "CATEGORY_REQUIRED", "categoryCode is required");
       }
-      if (params.location == null || params.location === "") {
-        throw new BackendError(422, "LOCATION_REQUIRED", "location is required");
+      if (params.location == null && params.locationId == null) {
+        throw new BackendError(422, "LOCATION_REQUIRED", "location or locationId is required");
       }
       categoryId = await findReportCategoryId(conn, params.categoryCode);
     }
 
-    const locationId = intakeRow
-      ? intakeRow.reported_location_id
-      : await insertLocationFromPayload(conn, params.actorUserId, params.location);
+    let locationId = intakeRow ? intakeRow.reported_location_id : null;
+    if (!intakeRow) {
+      if (params.locationId) {
+        locationId = await requireLocationIdByPublicUuid(conn, params.locationId);
+      } else if (params.location) {
+        const normalized = {
+          ...params.location,
+          source: params.location.source ?? "dispatcher_selected",
+        };
+        const adminAreaIdToUse = normalized.admin_area_id ?? gpsResolvedAdminAreaId ?? null;
+        if (adminAreaIdToUse != null) {
+          await requireAdministrativeAreaInTransaction(conn, adminAreaIdToUse);
+        }
+        const inserted = await insertLocationInTransaction(conn, {
+          admin_area_id: adminAreaIdToUse,
+          latitude: normalized.latitude,
+          longitude: normalized.longitude,
+          address_text: normalized.address_text,
+          place_name: normalized.place_name ?? null,
+          source: normalized.source,
+          created_by_user_id: params.actorUserId ?? null,
+        });
+        locationId = Number(inserted.id);
+      }
+    }
 
     const severityLevelId = await findSeverityLevelId(conn, params.severityCode);
     const reportedStatusId = await findIncidentStatusId(conn, "reported");

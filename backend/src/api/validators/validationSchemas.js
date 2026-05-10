@@ -32,28 +32,43 @@ const locationSourceEnum = z.enum([
   "manual_entry",
 ]);
 
-const locationObjectSchema = z.object({
+export const locationObjectSchema = z.object({
   latitude: z.number().gte(-90).lte(90),
   longitude: z.number().gte(-180).lte(180),
-  address_text: z.string().trim().min(1),
-  place_name: z.string().trim().optional(),
+  address_text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255, "address_text must be at most 255 characters"),
+  place_name: z.string().trim().max(150).optional(),
   admin_area_id: z.number().int().positive().optional(),
   source: locationSourceEnum.optional(),
 });
 
-export const createIntakeReportSchema = z.object({
-  channelCode: z.string().trim().min(1, "channelCode is required"),
-  categoryCode: z.string().trim().min(1, "categoryCode is required"),
-  summary: z
-    .string()
-    .trim()
-    .min(1, "summary is required")
-    .max(255, "summary must be at most 255 characters"),
-  description: z.string().optional(),
-  urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
-  reportedAt: z.iso.datetime({ offset: true }).optional(),
-  location: z.union([z.string().trim().min(1), locationObjectSchema]).optional(),
+/** Request body for POST /locations — source is required. */
+export const createLocationBodySchema = locationObjectSchema.extend({
+  source: locationSourceEnum,
 });
+
+export const createIntakeReportSchema = z
+  .object({
+    channelCode: z.string().trim().min(1, "channelCode is required"),
+    categoryCode: z.string().trim().min(1, "categoryCode is required"),
+    summary: z
+      .string()
+      .trim()
+      .min(1, "summary is required")
+      .max(255, "summary must be at most 255 characters"),
+    description: z.string().optional(),
+    urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
+    reportedAt: z.iso.datetime({ offset: true }).optional(),
+    location: locationObjectSchema.optional(),
+    locationId: z.uuid({ message: "Invalid location id" }).optional(),
+  })
+  .refine((data) => !(data.location && data.locationId), {
+    message: "Provide only one of location or locationId, not both",
+    path: ["locationId"],
+  });
 
 export const classifyServiceCaseSchema = z.object({
   title: z.string().trim().min(1).max(255).optional(),
@@ -83,11 +98,6 @@ export const userRoleAssignmentParamsSchema = z.object({
   userId: z.uuid({ message: "Invalid user id" }),
 });
 
-export const operationsLocationInputSchema = z.union([
-  z.string().trim().min(1),
-  locationObjectSchema,
-]);
-
 export const operationsCreateIncidentSchema = z
   .object({
     categoryCode: z.string().trim().min(1).optional(),
@@ -95,15 +105,21 @@ export const operationsCreateIncidentSchema = z
     title: z.string().trim().min(1).max(255).optional(),
     description: z.string().optional(),
     reportedAt: z.iso.datetime({ offset: true }).optional(),
-    location: operationsLocationInputSchema.optional(),
+    location: locationObjectSchema.optional(),
+    locationId: z.uuid({ message: "Invalid location id" }).optional(),
     intakeReportPublicUuid: z.uuid().optional(),
+  })
+  .refine((data) => !(data.location && data.locationId), {
+    message: "Provide only one of location or locationId, not both",
+    path: ["locationId"],
   })
   .refine(
     (data) =>
       Boolean(data.intakeReportPublicUuid) ||
-      Boolean(data.categoryCode && data.location != null && data.location !== ""),
+      Boolean(data.categoryCode && (data.location != null || data.locationId != null)),
     {
-      message: "Provide intakeReportPublicUuid or both categoryCode and location",
+      message:
+        "Provide intakeReportPublicUuid or categoryCode with a structured location or locationId",
       path: ["categoryCode"],
     },
   )
