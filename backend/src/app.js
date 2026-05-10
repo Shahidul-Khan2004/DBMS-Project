@@ -6,6 +6,7 @@ import authRouter from "./api/routes/auth.js";
 import usersRouter from "./api/routes/users.js";
 import intakeRouter from "./api/routes/intake.js";
 import operationsRouter from "./api/routes/operations.js";
+import locationsRouter from "./api/routes/locations.js";
 import { errorHandler, notFound } from "./api/middlewares/error.js";
 import { bootstrapDevelopmentSystemAdmin } from "./services/bootstrapService.js";
 
@@ -25,6 +26,7 @@ app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 app.use("/intake", intakeRouter);
 app.use("/operations", operationsRouter);
+app.use("/locations", locationsRouter);
 
 app.use(notFound);
 
