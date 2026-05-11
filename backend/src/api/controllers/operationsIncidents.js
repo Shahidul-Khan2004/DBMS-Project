@@ -1,4 +1,5 @@
 import * as incidentOperationsService from "../../services/incidentOperationsService.js";
+import * as intakeService from "../../services/intakeService.js";
 
 export async function createOperationsIncident(req, res) {
   const incident = await incidentOperationsService.operationsCreateStandaloneIncident(
@@ -56,5 +57,31 @@ export async function postOperationsIncidentNote(req, res) {
   res.status(201).json({
     message: "Operator note added",
     note,
+  });
+}
+
+export async function postLinkIntakeReportToIncident(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const link = await incidentOperationsService.operationsLinkIntakeReport(
+    req.actorUserId,
+    params.incidentPublicUuid,
+    body,
+  );
+  res.status(201).json({
+    message: "Intake report linked to incident",
+    link,
+  });
+}
+
+export async function postGateway999IntakeAndIncident(req, res) {
+  const body = req.validated?.body ?? req.body;
+  const result = await intakeService.createGateway999IntakeAndIncident(
+    req.user.id,
+    body,
+  );
+  res.status(201).json({
+    message: "999 intake and incident flow completed",
+    ...result,
   });
 }

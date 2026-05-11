@@ -9,6 +9,7 @@ import {
   requireLocationIdByPublicUuid,
 } from "../domain/locationAccess.js";
 import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
+import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
 
 const DEFAULT_INCIDENT_LIMIT = 50;
@@ -91,6 +92,8 @@ const EMERGENCY_CLASSIFIABLE_STATUSES = new Set([
   "linked_to_case",
 ]);
 
+const TERMINAL_INCIDENT_STATUSES = new Set(["resolved", "closed", "cancelled"]);
+
 function assertIntakeEligibleForIncident(intakeRow) {
   if (!EMERGENCY_CLASSIFIABLE_STATUSES.has(intakeRow.intake_status)) {
     throw new BackendError(
@@ -117,6 +120,24 @@ async function loadIntakeRowByPublicUuid(conn, publicUuid) {
         reported_at
       FROM intake_reports
       WHERE public_uuid = ?
+      LIMIT 1
+    `,
+    [publicUuid],
+  );
+  return rows[0] || null;
+}
+
+async function loadIncidentByPublicUuid(conn, publicUuid) {
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        ei.id AS id,
+        ei.public_uuid AS public_uuid,
+        ei.incident_code AS incident_code,
+        ist.status_code AS status_code
+      FROM emergency_incidents ei
+      INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+      WHERE ei.public_uuid = ?
       LIMIT 1
     `,
     [publicUuid],
@@ -196,6 +217,12 @@ export async function createIncidentAdminStandalone(params) {
           ...params.location,
           source: params.location.source ?? "dispatcher_selected",
         };
+        const derivedAddress = await deriveAddressAndSourceForLocation({
+          latitude: normalized.latitude,
+          longitude: normalized.longitude,
+          addressText: normalized.address_text ?? null,
+          source: normalized.source ?? null,
+        });
         const adminAreaIdToUse = normalized.admin_area_id ?? gpsResolvedAdminAreaId ?? null;
         if (adminAreaIdToUse != null) {
           await requireAdministrativeAreaInTransaction(conn, adminAreaIdToUse);
@@ -204,9 +231,9 @@ export async function createIncidentAdminStandalone(params) {
           admin_area_id: adminAreaIdToUse,
           latitude: normalized.latitude,
           longitude: normalized.longitude,
-          address_text: normalized.address_text,
+          address_text: derivedAddress.addressText,
           place_name: normalized.place_name ?? null,
-          source: normalized.source,
+          source: derivedAddress.source ?? normalized.source,
           created_by_user_id: params.actorUserId ?? null,
         });
         locationId = Number(inserted.id);
@@ -452,6 +479,108 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
   }
 }
 
+export async function linkIntakeReportToIncident(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const incident = await loadIncidentByPublicUuid(conn, params.incidentPublicUuid);
+    if (!incident) {
+      throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
+    }
+    if (TERMINAL_INCIDENT_STATUSES.has(incident.status_code)) {
+      throw new BackendError(
+        409,
+        "INCIDENT_NOT_LINKABLE",
+        "Cannot link intake report to a terminal incident",
+      );
+    }
+
+    const intakeRow = await loadIntakeRowByPublicUuid(conn, params.intakeReportPublicUuid);
+    if (!intakeRow) {
+      throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+    }
+    assertIntakeEligibleForIncident(intakeRow);
+    if (intakeRow.reported_location_id == null) {
+      throw new BackendError(
+        422,
+        "EMERGENCY_INCIDENT_REQUIRES_LOCATION",
+        "Intake report has no location; cannot link to incident",
+      );
+    }
+
+    const [linkDup] = await conn.execute(
+      `
+        SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1
+      `,
+      [intakeRow.id],
+    );
+    if (linkDup[0]) {
+      throw new BackendError(
+        409,
+        "INTAKE_ALREADY_LINKED",
+        "Intake report is already linked to an incident",
+      );
+    }
+
+    const [linkResult] = await conn.execute(
+      `
+        INSERT INTO incident_report_links (
+          incident_id,
+          intake_report_id,
+          link_type,
+          linked_by_user_id,
+          note
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        incident.id,
+        intakeRow.id,
+        params.linkType ?? "supporting_report",
+        params.actorUserId ?? null,
+        params.note ?? null,
+      ],
+    );
+
+    await updateIntakeReportStatusInTransaction(
+      conn,
+      intakeRow.id,
+      "linked_to_incident",
+      params.actorUserId,
+      `Linked to incident ${incident.incident_code}`,
+    );
+
+    const [rows] = await conn.execute(
+      `
+        SELECT
+          irl.id,
+          irl.link_type,
+          irl.linked_at,
+          irl.note,
+          ei.public_uuid AS incident_public_uuid,
+          ei.incident_code AS incident_code,
+          ir.public_uuid AS intake_report_public_uuid,
+          ir.report_code AS intake_report_code
+        FROM incident_report_links irl
+        INNER JOIN emergency_incidents ei ON ei.id = irl.incident_id
+        INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+        WHERE irl.id = ?
+        LIMIT 1
+      `,
+      [linkResult.insertId],
+    );
+
+    await conn.commit();
+    return rows[0];
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 function buildIncidentListWhere(filters, params) {
   const clauses = [];
 
@@ -647,9 +776,17 @@ export async function getIncidentDetailForOperations(publicUuid) {
           ir.public_uuid AS intake_public_uuid,
           ir.report_code AS intake_report_code,
           ir.summary AS intake_summary,
-          ir.intake_status AS intake_status
+          ir.intake_status AS intake_status,
+          l.public_uuid AS location_public_uuid,
+          l.latitude AS location_latitude,
+          l.longitude AS location_longitude,
+          l.address_text AS location_address_text,
+          l.place_name AS location_place_name,
+          l.admin_area_id AS location_admin_area_id,
+          l.source AS location_source
         FROM incident_report_links irl
         INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+        LEFT JOIN locations l ON l.id = ir.reported_location_id
         WHERE irl.incident_id = ?
         ORDER BY irl.linked_at ASC
       `,
@@ -683,6 +820,18 @@ export async function getIncidentDetailForOperations(publicUuid) {
         intake_report_code: l.intake_report_code,
         intake_summary: l.intake_summary,
         intake_status: l.intake_status,
+        location: l.location_public_uuid
+          ? {
+              public_uuid: l.location_public_uuid,
+              latitude: Number(l.location_latitude),
+              longitude: Number(l.location_longitude),
+              address_text: l.location_address_text,
+              place_name: l.location_place_name ?? null,
+              admin_area_id:
+                l.location_admin_area_id != null ? Number(l.location_admin_area_id) : null,
+              source: l.location_source ?? null,
+            }
+          : null,
       })),
       timeline_preview: timeline.map((t) => ({
         id: String(t.id),

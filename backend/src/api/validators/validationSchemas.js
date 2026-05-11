@@ -38,8 +38,8 @@ export const locationObjectSchema = z.object({
   address_text: z
     .string()
     .trim()
-    .min(1)
-    .max(255, "address_text must be at most 255 characters"),
+    .max(255, "address_text must be at most 255 characters")
+    .optional(),
   place_name: z.string().trim().max(150).optional(),
   admin_area_id: z.number().int().positive().optional(),
   source: locationSourceEnum.optional(),
@@ -178,3 +178,69 @@ export const operationsReportUuidParamSchema = z.object({
 export const operationsIncidentUuidParamSchema = z.object({
   incidentPublicUuid: z.uuid({ message: "Invalid incident id" }),
 });
+
+export const locationPublicUuidParamSchema = z.object({
+  publicUuid: z.uuid({ message: "Invalid location id" }),
+});
+
+export const intakeReportPublicUuidParamSchema = z.object({
+  reportPublicUuid: z.uuid({ message: "Invalid report id" }),
+});
+
+export const intakeReportLocationPatchSchema = z
+  .object({
+    location: locationObjectSchema.optional(),
+    locationId: z.uuid({ message: "Invalid location id" }).optional(),
+  })
+  .refine((data) => Boolean(data.location || data.locationId), {
+    message: "Provide either location or locationId",
+    path: ["location"],
+  })
+  .refine((data) => !(data.location && data.locationId), {
+    message: "Provide only one of location or locationId, not both",
+    path: ["locationId"],
+  });
+
+export const operationsLinkIntakeToIncidentSchema = z.object({
+  intakeReportPublicUuid: z.uuid({ message: "Invalid report id" }),
+  linkType: z
+    .enum(["supporting_report", "follow_up_report"])
+    .optional()
+    .default("supporting_report"),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const gateway999CreateSchema = z
+  .object({
+    disposition: z.enum(["service_case", "emergency_incident"]),
+    categoryCode: z.string().trim().min(1, "categoryCode is required"),
+    summary: z.string().trim().min(1).max(255),
+    description: z.string().optional(),
+    urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
+    reportedAt: z.iso.datetime({ offset: true }).optional(),
+    location: locationObjectSchema.optional(),
+    locationId: z.uuid({ message: "Invalid location id" }).optional(),
+    callerPhoneNumber: z.string().trim().max(30).optional(),
+    callStartedAt: z.iso.datetime({ offset: true }).optional(),
+    incidentTitle: z.string().trim().min(1).max(255).optional(),
+    incidentDescription: z.string().optional(),
+    priorityLevel: z.enum(["low", "medium", "high", "urgent"]).optional(),
+    severityCode: z.enum(["low", "medium", "high", "critical"]).optional(),
+  })
+  .refine((data) => !(data.location && data.locationId), {
+    message: "Provide only one of location or locationId, not both",
+    path: ["locationId"],
+  })
+  .refine((data) => Boolean(data.location || data.locationId), {
+    message: "location or locationId is required",
+    path: ["location"],
+  })
+  .refine(
+    (data) =>
+      data.disposition === "service_case" ||
+      (data.disposition === "emergency_incident" && Boolean(data.severityCode)),
+    {
+      message: "severityCode is required for emergency_incident disposition",
+      path: ["severityCode"],
+    },
+  );

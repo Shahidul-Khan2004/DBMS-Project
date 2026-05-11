@@ -37,6 +37,13 @@ const INTAKE_SELECT = `
     ir.reported_at AS reported_at,
     ir.created_at AS created_at,
     ir.updated_at AS updated_at,
+    l.public_uuid AS location_public_uuid,
+    l.latitude AS location_latitude,
+    l.longitude AS location_longitude,
+    l.address_text AS location_address_text,
+    l.place_name AS location_place_name,
+    l.admin_area_id AS location_admin_area_id,
+    l.source AS location_source,
     rc.channel_code AS channel_code,
     rcat.category_code AS category_code,
     EXISTS (
@@ -51,6 +58,7 @@ const INTAKE_FROM = `
   FROM intake_reports ir
   INNER JOIN report_channels rc ON rc.id = ir.channel_id AND rc.is_active = TRUE
   INNER JOIN report_categories rcat ON rcat.id = ir.category_id AND rcat.is_active = TRUE
+  LEFT JOIN locations l ON l.id = ir.reported_location_id
 `;
 
 /**
@@ -112,6 +120,18 @@ function formatIntakeRow(row) {
     final_disposition: row.final_disposition,
     channel_code: row.channel_code,
     category_code: row.category_code,
+    location: row.location_public_uuid
+      ? {
+          public_uuid: row.location_public_uuid,
+          latitude: Number(row.location_latitude),
+          longitude: Number(row.location_longitude),
+          address_text: row.location_address_text,
+          place_name: row.location_place_name ?? null,
+          admin_area_id:
+            row.location_admin_area_id != null ? Number(row.location_admin_area_id) : null,
+          source: row.location_source ?? null,
+        }
+      : null,
     has_service_case: Boolean(row.has_service_case),
     has_incident: Boolean(row.has_incident),
     reported_at: row.reported_at,

@@ -4,12 +4,16 @@ import { findUserByPublicUuid } from "../repositories/userRepo.js";
 import {
   createIntakeReport,
   findIntakeReportByPublicUuid,
+  findIntakeReportByPublicUuidForReporter,
   getIntakeReportStatsByReporterUserId,
+  listIntakeReportLocationHistory,
   listIntakeReportsByReporterUserId,
+  updateIntakeReportLocation,
 } from "../repositories/intakeRepo.js";
 import {
   createEmergency999PathFromIntake,
   createServiceCaseFromIntake,
+  ensureEmergencyCallForIntake,
 } from "../repositories/intakeGatewayRepo.js";
 
 const UUID_REGEX =
@@ -88,6 +92,14 @@ export async function classifyIntakeAsServiceCase(actorPublicUuid, reportPublicU
     reportPublicUuid,
     SERVICE_CASE_CLASSIFIABLE_STATUSES,
   );
+
+  if (intake.reported_location_id == null) {
+    throw new BackendError(
+      422,
+      "SERVICE_CASE_REQUIRES_LOCATION",
+      "Service case creation requires a reported location",
+    );
+  }
 
   if (intake.reporter_user_id == null) {
     throw new BackendError(
@@ -182,4 +194,117 @@ export async function getMyIntakeReportStats(actorPublicUuid) {
   }
 
   return getIntakeReportStatsByReporterUserId(userRow.id);
+}
+
+export async function getMyIntakeReportByPublicUuid(actorPublicUuid, reportPublicUuid) {
+  assertValidReportPublicUuid(reportPublicUuid);
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+  const intake = await findIntakeReportByPublicUuidForReporter(reportPublicUuid, userRow.id);
+  if (!intake) {
+    throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+  }
+  return intake;
+}
+
+export async function patchIntakeReportLocation(actorPublicUuid, actorRoleCodes, reportPublicUuid, body) {
+  assertValidReportPublicUuid(reportPublicUuid);
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+  return updateIntakeReportLocation({
+    reportPublicUuid,
+    actorUserId: userRow.id,
+    actorRoleCodes: actorRoleCodes ?? [],
+    location: body.location ?? null,
+    locationId: body.locationId ?? null,
+  });
+}
+
+export async function getIntakeReportLocationHistory(
+  actorPublicUuid,
+  actorRoleCodes,
+  reportPublicUuid,
+) {
+  assertValidReportPublicUuid(reportPublicUuid);
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+  return listIntakeReportLocationHistory({
+    reportPublicUuid,
+    actorUserId: userRow.id,
+    actorRoleCodes: actorRoleCodes ?? [],
+  });
+}
+
+export async function createGateway999IntakeAndIncident(actorPublicUuid, body) {
+  const intake = await createIntakeReportForUser(actorPublicUuid, {
+    channelCode: "emergency_call",
+    categoryCode: body.categoryCode,
+    summary: body.summary,
+    description: body.description,
+    urgencyType: body.urgencyType ?? "unknown",
+    reportedAt: body.reportedAt,
+    location: body.location ?? null,
+    locationId: body.locationId ?? null,
+  });
+
+  const placeholderRecordingUrl = "placeholder://recording-pending";
+
+  if (body.disposition === "service_case") {
+    const serviceResult = await classifyIntakeAsServiceCase(
+      actorPublicUuid,
+      intake.public_uuid,
+      {
+        title: body.incidentTitle ?? body.summary,
+        description: body.incidentDescription ?? body.description,
+        priorityLevel: body.priorityLevel ?? "medium",
+      },
+    );
+    const userRow = await findUserByPublicUuid(actorPublicUuid);
+    const emergencyCall = await ensureEmergencyCallForIntake({
+      intakeReportPublicUuid: intake.public_uuid,
+      dispatcherUserId: userRow.id,
+      callerPhoneNumber: body.callerPhoneNumber ?? null,
+      callStartedAt: body.callStartedAt ?? new Date().toISOString(),
+      callStatus: "triaged",
+      recordingUrl: placeholderRecordingUrl,
+    });
+    return {
+      intake,
+      emergency_call: emergencyCall,
+      disposition: "service_case",
+      ...serviceResult,
+    };
+  }
+
+  const emergencyResult = await classifyIntakeAsEmergency999(
+    actorPublicUuid,
+    intake.public_uuid,
+    {
+      severityCode: body.severityCode,
+      incidentTitle: body.incidentTitle ?? body.summary,
+      incidentDescription: body.incidentDescription ?? body.description,
+      callerPhoneNumber: body.callerPhoneNumber ?? null,
+      callStartedAt: body.callStartedAt ?? new Date().toISOString(),
+    },
+  );
+  const emergencyCall = await ensureEmergencyCallForIntake({
+    intakeReportPublicUuid: intake.public_uuid,
+    dispatcherUserId: emergencyResult.emergency_call.dispatcher_id,
+    callerPhoneNumber: body.callerPhoneNumber ?? null,
+    callStartedAt: body.callStartedAt ?? new Date().toISOString(),
+    callStatus: "linked_to_incident",
+    recordingUrl: placeholderRecordingUrl,
+  });
+  return {
+    intake,
+    emergency_call: emergencyCall,
+    disposition: "emergency_incident",
+    ...emergencyResult,
+  };
 }

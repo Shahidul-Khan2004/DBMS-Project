@@ -94,6 +94,26 @@ CREATE TABLE intake_report_status_history (
     CONSTRAINT fk_irsh_changed_by FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE intake_report_location_history (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    intake_report_id BIGINT UNSIGNED NOT NULL,
+    location_id BIGINT UNSIGNED NOT NULL,
+    previous_location_id BIGINT UNSIGNED NULL,
+    change_kind ENUM('initial_create','location_patch') NOT NULL,
+    changed_by_user_id BIGINT UNSIGNED NULL,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    change_reason VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    KEY idx_irlh_report_changed (intake_report_id, changed_at),
+    KEY idx_irlh_location (location_id),
+    KEY idx_irlh_previous_location (previous_location_id),
+    KEY idx_irlh_changed_by (changed_by_user_id),
+    CONSTRAINT fk_irlh_report FOREIGN KEY (intake_report_id) REFERENCES intake_reports(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_irlh_location FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_irlh_previous_location FOREIGN KEY (previous_location_id) REFERENCES locations(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_irlh_changed_by FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE intake_report_attachments (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     intake_report_id BIGINT UNSIGNED NOT NULL,

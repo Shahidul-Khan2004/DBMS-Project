@@ -11,3 +11,12 @@ export async function getOperationsIntakeReport(req, res) {
   );
   res.status(200).json({ intake_report: row });
 }
+
+export async function getOperationsIntakeReportLocationHistory(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const history = await incidentOperationsService.operationsGetIntakeReportLocationHistory(
+    req.actorUserId,
+    params.reportPublicUuid,
+  );
+  res.status(200).json({ history });
+}

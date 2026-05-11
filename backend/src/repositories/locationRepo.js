@@ -108,6 +108,34 @@ export async function getLocationRowByPublicUuid(conn, publicUuid) {
 
 /**
  * @param {import("mysql2/promise").PoolConnection} conn
+ * @param {number} creatorUserId
+ */
+export async function listLocationRowsByCreatorUserId(conn, creatorUserId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        id,
+        public_uuid,
+        admin_area_id,
+        latitude,
+        longitude,
+        ST_AsText(geo_point) AS geo_point_wkt,
+        address_text,
+        place_name,
+        source,
+        created_by_user_id,
+        created_at
+      FROM locations
+      WHERE created_by_user_id = ?
+      ORDER BY created_at DESC
+    `,
+    [creatorUserId],
+  );
+  return rows;
+}
+
+/**
+ * @param {import("mysql2/promise").PoolConnection} conn
  * @param {number} adminAreaId
  * @returns {Promise<{ id: number } | null>}
  */
