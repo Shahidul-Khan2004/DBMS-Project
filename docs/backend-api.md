@@ -1,30 +1,27 @@
-# Backend API (Insomnia Test Guide)
+# Backend API (Insomnia test guide)
 
-This is the living API doc for backend endpoints.  
-Whenever a new endpoint is added, this file should be updated in the same change.
+Living reference for HTTP endpoints. Update this file whenever routes or contract-relevant validation change.
 
 ## Base URL
 
 - Local: `http://localhost:8080`
 
-## Common Headers
+## Headers
 
-### Public endpoints
+**Public (e.g. `/auth/*`, `/health`):**
 
 ```http
 Content-Type: application/json
 ```
 
-### Protected endpoints
+**Protected (everything else in this doc):**
 
 ```http
 Content-Type: application/json
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-## Standard Error Shape
-
-All API errors return this structure:
+## Standard error shape
 
 ```json
 {
@@ -36,51 +33,68 @@ All API errors return this structure:
 }
 ```
 
-`details` is optional and usually present for validation errors.
+`details` is optional; validation failures often populate it.
 
-### User object (`user` in auth and `/users/me`)
+## User object (`user` in auth and `/users/me`)
 
-- **`account_status`** comes from the `users.account_status` column (`active` \| `suspended` \| `disabled` \| `pending_verification`). This is the source of truth for lifecycle.
-- **`is_active`** is not a database column. It is always `account_status === "active"` so clients can keep a simple boolean if they prefer.
-- **`full_name`** and **`phone_number`** come from `user_profiles` (joined in the repository), not from `users`.
+- **`account_status`** — from `users.account_status` (`active` \| `suspended` \| `disabled` \| `pending_verification`); lifecycle source of truth.
+- **`is_active`** — not a DB column; always `account_status === "active"` for clients that want a boolean.
+- **`full_name`** and **`phone_number`** — from `user_profiles` (joined in the repository), not from `users`.
+
+## Location payloads (intake, locations, operations)
+
+Structured `location` objects use **`latitude`** and **`longitude`** (required numbers in validation).
+
+- **`address_text`** — optional in the API schema. If omitted (preferred) or blank, the backend will derive and store a proper fallback from coordinates (see `locationAddressService`).
+- **`place_name`** — optional.
+- **`admin_area_id`** — optional positive integer; will be resolved from GPS when omitted (preferred).
+- **`source`** — `user_shared` \| `dispatcher_selected` \| `api_geocoded` \| `manual_entry` (required on **`POST /locations`**; optional on intake / incident payloads where the schema allows it).
+
+Do not send **`location`** and **`locationId`** in the same request.
 
 ## Route index
 
-- `GET /health`
-- `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh`
-- `GET /users/me` · `POST /users/:userId/roles`
-- `POST /intake/reports`
-- `GET /intake/reports/my` · `GET /intake/reports/my/stats`
-- `POST /intake/reports/:reportPublicUuid/classify/service-case`
-- `POST /intake/reports/:reportPublicUuid/classify/emergency`
-- `GET /operations/dispatcher/overview`
-- `GET /operations/intake-reports`
-- `GET /operations/intake-reports/:reportPublicUuid`
-- `POST /operations/intake-reports/:reportPublicUuid/promote/emergency`
-- `POST /operations/incidents` · `GET /operations/incidents`
-- `GET /operations/incidents/:incidentPublicUuid`
-- `PATCH /operations/incidents/:incidentPublicUuid/status`
-- `POST /operations/incidents/:incidentPublicUuid/notes`
+| Area | Method | Path | Notes |
+| --- | --- | --- | --- |
+| Health | GET | `/health` | Public |
+| Auth | POST | `/auth/register` | Public |
+| Auth | POST | `/auth/login` | Public |
+| Auth | POST | `/auth/refresh` | Public |
+| Users | GET | `/users/me` | |
+| Users | POST | `/users/:userId/roles` | Permission `auth.manage_roles` |
+| Locations | POST | `/locations` | |
+| Locations | GET | `/locations/my` | |
+| Locations | GET | `/locations/:publicUuid` | Owner or operator |
+| Intake | POST | `/intake/reports` | |
+| Intake | GET | `/intake/reports/my` | |
+| Intake | GET | `/intake/reports/my/stats` | |
+| Intake | GET | `/intake/reports/:reportPublicUuid` | Reporter: detail + `location` |
+| Intake | PATCH | `/intake/reports/:reportPublicUuid/location` | Reporter or dispatcher/system_admin |
+| Intake | GET | `/intake/reports/:reportPublicUuid/reported-location-history` | Same access as patch |
+| Intake | POST | `/intake/reports/:reportPublicUuid/classify/service-case` | Roles `dispatcher` / `system_admin` |
+| Intake | POST | `/intake/reports/:reportPublicUuid/classify/emergency` | Same roles |
+| Operations | GET | `/operations/dispatcher/overview` | Permission `incident.classify` |
+| Operations | GET | `/operations/intake-reports` | `incident.classify` |
+| Operations | GET | `/operations/intake-reports/:reportPublicUuid` | `incident.classify` |
+| Operations | GET | `/operations/intake-reports/:reportPublicUuid/reported-location-history` | `incident.classify` |
+| Operations | POST | `/operations/intake-reports/:reportPublicUuid/promote/emergency` | `incident.create` + `incident.classify` |
+| Operations | POST | `/operations/gateway/999/intake-and-incident` | `incident.classify` |
+| Operations | POST | `/operations/incidents` | `incident.create` |
+| Operations | GET | `/operations/incidents` | `incident.create` or `incident.update_status` |
+| Operations | GET | `/operations/incidents/:incidentPublicUuid` | Same |
+| Operations | PATCH | `/operations/incidents/:incidentPublicUuid/status` | `incident.update_status` |
+| Operations | POST | `/operations/incidents/:incidentPublicUuid/notes` | `incident.update_status` |
+| Operations | POST | `/operations/incidents/:incidentPublicUuid/intake-reports` | `incident.create` or `incident.update_status` |
 
 ---
 
-## 1) Health Check
+## Health
 
 ### GET `/health`
 
-Checks API + DB connectivity.
+Checks API and database connectivity. Public.
 
-#### Headers
-
-```http
-Content-Type: application/json
-```
-
-#### Body
-
-No request body.
-
-#### Success Response (200)
+**Response (200):**
 
 ```json
 {
@@ -93,21 +107,15 @@ No request body.
 
 ---
 
-## 2) Register User
+## Authentication
 
 ### POST `/auth/register`
 
-Creates a new user and returns access and refresh tokens plus the public `user` object.
+Creates a user and returns tokens plus public `user`.
 
-Registration inserts `users.account_status` as **`active`** so the account can log in and use tokens immediately. The SQL schema default for that column is `pending_verification`; the app overrides it on purpose for this MVP flow. To require email verification first, change the registration insert (and tests) to use `pending_verification` and add an activation path.
+Registration sets `users.account_status` to **`active`** so the account can log in immediately (the SQL default for the column is `pending_verification`; the app overrides it for this MVP).
 
-#### Headers
-
-```http
-Content-Type: application/json
-```
-
-#### Body
+**Body:**
 
 ```json
 {
@@ -119,287 +127,106 @@ Content-Type: application/json
 }
 ```
 
-- `phoneNumber` is required and must be 11 digits.
+`phoneNumber` must be exactly 11 digits.
 
-#### Success Response (201)
+**Response (201):** `message`, `accessToken`, `refreshToken`, `user` (see [User object](#user-object-user-in-auth-and-usersme)).
 
-```json
-{
-  "message": "User registered successfully",
-  "accessToken": "<JWT_ACCESS_TOKEN>",
-  "refreshToken": "<JWT_REFRESH_TOKEN>",
-  "user": {
-    "id": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-    "email": "john@example.com",
-    "full_name": "John Doe",
-    "phone_number": "01700000000",
-    "account_status": "active",
-    "is_active": true,
-    "created_at": "2026-05-03T16:00:00.000Z",
-    "updated_at": "2026-05-03T16:00:00.000Z"
-  }
-}
-```
-
-#### Example Error (409)
-
-```json
-{
-  "error": {
-    "code": "EXISTING_EMAIL",
-    "message": "Email already in use"
-  }
-}
-```
-
----
-
-## 3) Login User
+**Example error (409):** `EXISTING_EMAIL`.
 
 ### POST `/auth/login`
 
-Authenticates user credentials and returns access and refresh tokens plus the public `user` object.
+**Body:** `{ "email", "password" }`
 
-#### Headers
+**Response (200):** same token + `user` shape as register.
 
-```http
-Content-Type: application/json
-```
-
-#### Body
-
-```json
-{
-  "email": "john@example.com",
-  "password": "StrongPass123"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Login successful",
-  "accessToken": "<JWT_ACCESS_TOKEN>",
-  "refreshToken": "<JWT_REFRESH_TOKEN>",
-  "user": {
-    "id": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-    "email": "john@example.com",
-    "full_name": "John Doe",
-    "phone_number": "01700000000",
-    "account_status": "active",
-    "is_active": true,
-    "created_at": "2026-05-03T16:00:00.000Z",
-    "updated_at": "2026-05-03T16:00:00.000Z"
-  }
-}
-```
-
-#### Example Error (401)
-
-```json
-{
-  "error": {
-    "code": "INVALID_CREDENTIALS",
-    "message": "Invalid email or password"
-  }
-}
-```
-
----
-
-## 4) Refresh Token
+**Example error (401):** `INVALID_CREDENTIALS`.
 
 ### POST `/auth/refresh`
 
-Validates refresh token and returns a new access + refresh token pair.
+**Body:** `{ "refreshToken": "<JWT_REFRESH_TOKEN>" }`
 
-#### Headers
+**Response (200):** new access + refresh tokens and `user`.
 
-```http
-Content-Type: application/json
-```
-
-#### Body
-
-```json
-{
-  "refreshToken": "<JWT_REFRESH_TOKEN>"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Token refreshed successfully",
-  "accessToken": "<NEW_JWT_ACCESS_TOKEN>",
-  "refreshToken": "<NEW_JWT_REFRESH_TOKEN>",
-  "user": {
-    "id": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-    "email": "john@example.com",
-    "full_name": "John Doe",
-    "phone_number": "01700000000",
-    "account_status": "active",
-    "is_active": true,
-    "created_at": "2026-05-03T16:00:00.000Z",
-    "updated_at": "2026-05-03T16:00:00.000Z"
-  }
-}
-```
-
-#### Example Error (401)
-
-```json
-{
-  "error": {
-    "code": "INVALID_REFRESH_TOKEN",
-    "message": "Invalid or expired refresh token"
-  }
-}
-```
+**Example error (401):** `INVALID_REFRESH_TOKEN`.
 
 ---
 
-## 5) Get Current User
+## Users
 
 ### GET `/users/me`
 
-Returns the authenticated user profile (same `user` shape as auth endpoints).
+Returns `{ "user": { ... } }` with the same `user` fields as auth responses.
 
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-```
-
-#### Body
-
-No request body.
-
-#### Success Response (200)
-
-```json
-{
-  "user": {
-    "id": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-    "email": "john@example.com",
-    "full_name": "John Doe",
-    "phone_number": "01700000000",
-    "account_status": "active",
-    "is_active": true,
-    "created_at": "2026-05-03T16:00:00.000Z",
-    "updated_at": "2026-05-03T16:00:00.000Z"
-  }
-}
-```
-
-#### Example Error (401)
-
-```json
-{
-  "error": {
-    "code": "AUTH_HEADER_INVALID",
-    "message": "Missing or invalid Authorization header"
-  }
-}
-```
-
----
-
-## 6) Assign Role to User (Admin Permission Required)
+**Example error (401):** `AUTH_HEADER_INVALID`.
 
 ### POST `/users/:userId/roles`
 
-Assigns a role to another user by user public UUID.
+Assigns a role to another user by **target user public UUID**.
 
-Required permission: `auth.manage_roles`
+- **Permission:** `auth.manage_roles`
+- **Body:** `{ "roleCode": "dispatcher" }` (normalized to lowercase)
+- **Response (200):** `{ "message", "userId", "roleCode" }`
+- **Errors:** `403` `FORBIDDEN`, `404` `ROLE_NOT_FOUND`, etc.
 
-#### Headers
+---
 
-```http
-Content-Type: application/json
-Authorization: Bearer <JWT_ACCESS_TOKEN_WITH_AUTH_MANAGE_ROLES>
-```
+## Locations
 
-#### Path Params
+Citizen-owned saved locations; `public_uuid` is used as **`locationId`** on intake.
 
-- `userId` (UUID): target user public UUID
+### POST `/locations`
 
-#### Body
+**Body:** structured location (see [Location payloads](#location-payloads-intake-locations-operations)); **`source`** is required.
 
-```json
-{
-  "roleCode": "dispatcher"
-}
-```
-
-#### Success Response (200)
+**Response (201):**
 
 ```json
 {
-  "message": "Role assigned successfully",
-  "userId": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-  "roleCode": "dispatcher"
-}
-```
-
-#### Example Error (403)
-
-```json
-{
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Missing required permission"
+  "message": "Location created",
+  "location": {
+    "id": 1,
+    "publicUuid": "…",
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "addressText": "…",
+    "placeName": null,
+    "adminAreaId": 1,
+    "source": "user_shared",
+    "createdByUserId": 1,
+    "createdAt": "…",
+    "adminAreaResolved": true,
+    "adminAreaMatchedLevel": "division"
   }
 }
 ```
 
-#### Example Error (404)
+Field names are **camelCase** in JSON.
 
-```json
-{
-  "error": {
-    "code": "ROLE_NOT_FOUND",
-    "message": "Role not found"
-  }
-}
-```
+### GET `/locations/my`
 
----
+**Response (200):** `{ "locations": [ … ] }` (same element shape as create).
 
-## Dev RBAC Bootstrap Notes
+### GET `/locations/:publicUuid`
 
-On server start, backend seeds minimal RBAC data and tries to bootstrap a development admin user.
+**Access:** location owner, or caller with `incident.classify` / `incident.create`.
 
-Required env vars:
+**Response (200):** `{ "location": { … } }`
 
-- `SYSTEM_ADMIN__EMAIL`
-- `SYSTEM_ADMIN_PASSWORD`
-- `SYSTEM_ADMIN_NAME`
-- `SYSTEM_ADMIN_PHONE` (must be exactly 11 digits)
-
-If no current `system_admin` assignment exists and these env vars are set, the app will create/find the user and assign `system_admin`.
+**Response (404):** `LOCATION_NOT_FOUND`
 
 ---
 
-## 7) Create Intake Report
+## Intake (reporter)
+
+All routes require a valid JWT. Classification routes additionally require roles **`dispatcher`** or **`system_admin`** (not only permissions).
+
+Implementation pointers: **INTAKE-001** / **INTAKE-002** / **INTAKE-003** in `docs/tickets-intake-gateway-fe-db.md`; repositories `intakeRepo.js`, `intakeGatewayRepo.js`.
 
 ### POST `/intake/reports`
 
-Creates an `intake_reports` row for the authenticated user (reporter). Requires a valid JWT (any authenticated account). New reports start with `intake_status` **`received`**. Implementation: `backend/src/repositories/intakeRepo.js` (see **INTAKE-001** in `docs/tickets-intake-gateway-fe-db.md`).
+Creates an `intake_reports` row for the authenticated reporter. Initial **`intake_status`**: `received`.
 
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Body
-
-Structured `location` (omit `location` and `locationId` entirely if the reporter has no coordinates yet):
+**Body:**
 
 ```json
 {
@@ -412,15 +239,15 @@ Structured `location` (omit `location` and `locationId` entirely if the reporter
   "location": {
     "latitude": 23.8103,
     "longitude": 90.4125,
-    "address_text": "House 12, Road 3, Dhanmondi, Dhaka",
+    "address_text": "", // add only if dispatcher specifies
     "place_name": "Optional label",
-    "admin_area_id": 1,
+    "admin_area_id": 1, // add only if dispather specifies
     "source": "user_shared"
   }
 }
 ```
 
-Or reference a row created earlier with **`POST /locations`** (citizen-owned `locations.public_uuid`):
+Or reference an existing citizen location:
 
 ```json
 {
@@ -431,16 +258,14 @@ Or reference a row created earlier with **`POST /locations`** (citizen-owned `lo
 }
 ```
 
-- `urgencyType`: `non_emergency` | `emergency` | `unknown` (optional; default `unknown`). **Portal / citizen callers must not send `emergency`:** only users with permission `incident.classify` (e.g. **dispatcher**, **system_admin** per bootstrap) may set that value. Everyone else should use `unknown` or `non_emergency`; an operator promotes the report to the emergency path using `POST /intake/reports/:reportPublicUuid/classify/emergency` when appropriate.
-- `reportedAt`: optional ISO datetime.
-- **`location`**: optional object with `latitude`, `longitude`, `address_text` (required, non-blank), optional `place_name`, optional `admin_area_id`, optional `source` (`user_shared` \| `dispatcher_selected` \| `api_geocoded` \| `manual_entry`). **Do not send** `location` and **`locationId`** together.
-- **`locationId`**: optional UUID — must match `locations.public_uuid` and belong to the reporter.
-- Plain string **`location`** is **not** accepted (validation requires the structured object).
-- Provide a real location (inline or `locationId`) if the report may later take the emergency classification path (`reported_location_id` is required for those flows).
+**Rules:**
 
-#### Success Response (201)
+- `urgencyType`: `non_emergency` \| `emergency` \| `unknown` (optional; default `unknown`). Portal users **must not** send `emergency` unless they hold **`incident.classify`**; otherwise `403`. Use `unknown` / `non_emergency`; operators escalate via classify or promote flows.
+- `location` / `locationId`: optional, mutually exclusive; follow [Location payloads](#location-payloads-intake-locations-operations).
+- Plain string `location` is **not** accepted.
+- If the report may later go down the emergency path, ensure a stored location (`reported_location_id`) via inline location or `locationId` before classify/promote.
 
-`intake` is the inserted row from `intake_reports` (MySQL column names, e.g. `public_uuid`, `report_code`, `intake_status`, `urgency_type`, `reported_at`, plus internal ids such as `channel_id` / `category_id`).
+**Response (201):**
 
 ```json
 {
@@ -456,47 +281,13 @@ Or reference a row created earlier with **`POST /locations`** (citizen-owned `lo
 }
 ```
 
-#### Example Error (422 — invalid channel or category)
-
-`REPORT_CHANNEL_NOT_FOUND` or `REPORT_CATEGORY_NOT_FOUND` when `channelCode` / `categoryCode` is missing from seed data or inactive.
-
-#### Example Error (422)
-
-Validation failures use `VALIDATION_ERROR` with `details` (standard shape).
-
-#### Example Error (403 — emergency urgency not allowed for portal user)
-
-```json
-{
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Missing required permission"
-  }
-}
-```
-
-Sent when `urgencyType` is `emergency` but the token does not include `incident.classify`.
-
----
-
-## 8) Get My Intake Reports
+**Errors:** `422` `REPORT_CHANNEL_NOT_FOUND`, `REPORT_CATEGORY_NOT_FOUND`, `VALIDATION_ERROR`, `403` for disallowed `urgencyType`.
 
 ### GET `/intake/reports/my`
 
-Returns all intake reports created by the authenticated user (newest first).
+Newest first. List items use snake_case fields. Each row includes **`location`**: a structured object or `null` when there is no reported location (same fields as **`GET /intake/reports/:reportPublicUuid`**; see [Location payloads](#location-payloads-intake-locations-operations)).
 
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Body
-
-No request body.
-
-#### Success Response (200)
+**Response (200):**
 
 ```json
 {
@@ -513,32 +304,23 @@ No request body.
       "created_at": "2026-05-04T12:00:00.000Z",
       "channel_code": "web_portal",
       "category_code": "medical",
-      "location_text": "House 12, Road 3, Dhanmondi, Dhaka"
+      "location": {
+        "public_uuid": "c2a9f1b0-4d3e-4c1a-9f2b-8e7d6c5b4a30",
+        "latitude": 23.7461,
+        "longitude": 90.3742,
+        "address_text": "House 12, Road 3, Dhanmondi, Dhaka",
+        "place_name": null,
+        "admin_area_id": 1,
+        "source": "user_shared"
+      }
     }
   ]
 }
 ```
 
----
-
-## 9) Get My Intake Report Stats
-
 ### GET `/intake/reports/my/stats`
 
-Returns dashboard counters for the authenticated user.
-
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Body
-
-No request body.
-
-#### Success Response (200)
+**Response (200):**
 
 ```json
 {
@@ -550,28 +332,57 @@ No request body.
 }
 ```
 
----
+### GET `/intake/reports/:reportPublicUuid`
 
-## 10) Classify Intake → Service Case (Non-Emergency)
+Reporter-only detail for one report.
+
+**Response (200):** `{ "report": { … } }` including:
+
+- Same core fields as list rows, plus
+- **`location`**: structured object or `null` (`public_uuid`, `latitude`, `longitude`, `address_text`, `place_name`, `admin_area_id`, `source`)
+- **`location_text`**: backward-compatible string (from stored address when present)
+
+**Response (404):** `INTAKE_REPORT_NOT_FOUND`
+
+### PATCH `/intake/reports/:reportPublicUuid/location`
+
+Updates **only** the report’s reported location.
+
+**Who:** report owner (**citizen**), or **`dispatcher`** / **`system_admin`**.
+
+**Body (exactly one of):**
+
+```json
+{ "location": { "latitude": 23.81, "longitude": 90.41, "address_text": "…" } }
+```
+
+or
+
+```json
+{ "locationId": "uuid-of-existing-location" }
+```
+
+Effective location changes append **`intake_report_location_history`**.
+
+**Response (200):** `{ "message": "Reported location updated", "report": { … } }` (same shape as GET detail / list mapper as applicable).
+
+### GET `/intake/reports/:reportPublicUuid/reported-location-history`
+
+History ordered by **`changed_at` descending** (newest change first).
+
+Each element includes:
+
+- `change_kind`: `initial_create` \| `location_patch`
+- `location`, `previous_location` (nullable)
+- `changed_by`: `{ public_uuid, full_name, actor_kind }` where `actor_kind` is `dispatcher` (includes system-admin operators in current mapping) or `citizen`
+
+**Response (200):** `{ "history": [ … ] }` (empty array when allowed but no history rows).
 
 ### POST `/intake/reports/:reportPublicUuid/classify/service-case`
 
-Branches an existing intake into a **service case**. **Required role:** `dispatcher` or `system_admin` (citizens cannot call this endpoint).
+Branches intake → **service case**. Requires **`reported_location_id`** on the intake (otherwise classification fails with an appropriate business/validation error).
 
-SQL / flow: **INTAKE-002** in `docs/tickets-intake-gateway-fe-db.md` (`createServiceCaseFromIntake` in `backend/src/repositories/intakeGatewayRepo.js`).
-
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Path Params
-
-- `reportPublicUuid` — intake `public_uuid` (UUID).
-
-#### Body
+**Body:**
 
 ```json
 {
@@ -581,70 +392,17 @@ Authorization: Bearer <ACCESS_TOKEN>
 }
 ```
 
-If `title` is omitted, the service uses the intake `summary`.
+`priorityLevel`: `low` \| `medium` \| `high` \| `urgent` (optional).
 
-#### Success Response (201)
+**Response (201):** `{ "message", "service_case", "intake" }` — DB-shaped rows.
 
-```json
-{
-  "message": "Intake classified as service case",
-  "service_case": {},
-  "intake": {}
-}
-```
-
-`service_case` and `intake` are full rows from `service_cases` and `intake_reports` respectively (column names match the database).
-
-#### Example Error (409)
-
-```json
-{
-  "error": {
-    "code": "INTAKE_NOT_CLASSIFIABLE",
-    "message": "Intake report cannot be classified in its current status"
-  }
-}
-```
-
-#### Example Error (422)
-
-`SERVICE_CASE_REQUIRES_REPORTER_USER` if the intake has no `reporter_user_id` (schema requires it on `service_cases`).
-
-#### Example Error (403)
-
-```json
-{
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Missing required role"
-  }
-}
-```
-
-Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
-
----
-
-## 11) Classify Intake → Emergency Path (999)
+**Errors:** `409` `INTAKE_NOT_CLASSIFIABLE`, `422` e.g. `SERVICE_CASE_REQUIRES_REPORTER_USER`, `403` if not dispatcher/system_admin.
 
 ### POST `/intake/reports/:reportPublicUuid/classify/emergency`
 
-Branches an intake into the **999 / emergency** path: creates `emergency_calls`, `emergency_incidents`, and `incident_report_links`, and moves intake to `linked_to_incident`. **Required role:** `dispatcher` or `system_admin` only (not merely `incident.create`; citizens and other roles cannot call this even if they somehow hold other permissions). Same roles apply when escalating an intake already `linked_to_case` to the emergency path.
+Branches intake → **999 / emergency** path (`emergency_calls`, `emergency_incidents`, `incident_report_links`; intake moves toward `linked_to_incident`). **Roles:** dispatcher / system_admin only.
 
-SQL / flow: **INTAKE-003** in `docs/tickets-intake-gateway-fe-db.md` (`createEmergency999PathFromIntake` in `backend/src/repositories/intakeGatewayRepo.js`).
-
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Path Params
-
-- `reportPublicUuid` — intake `public_uuid` (UUID).
-
-#### Body
+**Body:**
 
 ```json
 {
@@ -652,83 +410,38 @@ Authorization: Bearer <ACCESS_TOKEN>
   "incidentTitle": "Optional override",
   "incidentDescription": "Optional",
   "callerPhoneNumber": "01700000000",
-  "callStartedAt": "2026-05-04T12:05:00.000Z"
+  "callStartedAt": "2026-05-04T12:05:00.000Z",
+  "reportedAt": "2026-05-04T12:05:00.000Z"
 }
 ```
 
-- `severityCode`: `low` | `medium` | `high` | `critical` (matches `incident_severity_levels.severity_code` seeds).
+`severityCode`: `low` \| `medium` \| `high` \| `critical`. `reportedAt` is optional here (also used by some promote flows sharing validation).
 
-#### Success Response (201)
+**Response (201):** `{ "message", "emergency_call", "emergency_incident", "incident_report_link", "intake" }`.
 
-```json
-{
-  "message": "Intake classified on emergency (999) path",
-  "emergency_call": {},
-  "emergency_incident": {},
-  "incident_report_link": {},
-  "intake": {}
-}
-```
-
-Each object is a row from the corresponding table (`emergency_calls`, `emergency_incidents`, `incident_report_links`, `intake_reports`).
-
-#### Example Error (422)
-
-`EMERGENCY_INCIDENT_REQUIRES_LOCATION` when the intake has no `reported_location_id`.
-
-#### Example Error (403)
-
-```json
-{
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Missing required role"
-  }
-}
-```
-
-Returned when the authenticated user is neither `dispatcher` nor `system_admin`.
+**Errors:** `422` `EMERGENCY_INCIDENT_REQUIRES_LOCATION` when intake has no location, `403` for role.
 
 ---
 
-## 12) Dispatcher Overview (operations dashboard)
+## Operations
+
+Permissions are enforced per route (see [Route index](#route-index)).
 
 ### GET `/operations/dispatcher/overview`
 
-Read-only rollup for dispatcher UIs: summary **counts** and a **recent** timeline merged from intake reports pending classification, non-terminal emergency incidents, and open service cases. **Required permission:** `incident.classify` (dispatcher and system administrator roles receive this permission in seeded RBAC).
+Rollup for dispatcher UIs: **counts** + merged **recent** timeline (intakes pending classification, non-terminal incidents, open service cases). Requires **`incident.classify`**.
 
-#### Headers
+**Count semantics:**
 
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Count semantics (`counts`)
-
-| Field | Predicate |
+| Field | Meaning |
 | --- | --- |
-| `intake_reports_pending_classification` | `intake_reports.intake_status` is `received` **or** `under_review`. |
-| `incidents_active` | Current `incident_statuses.is_terminal` is `FALSE`. |
-| `service_cases_open` | Current `case_statuses.is_terminal` is `FALSE` (aligned with queue logic used by `vw_admin_case_queue`). |
+| `intake_reports_pending_classification` | `intake_status` in `received` or `under_review` |
+| `incidents_active` | current incident status `is_terminal = false` |
+| `service_cases_open` | current case status `is_terminal = false` |
 
-#### Recent timeline (`recent`)
+**Recent:** up to 10 per source, merged by `occurred_at`, capped at **15** items. Each item: `kind` (`intake_report` \| `incident` \| `service_case`), `public_uuid`, `summary`, `status`, `category`, `occurred_at`, `age_minutes`.
 
-Each source loads up to **10** newest rows (`reported_at` for intakes/incidents; `created_at` for service cases). The backend merges rows by **`occurred_at`** descending (ISO 8601) and returns at most **15** items.
-
-Every element:
-
-| Field | Notes |
-| --- | --- |
-| `kind` | `intake_report` \| `incident` \| `service_case`. |
-| `public_uuid` | Public identifier for correlation with other `/operations/*` payloads. |
-| `summary` | Intake summary, incident title, or service-case title (empty string allowed). |
-| `status` | Intake uses `intake_status`; incidents use incident `status_code`; service cases use case `status_code`. |
-| `category` | `report_categories.category_code` for each entity. |
-| `occurred_at` | Canonical sort key normalized to UTC ISO timestamps. |
-| `age_minutes` | Whole minutes elapsed between `TIMESTAMPDIFF` anchors used in repositories (reported versus created timestamps per kind). |
-
-#### Success Response (200)
+**Response (200):**
 
 ```json
 {
@@ -751,182 +464,66 @@ Every element:
 }
 ```
 
----
-
-## 13) List Intake Reports (Operations Queue)
-
 ### GET `/operations/intake-reports`
 
-Paginated dispatcher / operations queue of all intake reports. **Required permission:** `incident.classify`.
+Queue of intake reports. Query: `intake_status`, `urgency_type`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc`).
 
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Query params (optional)
-
-| Param | Notes |
-| --- | --- |
-| `intake_status` | Filter by intake status string |
-| `urgency_type` | `non_emergency` \| `emergency` \| `unknown` |
-| `categoryCode` | Matches seeded `report_categories.category_code` |
-| `limit` | 1–100 (default 50) |
-| `offset` | Non-negative integer |
-| `sort` | `reported_at_desc` (default) \| `reported_at_asc` |
-
-#### Success Response (200)
-
-```json
-{
-  "intake_reports": [
-    {
-      "public_uuid": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-      "report_code": "IR-MA4SJP2K-9C2E2EAA",
-      "reporter_user_id": "1",
-      "urgency_type": "non_emergency",
-      "summary": "Road blocked",
-      "description": null,
-      "intake_status": "received",
-      "final_disposition": null,
-      "channel_code": "web_portal",
-      "category_code": "medical",
-      "has_service_case": false,
-      "has_incident": false,
-      "reported_at": "2026-05-04T12:00:00.000Z",
-      "created_at": "2026-05-04T12:00:00.000Z",
-      "updated_at": "2026-05-04T12:00:00.000Z"
-    }
-  ],
-  "pagination": { "limit": 50, "offset": 0, "total": 1 }
-}
-```
-
-#### Example Error (403)
-
-Missing `incident.classify`: `FORBIDDEN` / `Missing required permission`.
-
----
-
-## 14) Get Intake Report (Operations)
+**Response (200):** `{ "intake_reports": [ … ], "pagination": { "limit", "offset", "total" } }`
 
 ### GET `/operations/intake-reports/:reportPublicUuid`
 
-Single intake row in the same shape as list items. **Required permission:** `incident.classify`.
+Single row, same shape as list elements.
 
-#### Path params
+**Response (404):** `INTAKE_REPORT_NOT_FOUND`
 
-- `reportPublicUuid` — UUID
+### GET `/operations/intake-reports/:reportPublicUuid/reported-location-history`
 
-#### Success Response (200)
-
-```json
-{
-  "intake_report": {
-    "public_uuid": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
-    "report_code": "IR-MA4SJP2K-9C2E2EAA",
-    "reporter_user_id": "1",
-    "urgency_type": "non_emergency",
-    "summary": "Road blocked",
-    "description": null,
-    "intake_status": "received",
-    "final_disposition": null,
-    "channel_code": "web_portal",
-    "category_code": "medical",
-    "has_service_case": false,
-    "has_incident": false,
-    "reported_at": "2026-05-04T12:00:00.000Z",
-    "created_at": "2026-05-04T12:00:00.000Z",
-    "updated_at": "2026-05-04T12:00:00.000Z"
-  }
-}
-```
-
-#### Example Error (404)
-
-`INTAKE_REPORT_NOT_FOUND`
-
----
-
-## 15) Promote Intake to Emergency (Operations)
+Same payload shape as the reporter **`GET /intake/reports/.../reported-location-history`**, for users with **`incident.classify`**.
 
 ### POST `/operations/intake-reports/:reportPublicUuid/promote/emergency`
 
-Creates an `emergency_incidents` row from an existing intake **without** an `emergency_calls` row (note is stored on the incident link — “Promoted on emergency path (no call record)”). Intake must be in `received`, `under_review`, or `linked_to_case`, must already have `reported_location_id`, and must not already be linked to an incident.
+Creates an **`emergency_incidents`** row from an intake **without** requiring an `emergency_calls` row (link note explains promotion without call record). Intake must be promotable, must have **`reported_location_id`**, and must not already be linked to an incident.
 
-**Required permissions:** both `incident.create` **and** `incident.classify`.
+**Permissions:** **`incident.create`** and **`incident.classify`**.
 
-#### Headers
-
-```http
-Content-Type: application/json
-Authorization: Bearer <ACCESS_TOKEN>
-```
-
-#### Path params
-
-- `reportPublicUuid` — intake `public_uuid` (UUID)
-
-#### Body
+**Body:**
 
 ```json
 {
   "severityCode": "high",
   "incidentTitle": "Unconscious patient near gate 2",
-  "incidentDescription": "Security team found a person unresponsive and requested ambulance support.",
+  "incidentDescription": "…",
   "callerPhoneNumber": "+8801700000000",
   "callStartedAt": "2026-05-04T12:03:00.000Z",
   "reportedAt": "2026-05-04T12:05:00.000Z"
 }
 ```
 
-#### Success Response (201)
+**Response (201):** `{ "message", "incident" }` — `incident` matches detail map (codes, timestamps, etc.).
 
-Returns the created incident snapshot (`mapIncidentDetail` shape):
+**Errors:** `422` `EMERGENCY_INCIDENT_REQUIRES_LOCATION`, `409` `INTAKE_NOT_PROMOTABLE`, `INTAKE_ALREADY_LINKED`, …
 
-```json
-{
-  "message": "Intake promoted to emergency incident",
-  "incident": {
-    "public_uuid": "…",
-    "incident_code": "EMI-…",
-    "title": "…",
-    "description": null,
-    "origin_type": "admin_created",
-    "status_code": "reported",
-    "category_code": "medical",
-    "severity_code": "high",
-    "outcome_code": null,
-    "reported_at": "2026-05-04T12:05:00.000Z",
-    "resolved_at": null,
-    "closed_at": null,
-    "created_at": "2026-05-04T12:05:01.000Z",
-    "updated_at": "2026-05-04T12:05:01.000Z"
-  }
-}
-```
+### POST `/operations/gateway/999/intake-and-incident`
 
-#### Example Error (422)
+Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures emergency call placeholder, then branches to **`service_case`** or **`emergency_incident`** per `disposition`.
 
-`EMERGENCY_INCIDENT_REQUIRES_LOCATION` if the intake has no location.
+**Body (validated):**
 
-#### Example Error (409)
+- `disposition`: `service_case` \| `emergency_incident` (**required**)
+- `categoryCode`, `summary` (**required**); `description`, `urgencyType`, `reportedAt` optional
+- Exactly one of **`location`** or **`locationId`** (**required**)
+- `callerPhoneNumber`, `callStartedAt` optional call metadata
+- `incidentTitle`, `incidentDescription` optional overrides
+- If `disposition === "emergency_incident"`: **`severityCode`** required
+- If `service_case`: **`priorityLevel`** optional (`low` \| `medium` \| `high` \| `urgent`)
 
-`INTAKE_NOT_PROMOTABLE` (wrong intake status), or `INTAKE_ALREADY_LINKED`.
-
----
-
-## 16) Create Emergency Incident (Operations)
+**Response (201):** `{ "message": "999 intake and incident flow completed", … }` — spreads `intake`, branch-specific rows (`service_case` / emergency entities), and `emergency_call` as implemented in `createGateway999IntakeAndIncident`.
 
 ### POST `/operations/incidents`
 
-Creates a standalone **or** intake-linked emergency incident. **Required permission:** `incident.create`.
+**Permission:** `incident.create`.
 
-#### Body (choose one mode)
-
-**A — Link an existing intake** (uses intake category + location; intake must be promotable and not already linked):
+**Mode A — link existing intake** (category + location from intake; intake must be eligible):
 
 ```json
 {
@@ -938,90 +535,39 @@ Creates a standalone **or** intake-linked emergency incident. **Required permiss
 }
 ```
 
-**B — Standalone incident** (no intake):
+**Mode B — standalone** (no intake): requires **`categoryCode`**, **`title`**, and either **`location`** or **`locationId`** (structured location object, not a plain string):
 
 ```json
 {
   "categoryCode": "medical",
   "severityCode": "high",
   "title": "Worker collapsed near loading dock",
-  "description": "On-site medic requested immediate ambulance dispatch.",
+  "description": "Optional",
   "reportedAt": "2026-05-04T12:00:00.000Z",
-  "location": "House 12, Road 3, Dhanmondi, Dhaka"
+  "location": {
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "address_text": "House 12, Road 3, Dhanmondi, Dhaka",
+    "place_name": null,
+    "admin_area_id": 1,
+    "source": "dispatcher_selected"
+  }
 }
 ```
 
-Location object matches intake create: `latitude`, `longitude`, `address_text`, optional `place_name`, `admin_area_id`, optional `source` (`user_shared` \| `dispatcher_selected` \| `api_geocoded` \| `manual_entry`).
+**Response (201):** `{ "message": "Incident created", "incident": { … } }`
 
-#### Success Response (201)
-
-```json
-{
-  "message": "Incident created",
-  "incident": {}
-}
-```
-
-`incident` matches the detail object returned by promote/create (see §17 `incident`).
-
-#### Example Error (422)
-
-`REPORT_CATEGORY_NOT_FOUND`, `LOCATION_REQUIRED`, `INCIDENT_TITLE_REQUIRED`, `EMERGENCY_INCIDENT_REQUIRES_LOCATION`, etc., depending on mode and payload.
-
----
-
-## 17) List Emergency Incidents (Operations)
+**Errors:** `422` for `REPORT_CATEGORY_NOT_FOUND`, `LOCATION_REQUIRED`, `INCIDENT_TITLE_REQUIRED`, `EMERGENCY_INCIDENT_REQUIRES_LOCATION`, etc.
 
 ### GET `/operations/incidents`
 
-**Required permission:** `incident.create` **or** `incident.update_status` (either is sufficient).
+Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Ordered by `reported_at` descending.
 
-#### Query params (optional)
-
-| Param | Notes |
-| --- | --- |
-| `status_code` | Current incident status code |
-| `reported_after` | ISO datetime with offset |
-| `reported_before` | ISO datetime with offset |
-| `limit` | 1–100 (default 50) |
-| `offset` | Non-negative integer |
-
-Results are ordered by `reported_at` descending.
-
-#### Success Response (200)
-
-```json
-{
-  "incidents": [
-    {
-      "public_uuid": "…",
-      "incident_code": "EMI-…",
-      "title": "…",
-      "description": null,
-      "origin_type": "admin_created",
-      "status_code": "reported",
-      "category_code": "medical",
-      "severity_code": "high",
-      "reported_at": "2026-05-04T12:00:00.000Z",
-      "resolved_at": null,
-      "closed_at": null,
-      "created_at": "2026-05-04T12:00:01.000Z",
-      "updated_at": "2026-05-04T12:00:01.000Z"
-    }
-  ],
-  "pagination": { "limit": 50, "offset": 0, "total": 1 }
-}
-```
-
----
-
-## 18) Get Emergency Incident (Operations)
+**Response (200):** `{ "incidents": [ … ], "pagination": { … } }`
 
 ### GET `/operations/incidents/:incidentPublicUuid`
 
-**Required permission:** `incident.create` **or** `incident.update_status`.
-
-#### Success Response (200)
+**Response (200):**
 
 ```json
 {
@@ -1049,21 +595,15 @@ Results are ordered by `reported_at` descending.
 }
 ```
 
-`incident` is the full detail object; timeline is capped (last 50 events by `event_time`).
+`incident` is the full detail DTO; timeline preview is capped (e.g. last 50 by `event_time`).
 
-#### Example Error (404)
-
-`INCIDENT_NOT_FOUND`
-
----
-
-## 19) Patch Emergency Incident Status (Operations)
+**Response (404):** `INCIDENT_NOT_FOUND`
 
 ### PATCH `/operations/incidents/:incidentPublicUuid/status`
 
-Updates current status with server-side transition rules. **Required permission:** `incident.update_status`.
+**Permission:** `incident.update_status`.
 
-#### Body
+**Body:**
 
 ```json
 {
@@ -1073,35 +613,25 @@ Updates current status with server-side transition rules. **Required permission:
 }
 ```
 
-- `outcomeCode` is only accepted when moving to **`resolved`**, **`closed`**, or **`cancelled`**. Allowed values: `resolved`, `false_alarm`, `duplicate_incident`, `cancelled`, `transferred`, `unresolved`.
-- Allowed transitions (from → to):
-  - `reported` → `classified`, `cancelled`
-  - `classified` → `in_progress`, `resolved`, `closed`, `cancelled`
-  - `in_progress` → `resolved`, `closed`, `cancelled`
-- Terminal statuses (`resolved`, `closed`, `cancelled`) cannot be changed further.
+`outcomeCode` only when moving to **`resolved`**, **`closed`**, or **`cancelled`**: `resolved` \| `false_alarm` \| `duplicate_incident` \| `cancelled` \| `transferred` \| `unresolved`.
 
-#### Success Response (200)
+**Transitions (from → to):**
 
-```json
-{
-  "message": "Incident status updated",
-  "incident": {}
-}
-```
+- `reported` → `classified`, `cancelled`
+- `classified` → `in_progress`, `resolved`, `closed`, `cancelled`
+- `in_progress` → `resolved`, `closed`, `cancelled`
 
-#### Example Error (409)
+Terminal statuses cannot change again.
 
-`INVALID_STATUS_TRANSITION` (illegal transition, terminal incident, or same status as current).
+**Response (200):** `{ "message": "Incident status updated", "incident": { … } }`
 
----
-
-## 20) Add Operator Note to Incident (Operations)
+**Response (409):** `INVALID_STATUS_TRANSITION`
 
 ### POST `/operations/incidents/:incidentPublicUuid/notes`
 
-Appends an `operator_note` row to `incident_timeline_events`. **Required permission:** `incident.update_status`.
+**Permission:** `incident.update_status`.
 
-#### Body
+**Body:**
 
 ```json
 {
@@ -1111,22 +641,41 @@ Appends an `operator_note` row to `incident_timeline_events`. **Required permiss
 }
 ```
 
-`title` is required (max 255 chars). `eventTime` is optional ISO datetime; defaults to “now” if omitted.
+`title` required (max 255). `eventTime` optional ISO datetime; defaults to now.
 
-#### Success Response (201)
+**Response (201):** `{ "message": "Operator note added", "note": { … } }`
+
+### POST `/operations/incidents/:incidentPublicUuid/intake-reports`
+
+Links another intake to an existing incident. **Does not** move the incident’s primary location.
+
+**Body:**
 
 ```json
 {
-  "message": "Operator note added",
-  "note": {
-    "id": "42",
-    "event_type": "operator_note",
-    "event_title": "Radio check",
-    "event_description": null
-  }
+  "intakeReportPublicUuid": "required-uuid",
+  "linkType": "supporting_report",
+  "note": "Optional, max 500 chars"
 }
 ```
 
-#### Example Error (404)
+`linkType`: `supporting_report` \| `follow_up_report` (optional; default `supporting_report`).
 
-`INCIDENT_NOT_FOUND`
+Intake must have a location and must not already be linked (`422` / `409` as applicable).
+
+**Response (201):** `{ "message": "Intake report linked to incident", "link": { … } }` (link row + incident/intake identifiers per repository).
+
+---
+
+## Development RBAC bootstrap
+
+On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**.
+
+**Env vars:**
+
+- `SYSTEM_ADMIN__EMAIL`
+- `SYSTEM_ADMIN_PASSWORD`
+- `SYSTEM_ADMIN_NAME`
+- `SYSTEM_ADMIN_PHONE` (exactly 11 digits)
+
+If no active `system_admin` assignment exists and these are set, the app creates or finds the user and assigns **`system_admin`**.
