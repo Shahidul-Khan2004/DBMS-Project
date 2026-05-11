@@ -11,6 +11,27 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 type Mode = "standalone" | "intake";
+type IncidentCreatePayload =
+  | {
+      severityCode: string;
+      intakeReportPublicUuid: string;
+      title?: string;
+      description?: string;
+      reportedAt?: string;
+    }
+  | {
+      categoryCode: string;
+      severityCode: string;
+      title: string;
+      description?: string;
+      reportedAt?: string;
+      location: {
+        latitude: number;
+        longitude: number;
+        address_text: string;
+        source: "manual_entry";
+      };
+    };
 
 const labelClassName = "block text-sm font-medium text-gray-700";
 const fieldClassName =
@@ -27,6 +48,8 @@ export default function CreateEmergencyIncidentPage() {
   const [description, setDescription] = useState("");
   const [reportedAt, setReportedAt] = useState("");
   const [location, setLocation] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -37,6 +60,20 @@ export default function CreateEmergencyIncidentPage() {
     clearAuthSession();
     router.push("/auth/login");
   }, [router]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
+    const requestedIntakeUuid = params.get("intakeReportPublicUuid");
+
+    if (requestedMode === "intake") {
+      setMode("intake");
+    }
+
+    if (requestedIntakeUuid) {
+      setIntakeReportPublicUuid(requestedIntakeUuid);
+    }
+  }, []);
 
   useEffect(() => {
     const sessionUser = sessionStorage.getItem("loggedInUser");
@@ -69,26 +106,31 @@ export default function CreateEmergencyIncidentPage() {
         return;
       }
 
-      const body =
+      const reportedAtIso = reportedAt
+        ? new Date(reportedAt).toISOString()
+        : undefined;
+
+      const body: IncidentCreatePayload =
         mode === "intake"
           ? {
               severityCode,
-              intakeReportPublicUuid,
+              intakeReportPublicUuid: intakeReportPublicUuid.trim(),
               title: title || undefined,
               description: description || undefined,
-              reportedAt: reportedAt
-                ? new Date(reportedAt).toISOString()
-                : new Date().toISOString(),
+              reportedAt: reportedAtIso,
             }
           : {
               categoryCode,
               severityCode,
-              title,
+              title: title.trim(),
               description: description || undefined,
-              reportedAt: reportedAt
-                ? new Date(reportedAt).toISOString()
-                : new Date().toISOString(),
-              location,
+              reportedAt: reportedAtIso,
+              location: {
+                latitude: Number(latitude),
+                longitude: Number(longitude),
+                address_text: location.trim(),
+                source: "manual_entry",
+              },
             };
 
       const res = await fetch(`${API_BASE}/operations/incidents`, {
@@ -189,9 +231,11 @@ export default function CreateEmergencyIncidentPage() {
                   >
                     <option value="medical">Medical</option>
                     <option value="fire">Fire</option>
-                    <option value="crime">Crime</option>
-                    <option value="disaster">Disaster</option>
-                    <option value="other">Other</option>
+                    <option value="crime_public_safety">Crime / Public Safety</option>
+                    <option value="natural_disaster">Natural Disaster</option>
+                    <option value="infrastructure_emergency">Infrastructure Emergency</option>
+                    <option value="relief_request">Relief Request</option>
+                    <option value="blood_request">Blood Request</option>
                   </select>
                 </div>
               )}
@@ -243,16 +287,44 @@ export default function CreateEmergencyIncidentPage() {
               </div>
 
               {mode === "standalone" && (
-                <div>
-                  <label className={labelClassName}>Location</label>
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    required
-                    className={fieldClassName}
-                    placeholder="House 12, Road 3, Dhanmondi, Dhaka"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className={labelClassName}>Location</label>
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      required
+                      className={fieldClassName}
+                      placeholder="House 12, Road 3, Dhanmondi, Dhaka"
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className={labelClassName}>Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={latitude}
+                        onChange={(e) => setLatitude(e.target.value)}
+                        required
+                        className={fieldClassName}
+                        placeholder="23.8103"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClassName}>Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={longitude}
+                        onChange={(e) => setLongitude(e.target.value)}
+                        required
+                        className={fieldClassName}
+                        placeholder="90.4125"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="flex gap-3">

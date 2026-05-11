@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { clearAuthSession, getValidAccessToken } from "@/lib/auth-store";
@@ -15,16 +15,14 @@ const labelClassName = "block text-sm font-medium text-gray-700";
 const fieldClassName =
   "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-400";
 
-export default function PromoteIntakeToEmergencyPage() {
+export default function ClassifyIntakeAsServiceCasePage() {
   const router = useRouter();
   const params = useParams();
   const reportPublicUuid = params.reportPublicUuid as string;
 
-  const [severityCode, setSeverityCode] = useState("high");
-  const [incidentTitle, setIncidentTitle] = useState("");
-  const [incidentDescription, setIncidentDescription] = useState("");
-  const [callerPhoneNumber, setCallerPhoneNumber] = useState("");
-  const [callStartedAt, setCallStartedAt] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priorityLevel, setPriorityLevel] = useState("medium");
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,7 +52,7 @@ export default function PromoteIntakeToEmergencyPage() {
     router.push("/");
   };
 
-  async function promoteIntake() {
+  async function classifyReport() {
     setLoading(true);
     setError("");
 
@@ -67,7 +65,7 @@ export default function PromoteIntakeToEmergencyPage() {
       }
 
       const res = await fetch(
-        `${API_BASE}/intake/reports/${reportPublicUuid}/classify/emergency`,
+        `${API_BASE}/intake/reports/${reportPublicUuid}/classify/service-case`,
         {
           method: "POST",
           headers: {
@@ -75,13 +73,9 @@ export default function PromoteIntakeToEmergencyPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            severityCode,
-            incidentTitle: incidentTitle || undefined,
-            incidentDescription: incidentDescription || undefined,
-            callerPhoneNumber: callerPhoneNumber || undefined,
-            callStartedAt: callStartedAt
-              ? new Date(callStartedAt).toISOString()
-              : undefined,
+            title: title || undefined,
+            description: description || undefined,
+            priorityLevel,
           }),
         },
       );
@@ -93,13 +87,11 @@ export default function PromoteIntakeToEmergencyPage() {
           data?.error?.message ||
             data?.message ||
             data?.code ||
-            "Promotion failed",
+            "Classification failed",
         );
       }
 
-      router.push(
-        `/dashboard/dispatcher/incidents/${data.emergency_incident.public_uuid}`,
-      );
+      router.push(`/dashboard/dispatcher/intake-reports/${reportPublicUuid}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -118,27 +110,27 @@ export default function PromoteIntakeToEmergencyPage() {
 
   return (
     <DashboardLayout
-      title="Promote Intake to Emergency"
-      subtitle={`Create an emergency incident from ${reportPublicUuid}`}
+      title="Classify Intake"
+      subtitle={`Create a service case from ${reportPublicUuid}`}
       onLogout={handleLogout}
     >
       <div className="mx-auto max-w-3xl space-y-6">
         <ConfirmModal
           open={confirmOpen}
-          title="Promote intake to emergency?"
-          message="This will create an emergency incident from the intake report and move it onto the emergency path."
-          confirmLabel="Promote"
+          title="Classify as service case?"
+          message="This will create a non-emergency service case from the intake report."
+          confirmLabel="Classify"
           isLoading={loading}
-          onConfirm={() => void promoteIntake()}
+          onConfirm={() => void classifyReport()}
           onCancel={() => setConfirmOpen(false)}
         />
         <Card>
           <CardHeader>
             <h1 className="text-2xl font-bold text-gray-900">
-              Promote Intake to Emergency
+              Classify as Service Case
             </h1>
             <p className="text-sm text-gray-500">
-              Create an emergency incident from this intake report.
+              Create a non-emergency service case from this intake report.
             </p>
           </CardHeader>
 
@@ -157,71 +149,43 @@ export default function PromoteIntakeToEmergencyPage() {
               className="space-y-4"
             >
               <div>
-                <label className={labelClassName}>Severity</label>
+                <label className={labelClassName}>Title</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={fieldClassName}
+                  placeholder="Leave blank to use intake summary"
+                />
+              </div>
+
+              <div>
+                <label className={labelClassName}>Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className={fieldClassName}
+                  rows={4}
+                  placeholder="Optional service case notes"
+                />
+              </div>
+
+              <div>
+                <label className={labelClassName}>Priority</label>
                 <select
-                  value={severityCode}
-                  onChange={(e) => setSeverityCode(e.target.value)}
+                  value={priorityLevel}
+                  onChange={(e) => setPriorityLevel(e.target.value)}
                   className={fieldClassName}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
-                  <option value="critical">Critical</option>
+                  <option value="urgent">Urgent</option>
                 </select>
-              </div>
-
-              <div>
-                <label className={labelClassName}>
-                  Incident Title
-                </label>
-                <input
-                  value={incidentTitle}
-                  onChange={(e) => setIncidentTitle(e.target.value)}
-                  className={fieldClassName}
-                  placeholder="Unconscious patient near gate 2"
-                />
-              </div>
-
-              <div>
-                <label className={labelClassName}>
-                  Incident Description
-                </label>
-                <textarea
-                  value={incidentDescription}
-                  onChange={(e) => setIncidentDescription(e.target.value)}
-                  className={fieldClassName}
-                  rows={4}
-                  placeholder="Security team found a person unresponsive..."
-                />
-              </div>
-
-              <div>
-                <label className={labelClassName}>
-                  Caller Phone Number
-                </label>
-                <input
-                  value={callerPhoneNumber}
-                  onChange={(e) => setCallerPhoneNumber(e.target.value)}
-                  className={fieldClassName}
-                  placeholder="01700000000"
-                />
-              </div>
-
-              <div>
-                <label className={labelClassName}>
-                  Call Started At
-                </label>
-                <input
-                  type="datetime-local"
-                  value={callStartedAt}
-                  onChange={(e) => setCallStartedAt(e.target.value)}
-                  className={fieldClassName}
-                />
               </div>
 
               <div className="flex gap-3">
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Promoting..." : "Promote to Emergency"}
+                  {loading ? "Classifying..." : "Classify as Service Case"}
                 </Button>
 
                 <Button

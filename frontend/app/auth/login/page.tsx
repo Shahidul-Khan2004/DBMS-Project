@@ -34,7 +34,7 @@ export default function LoginPage() {
       // Auto-redirect after 2 seconds
       const timer = setTimeout(() => {
         router.push(redirectUrl);
-      }, 2000);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [loggedInUser, router]);

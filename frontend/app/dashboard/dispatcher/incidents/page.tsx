@@ -43,6 +43,11 @@ export default function IncidentsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ limit: 50, offset: 0, total: 0 });
+  const [filters, setFilters] = useState({
+    status_code: "",
+    reported_after: "",
+    reported_before: "",
+  });
 
   const redirectToLogin = useCallback(() => {
     sessionStorage.removeItem("loggedInUser");
@@ -62,7 +67,17 @@ export default function IncidentsPage() {
 
     try {
       const response = await fetch(
-        `${API_BASE}/operations/incidents?limit=50&offset=${offset}`,
+        `${API_BASE}/operations/incidents?${new URLSearchParams({
+          limit: "50",
+          offset: String(offset),
+          ...(filters.status_code ? { status_code: filters.status_code } : {}),
+          ...(filters.reported_after
+            ? { reported_after: new Date(filters.reported_after).toISOString() }
+            : {}),
+          ...(filters.reported_before
+            ? { reported_before: new Date(filters.reported_before).toISOString() }
+            : {}),
+        }).toString()}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -97,7 +112,7 @@ export default function IncidentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [redirectToLogin]);
+  }, [filters, redirectToLogin]);
 
   useEffect(() => {
     const sessionUser = sessionStorage.getItem("loggedInUser");
@@ -217,6 +232,65 @@ export default function IncidentsPage() {
             <p>{error}</p>
           </div>
         )}
+
+        <Card className="shadow-md">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-4">
+              <select
+                value={filters.status_code}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    status_code: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+              >
+                <option value="">All statuses</option>
+                <option value="reported">Reported</option>
+                <option value="classified">Classified</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <input
+                type="datetime-local"
+                value={filters.reported_after}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    reported_after: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                aria-label="Reported after"
+              />
+              <input
+                type="datetime-local"
+                value={filters.reported_before}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    reported_before: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                aria-label="Reported before"
+              />
+              <Button
+                type="button"
+                onClick={() => void loadIncidents(0)}
+                disabled={loading}
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="shadow-md">
           <CardHeader>

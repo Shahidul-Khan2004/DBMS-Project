@@ -7,14 +7,18 @@ import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { RoleAssignmentForm } from "@/components/admin/RoleAssignmentForm";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { LoginResponse } from "@/types/auth";
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const isCheckingAuth = useAuthGuard(["system_admin"]);
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (isCheckingAuth) return;
+
     const sessionUser = sessionStorage.getItem("loggedInUser");
     if (sessionUser) {
       try {
@@ -27,7 +31,7 @@ export default function AdminDashboard() {
     } else {
       router.push("/auth/login");
     }
-  }, [router]);
+  }, [isCheckingAuth, router]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -35,7 +39,7 @@ export default function AdminDashboard() {
     router.push("/");
   };
 
-  if (isLoading) {
+  if (isCheckingAuth || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         Loading...

@@ -24,6 +24,29 @@ function formatDate(value: string | null): string {
   return date.toLocaleString();
 }
 
+function getReportStatus(report: IntakeReport): string {
+  return report.incident_status_code ?? report.intake_status;
+}
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case "resolved":
+    case "closed":
+      return "bg-green-50 text-green-700";
+    case "cancelled":
+    case "false_report":
+    case "duplicate":
+      return "bg-gray-100 text-gray-700";
+    case "reported":
+    case "classified":
+    case "in_progress":
+    case "linked_to_incident":
+      return "bg-yellow-50 text-yellow-700";
+    default:
+      return "bg-blue-50 text-blue-700";
+  }
+}
+
 export default function CitizenReportsPage() {
   const router = useRouter();
   const [reports, setReports] = useState<IntakeReport[]>([]);
@@ -89,7 +112,13 @@ export default function CitizenReportsPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button
+            variant="secondary"
+            onClick={() => router.push("/dashboard/citizen")}
+          >
+            Back to Dashboard
+          </Button>
           <Button onClick={() => router.push("/dashboard/citizen/report-new")}>
             Report New Incident
           </Button>
@@ -125,15 +154,21 @@ export default function CitizenReportsPage() {
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm font-bold uppercase tracking-wide text-gray-600">
+                          Report ID
+                        </p>
+
+                        <p className="mt-0.5 text-sm text-gray-600">
                           {report.report_code}
                         </p>
                         <h3 className="font-medium text-gray-900">
                           {report.summary}
                         </h3>
                       </div>
-                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                        {report.intake_status}
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(getReportStatus(report))}`}
+                      >
+                        {getReportStatus(report)}
                       </span>
                     </div>
 
@@ -162,6 +197,36 @@ export default function CitizenReportsPage() {
                         </span>{" "}
                         {formatDate(report.created_at)}
                       </p>
+                      {report.incident_code && (
+                        <p>
+                          <span className="font-medium text-gray-800">
+                            Incident:
+                          </span>{" "}
+                          {report.incident_code}
+                        </p>
+                      )}
+                      {report.incident_resolved_at && (
+                        <p>
+                          <span className="font-medium text-gray-800">
+                            Resolved:
+                          </span>{" "}
+                          {formatDate(report.incident_resolved_at)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="mt-4">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/citizen/reports/${report.public_uuid}`,
+                          )
+                        }
+                      >
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 ))}

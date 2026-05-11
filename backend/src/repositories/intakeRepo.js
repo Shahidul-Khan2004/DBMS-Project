@@ -338,6 +338,9 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
       INNER JOIN report_channels rc ON rc.id = ir.channel_id
       INNER JOIN report_categories rcat ON rcat.id = ir.category_id
       LEFT JOIN locations l ON l.id = ir.reported_location_id
+      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
+      LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
+      LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
       WHERE ir.reporter_user_id = ?
       ORDER BY ir.created_at DESC
     `,
@@ -390,20 +393,25 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         COUNT(*) AS total_reports,
         SUM(
           CASE
-            WHEN intake_status IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
+            WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = FALSE, 1, 0)
+            WHEN ir.intake_status IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
             THEN 1
             ELSE 0
           END
         ) AS pending_reports,
         SUM(
           CASE
-            WHEN intake_status IN ('duplicate', 'false_report', 'closed')
+            WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = TRUE, 1, 0)
+            WHEN ir.intake_status IN ('duplicate', 'false_report', 'closed')
             THEN 1
             ELSE 0
           END
         ) AS resolved_reports
-      FROM intake_reports
-      WHERE reporter_user_id = ?
+      FROM intake_reports ir
+      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
+      LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
+      LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
+      WHERE ir.reporter_user_id = ?
     `,
     [reporterUserId],
   );

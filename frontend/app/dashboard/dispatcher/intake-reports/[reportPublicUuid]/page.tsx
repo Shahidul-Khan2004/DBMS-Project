@@ -213,16 +213,49 @@ export default function IntakeReportDetailPage() {
           </Button>
 
           {report && !report.has_incident ? (
-            <Button
-              type="button"
-              onClick={() =>
-                router.push(
-                  `/dashboard/dispatcher/intake-reports/${report.public_uuid}/promote/emergency`,
-                )
-              }
-            >
-              Promote to Emergency
-            </Button>
+            <>
+              {!report.has_service_case ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/dispatcher/intake-reports/${report.public_uuid}/classify/service-case`,
+                    )
+                  }
+                >
+                  Classify as Service Case
+                </Button>
+              ) : null}
+
+              <Button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/dashboard/dispatcher/intake-reports/${report.public_uuid}/promote/emergency`,
+                  )
+                }
+              >
+                Promote to Emergency
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const query = new URLSearchParams({
+                    mode: "intake",
+                    intakeReportPublicUuid: report.public_uuid,
+                  });
+
+                  router.push(
+                    `/dashboard/dispatcher/incidents/create-incident?${query.toString()}`,
+                  );
+                }}
+              >
+                Link to Incident
+              </Button>
+            </>
           ) : null}
         </div>
 
@@ -250,7 +283,10 @@ export default function IntakeReportDetailPage() {
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">
+                    <p className="text-sm font-bold uppercase tracking-wide text-gray-600">
+                      Report ID
+                    </p>
+                    <p className="mt-0.5 text-sm font-medium text-gray-600">
                       {report.report_code}
                     </p>
                     <h2 className="mt-1 text-xl font-semibold text-gray-900">

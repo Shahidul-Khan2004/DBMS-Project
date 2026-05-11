@@ -27,6 +27,12 @@ export default function IntakeReportsPage() {
     offset: 0,
     total: 0,
   });
+  const [filters, setFilters] = useState({
+    intake_status: "",
+    urgency_type: "",
+    categoryCode: "",
+    sort: "reported_at_desc",
+  });
 
   const loadReports = useCallback(
     async (offset = 0) => {
@@ -42,7 +48,16 @@ export default function IntakeReportsPage() {
 
       try {
         const response = await fetch(
-          `${API_BASE}/operations/intake-reports?limit=50&offset=${offset}`,
+          `${API_BASE}/operations/intake-reports?${new URLSearchParams({
+            limit: "50",
+            offset: String(offset),
+            ...(filters.intake_status
+              ? { intake_status: filters.intake_status }
+              : {}),
+            ...(filters.urgency_type ? { urgency_type: filters.urgency_type } : {}),
+            ...(filters.categoryCode ? { categoryCode: filters.categoryCode } : {}),
+            sort: filters.sort,
+          }).toString()}`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -79,7 +94,7 @@ export default function IntakeReportsPage() {
         setLoading(false);
       }
     },
-    [router]
+    [filters, router]
   );
 
   useEffect(() => {
@@ -177,6 +192,83 @@ export default function IntakeReportsPage() {
 
         <Card className="shadow-md">
           <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-5">
+              <select
+                value={filters.intake_status}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    intake_status: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+              >
+                <option value="">All statuses</option>
+                <option value="received">Received</option>
+                <option value="under_review">Under review</option>
+                <option value="linked_to_case">Linked to case</option>
+                <option value="linked_to_incident">Linked to incident</option>
+              </select>
+              <select
+                value={filters.urgency_type}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    urgency_type: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+              >
+                <option value="">All urgency</option>
+                <option value="unknown">Unknown</option>
+                <option value="non_emergency">Non-emergency</option>
+                <option value="emergency">Emergency</option>
+              </select>
+              <select
+                value={filters.categoryCode}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    categoryCode: e.target.value,
+                  }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+              >
+                <option value="">All categories</option>
+                <option value="medical">Medical</option>
+                <option value="crime_public_safety">Crime / Public Safety</option>
+                <option value="fire">Fire</option>
+                <option value="natural_disaster">Natural Disaster</option>
+                <option value="infrastructure_emergency">Infrastructure</option>
+                <option value="relief_request">Relief Request</option>
+                <option value="blood_request">Blood Request</option>
+              </select>
+              <select
+                value={filters.sort}
+                onChange={(e) =>
+                  setFilters((current) => ({ ...current, sort: e.target.value }))
+                }
+                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+              >
+                <option value="reported_at_desc">Newest first</option>
+                <option value="reported_at_asc">Oldest first</option>
+              </select>
+              <Button
+                type="button"
+                onClick={() => void loadReports(0)}
+                disabled={loading}
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md">
+          <CardHeader>
             <h2 className="text-lg font-semibold text-gray-900">
               Reports Queue
             </h2>
@@ -208,8 +300,11 @@ export default function IntakeReportsPage() {
                           {report.urgency_type}
                         </span>
 
-                        <span className="text-xs text-gray-500">
-                          {report.report_code}
+                        <span className="inline-flex flex-col text-xs text-gray-500">
+                          <span className="text-sm font-bold uppercase tracking-wide text-gray-600">
+                            Report ID
+                          </span>
+                          <span>{report.report_code}</span>
                         </span>
                       </div>
 

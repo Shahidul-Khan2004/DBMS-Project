@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { clearAuthSession, getValidAccessToken } from "@/lib/auth-store";
 
 interface IncidentDetail {
@@ -107,6 +108,7 @@ export default function IncidentDetailPage() {
   const [note, setNote] = useState("");
   const [outcomeCode, setOutcomeCode] = useState("resolved");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [confirmStatusOpen, setConfirmStatusOpen] = useState(false);
   const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
   const [statusUpdateSuccess, setStatusUpdateSuccess] = useState<string | null>(
     null,
@@ -243,9 +245,7 @@ export default function IncidentDetailPage() {
     );
   };
 
-  const handleStatusSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const updateIncidentStatus = async () => {
     if (!incident) return;
 
     const accessToken = getValidAccessToken();
@@ -299,6 +299,7 @@ export default function IncidentDetailPage() {
       setStatusUpdateError("Unexpected error while updating incident status.");
     } finally {
       setIsUpdatingStatus(false);
+      setConfirmStatusOpen(false);
     }
   };
 
@@ -432,6 +433,15 @@ export default function IncidentDetailPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
+        <ConfirmModal
+          open={confirmStatusOpen}
+          title="Update incident status?"
+          message={`This will change the incident from ${incident?.status_code ?? "current status"} to ${statusCode}.`}
+          confirmLabel="Update Status"
+          isLoading={isUpdatingStatus}
+          onConfirm={() => void updateIncidentStatus()}
+          onCancel={() => setConfirmStatusOpen(false)}
+        />
         <div className="flex items-center gap-4">
           <Button
             type="button"
@@ -566,7 +576,13 @@ export default function IncidentDetailPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleStatusSubmit} className="space-y-4">
+                <form
+                  onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                    event.preventDefault();
+                    setConfirmStatusOpen(true);
+                  }}
+                  className="space-y-4"
+                >
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className={labelClassName}>Status</label>

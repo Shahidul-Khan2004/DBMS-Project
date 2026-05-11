@@ -18,6 +18,11 @@ export interface IntakeReport {
   channel_code: string;
   category_code: string;
   location_text: string | null;
+  incident_public_uuid: string | null;
+  incident_code: string | null;
+  incident_status_code: string | null;
+  incident_is_terminal: 0 | 1 | boolean | null;
+  incident_resolved_at: string | null;
 }
 
 export interface IntakeReportListResponse {

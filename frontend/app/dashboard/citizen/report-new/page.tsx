@@ -249,6 +249,16 @@ export default function CitizenNewReportPage() {
       onLogout={handleLogout}
     >
       <div className="mx-auto max-w-2xl">
+        <div className="mb-4 flex justify-end">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => router.push("/dashboard/citizen")}
+          >
+            Back to Dashboard
+          </Button>
+        </div>
+
         <Card className="shadow-md">
           <CardHeader>
             <h2 className="text-lg font-semibold text-gray-900">
