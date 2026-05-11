@@ -251,9 +251,10 @@ export async function createEmergency999PathFromIntake(params) {
           call_started_at,
           call_ended_at,
           triaged_at,
-          call_status
+          call_status,
+          recording_url
         )
-        VALUES (?, ?, ?, ?, ?, ?, 'received')
+        VALUES (?, ?, ?, ?, ?, ?, 'received', ?)
       `,
       [
         params.intake.id,
@@ -262,6 +263,7 @@ export async function createEmergency999PathFromIntake(params) {
         toMySqlDateTimeOrNull(params.emergencyCall.callStartedAt),
         toMySqlDateTimeOrNull(params.emergencyCall.callEndedAt),
         toMySqlDateTimeOrNull(params.emergencyCall.triagedAt),
+        params.emergencyCall.recordingUrl ?? null,
       ],
     );
 
@@ -461,6 +463,112 @@ export async function createEmergency999PathFromIntake(params) {
         "Intake report is already linked to an emergency path",
       );
     }
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function ensureEmergencyCallForIntake(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [intakeRows] = await conn.execute(
+      `
+        SELECT id
+        FROM intake_reports
+        WHERE public_uuid = ?
+        LIMIT 1
+      `,
+      [params.intakeReportPublicUuid],
+    );
+    const intake = intakeRows[0];
+    if (!intake) {
+      throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+    }
+
+    const [existingRows] = await conn.execute(
+      `
+        SELECT id
+        FROM emergency_calls
+        WHERE intake_report_id = ?
+        LIMIT 1
+      `,
+      [intake.id],
+    );
+
+    let emergencyCallId;
+    if (existingRows[0]) {
+      emergencyCallId = existingRows[0].id;
+      await conn.execute(
+        `
+          UPDATE emergency_calls
+          SET
+            recording_url = COALESCE(recording_url, ?),
+            caller_phone_number = COALESCE(caller_phone_number, ?),
+            call_started_at = COALESCE(call_started_at, ?)
+          WHERE id = ?
+        `,
+        [
+          params.recordingUrl ?? null,
+          params.callerPhoneNumber ?? null,
+          toMySqlDateTimeOrNull(params.callStartedAt),
+          emergencyCallId,
+        ],
+      );
+    } else {
+      const [insertResult] = await conn.execute(
+        `
+          INSERT INTO emergency_calls (
+            intake_report_id,
+            dispatcher_id,
+            caller_phone_number,
+            call_started_at,
+            call_ended_at,
+            triaged_at,
+            call_status,
+            recording_url
+          )
+          VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)
+        `,
+        [
+          intake.id,
+          params.dispatcherUserId,
+          params.callerPhoneNumber ?? null,
+          toMySqlDateTimeOrNull(params.callStartedAt) ?? toMySqlDateTimeOrNull(new Date().toISOString()),
+          params.callStatus ?? "triaged",
+          params.recordingUrl ?? null,
+        ],
+      );
+      emergencyCallId = insertResult.insertId;
+    }
+
+    const [rows] = await conn.execute(
+      `
+        SELECT
+          id,
+          intake_report_id,
+          dispatcher_id,
+          caller_phone_number,
+          call_started_at,
+          call_ended_at,
+          triaged_at,
+          call_status,
+          recording_url,
+          transcript_text,
+          created_at
+        FROM emergency_calls
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [emergencyCallId],
+    );
+
+    await conn.commit();
+    return rows[0];
+  } catch (error) {
+    await conn.rollback();
     throw error;
   } finally {
     conn.release();

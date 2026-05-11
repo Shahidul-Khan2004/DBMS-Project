@@ -3,8 +3,11 @@ import {
   classifyEmergency999,
   classifyServiceCase,
   createIntakeReport,
+  getMyIntakeReportByPublicUuid,
+  getMyIntakeReportLocationHistory,
   getMyIntakeReports,
   getMyIntakeReportStats,
+  patchMyIntakeReportLocation,
 } from "../controllers/intake.js";
 import {
   forbidEmergencyUrgencyWithoutIncidentClassify,
@@ -16,6 +19,8 @@ import {
   validateClassifyEmergency999,
   validateClassifyServiceCase,
   validateCreateIntakeReport,
+  validateIntakeReportUuidParam,
+  validatePatchIntakeReportLocation,
 } from "../validators/intake.js";
 
 const router = express.Router();
@@ -24,6 +29,18 @@ router.use(requireAuth);
 
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
+router.get("/reports/:reportPublicUuid", validateIntakeReportUuidParam, getMyIntakeReportByPublicUuid);
+router.get(
+  "/reports/:reportPublicUuid/reported-location-history",
+  validateIntakeReportUuidParam,
+  getMyIntakeReportLocationHistory,
+);
+router.patch(
+  "/reports/:reportPublicUuid/location",
+  validateIntakeReportUuidParam,
+  validatePatchIntakeReportLocation,
+  patchMyIntakeReportLocation,
+);
 
 router.post(
   "/reports",
