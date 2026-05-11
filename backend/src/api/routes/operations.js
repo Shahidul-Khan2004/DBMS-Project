@@ -9,18 +9,23 @@ import {
   getOperationsIncident,
   listOperationsIncidents,
   patchOperationsIncidentStatus,
+  postGateway999IntakeAndIncident,
+  postLinkIntakeReportToIncident,
   postOperationsIncidentNote,
   promoteIntakeToEmergency,
 } from "../controllers/operationsIncidents.js";
 import {
+  getOperationsIntakeReportLocationHistory,
   getOperationsIntakeReport,
   listOperationsIntakeReports,
 } from "../controllers/operationsIntakeReports.js";
 import {
   validateOperationsCreateIncident,
+  validateOperationsGateway999Create,
   validateOperationsIncidentNote,
   validateOperationsIncidentUuidParam,
   validateOperationsListIncidentsQuery,
+  validateOperationsLinkIntakeToIncident,
   validateOperationsListIntakeQuery,
   validateOperationsPatchIncidentStatus,
   validateOperationsPromoteEmergency,
@@ -52,6 +57,13 @@ router.get(
   getOperationsIntakeReport,
 );
 
+router.get(
+  "/intake-reports/:reportPublicUuid/reported-location-history",
+  requirePermission("incident.classify"),
+  validateOperationsReportUuidParam,
+  getOperationsIntakeReportLocationHistory,
+);
+
 router.post(
   "/intake-reports/:reportPublicUuid/promote/emergency",
   requirePermission("incident.create"),
@@ -59,6 +71,13 @@ router.post(
   validateOperationsReportUuidParam,
   validateOperationsPromoteEmergency,
   promoteIntakeToEmergency,
+);
+
+router.post(
+  "/gateway/999/intake-and-incident",
+  requirePermission("incident.classify"),
+  validateOperationsGateway999Create,
+  postGateway999IntakeAndIncident,
 );
 
 router.post(
@@ -96,6 +115,14 @@ router.post(
   validateOperationsIncidentUuidParam,
   validateOperationsIncidentNote,
   postOperationsIncidentNote,
+);
+
+router.post(
+  "/incidents/:incidentPublicUuid/intake-reports",
+  requireAnyPermission("incident.create", "incident.update_status"),
+  validateOperationsIncidentUuidParam,
+  validateOperationsLinkIntakeToIncident,
+  postLinkIntakeReportToIncident,
 );
 
 export default router;

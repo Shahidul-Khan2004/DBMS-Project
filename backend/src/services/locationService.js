@@ -1,13 +1,18 @@
 import pool from "../config/db.js";
 import { requireAdministrativeAreaInTransaction } from "../domain/locationAccess.js";
-import { insertLocationInTransaction } from "../repositories/locationRepo.js";
+import {
+  getLocationRowByPublicUuid,
+  insertLocationInTransaction,
+  listLocationRowsByCreatorUserId,
+} from "../repositories/locationRepo.js";
 import { resolveAdminAreaIdForLocationPayload } from "./adminAreaFromGpsService.js";
+import { deriveAddressAndSourceForLocation } from "./locationAddressService.js";
 
 /**
  * @param {object | null} row
  * @param {{ adminAreaResolved: boolean, adminAreaMatchedLevel: string | null } | null} [resolutionMeta]
  */
-function mapRowToLocationResponse(row, resolutionMeta = null) {
+export function mapRowToLocationResponse(row, resolutionMeta = null) {
   if (!row) return null;
   const base = {
     id: Number(row.id),
@@ -28,6 +33,16 @@ function mapRowToLocationResponse(row, resolutionMeta = null) {
     base.adminAreaMatchedLevel = resolutionMeta.adminAreaMatchedLevel;
   }
   return base;
+}
+
+function canAccessLocation(actorUserId, actorPermissions, locationRow) {
+  const isOwner =
+    locationRow.created_by_user_id != null &&
+    Number(locationRow.created_by_user_id) === Number(actorUserId);
+  const isOperator =
+    actorPermissions.includes("incident.classify") ||
+    actorPermissions.includes("incident.create");
+  return isOwner || isOperator;
 }
 
 /**
@@ -57,13 +72,19 @@ export async function createLocationForActor(actorUserId, body) {
     if (adminToInsert != null) {
       await requireAdministrativeAreaInTransaction(conn, adminToInsert);
     }
+    const derived = await deriveAddressAndSourceForLocation({
+      latitude: body.latitude,
+      longitude: body.longitude,
+      addressText: body.address_text ?? null,
+      source: body.source ?? null,
+    });
     const row = await insertLocationInTransaction(conn, {
       admin_area_id: adminToInsert,
       latitude: body.latitude,
       longitude: body.longitude,
-      address_text: body.address_text,
+      address_text: derived.addressText,
       place_name: body.place_name ?? null,
-      source: body.source,
+      source: derived.source ?? body.source,
       created_by_user_id: actorUserId,
     });
     await conn.commit();
@@ -71,6 +92,28 @@ export async function createLocationForActor(actorUserId, body) {
   } catch (error) {
     await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function listLocationsForActor(actorUserId) {
+  const conn = await pool.getConnection();
+  try {
+    const rows = await listLocationRowsByCreatorUserId(conn, actorUserId);
+    return rows.map((row) => mapRowToLocationResponse(row));
+  } finally {
+    conn.release();
+  }
+}
+
+export async function getLocationForActor(publicUuid, actorUserId, actorPermissions = []) {
+  const conn = await pool.getConnection();
+  try {
+    const row = await getLocationRowByPublicUuid(conn, publicUuid);
+    if (!row) return null;
+    if (!canAccessLocation(actorUserId, actorPermissions, row)) return null;
+    return mapRowToLocationResponse(row);
   } finally {
     conn.release();
   }

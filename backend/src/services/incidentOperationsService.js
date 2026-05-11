@@ -3,6 +3,7 @@ import { query } from "../config/db.js";
 import {
   applyIncidentStatusChange,
   insertIncidentOperatorNote,
+  linkIntakeReportToIncident,
   promoteIntakeReportToEmergencyIncident,
   createIncidentAdminStandalone,
   getIncidentDetailForOperations,
@@ -12,6 +13,7 @@ import {
   findIntakeReportDetailForOperations,
   listIntakeReportsForOperations,
 } from "../repositories/operationsIntakeRepo.js";
+import { listIntakeReportLocationHistory } from "../repositories/intakeRepo.js";
 
 const TERMINAL_STATUSES = new Set(["resolved", "closed", "cancelled"]);
 
@@ -82,6 +84,14 @@ export async function operationsGetIntakeReport(publicUuid) {
   return findIntakeReportDetailForOperations(publicUuid);
 }
 
+export async function operationsGetIntakeReportLocationHistory(actorUserId, reportPublicUuid) {
+  return listIntakeReportLocationHistory({
+    reportPublicUuid,
+    actorUserId,
+    actorRoleCodes: ["dispatcher"],
+  });
+}
+
 export async function operationsCreateStandaloneIncident(actorUserId, body) {
   return createIncidentAdminStandalone({
     actorUserId,
@@ -146,4 +156,18 @@ export async function operationsAddIncidentNote(actorUserId, incidentPublicUuid,
     eventTime: body.eventTime ?? null,
   });
   return row;
+}
+
+export async function operationsLinkIntakeReport(
+  actorUserId,
+  incidentPublicUuid,
+  body,
+) {
+  return linkIntakeReportToIncident({
+    actorUserId,
+    incidentPublicUuid,
+    intakeReportPublicUuid: body.intakeReportPublicUuid,
+    linkType: body.linkType ?? "supporting_report",
+    note: body.note ?? null,
+  });
 }

@@ -1,6 +1,8 @@
 import validate from "./validator.js";
 import {
   classifyEmergency999Schema,
+  gateway999CreateSchema,
+  operationsLinkIntakeToIncidentSchema,
   operationsCreateIncidentSchema,
   operationsIncidentNoteSchema,
   operationsIncidentUuidParamSchema,
@@ -52,4 +54,14 @@ export const validateOperationsPatchIncidentStatus = validate(
 export const validateOperationsIncidentNote = validate(
   "operations incident note",
   operationsIncidentNoteSchema,
+);
+
+export const validateOperationsLinkIntakeToIncident = validate(
+  "operations link intake report",
+  operationsLinkIntakeToIncidentSchema,
+);
+
+export const validateOperationsGateway999Create = validate(
+  "operations gateway 999 create",
+  gateway999CreateSchema,
 );
