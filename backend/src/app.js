@@ -7,8 +7,10 @@ import usersRouter from "./api/routes/users.js";
 import intakeRouter from "./api/routes/intake.js";
 import operationsRouter from "./api/routes/operations.js";
 import locationsRouter from "./api/routes/locations.js";
+import notificationsRouter from "./api/routes/notifications.js";
 import { errorHandler, notFound } from "./api/middlewares/error.js";
 import { bootstrapDevelopmentSystemAdmin } from "./services/bootstrapService.js";
+import { startEmailWorker } from "./workers/emailWorker.js";
 
 const app = express();
 
@@ -27,6 +29,7 @@ app.use("/users", usersRouter);
 app.use("/intake", intakeRouter);
 app.use("/operations", operationsRouter);
 app.use("/locations", locationsRouter);
+app.use("/notifications", notificationsRouter);
 
 app.use(notFound);
 
@@ -39,6 +42,8 @@ async function startServer() {
   } catch (error) {
     console.error("Bootstrap failed:", error);
   }
+
+  startEmailWorker();
 
   app.listen(PORT, () => {
     console.log(`Server is running on port http://localhost:${PORT}`);

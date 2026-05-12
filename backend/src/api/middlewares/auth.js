@@ -61,10 +61,7 @@ export function requirePermission(...permissionCodes) {
   };
 }
 
-/**
- * Web-portal reporters must not declare `urgencyType: emergency`; only operators
- * with `incident.classify` (e.g. dispatcher, system_admin) may.
- */
+
 export function forbidEmergencyUrgencyWithoutIncidentClassify(req, res, next) {
   if (req.body?.urgencyType !== "emergency") {
     return next();

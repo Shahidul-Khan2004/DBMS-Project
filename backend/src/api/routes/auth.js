@@ -13,7 +13,9 @@ import {
 const router = express.Router();
 
 router.post('/register', validateUserRegistration, registerUser);
-router.post('/login', validateUserLogin, loginUser);
+
+router.post('/login', validateUserLogin, loginUser); 
+
 router.post('/refresh', validateRefreshToken, refreshAccessToken);
 
 export default router;

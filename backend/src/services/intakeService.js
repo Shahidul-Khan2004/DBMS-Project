@@ -15,6 +15,7 @@ import {
   createServiceCaseFromIntake,
   ensureEmergencyCallForIntake,
 } from "../repositories/intakeGatewayRepo.js";
+import { createNotification } from "./notificationService.js";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,7 +49,7 @@ export async function createIntakeReportForUser(actorPublicUuid, body) {
   const publicUuid = randomUUID();
   const reportCode = generateCode("IR");
 
-  return createIntakeReport({
+  const report = await createIntakeReport({
     publicUuid,
     reportCode,
     reporterUserId: userRow.id,
@@ -64,6 +65,27 @@ export async function createIntakeReportForUser(actorPublicUuid, body) {
     locationId: body.locationId ?? null,
     createdByUserPublicUuid: actorPublicUuid,
   });
+
+  // Confirm receipt to the submitter. Fire-and-forget — a notification
+  // failure must never roll back the intake that was already committed.
+  try {
+    await createNotification({
+      notificationType:  "case_reply",
+      templateCode:      "intake_received",
+      templateVars:      { report_code: reportCode },
+      fallbackTitle:     "Your report has been received",
+      fallbackBody:      `We have received your report (${reportCode}). You will be notified as it is reviewed.`,
+      entityType:        "intake_report",
+      entityId:          report.id,
+      recipientUserIds:  [userRow.id],
+      createdByUserId:   null,
+      deliveryChannel:   "both",
+    });
+  } catch (err) {
+    console.error("Failed to send intake_created notification:", err);
+  }
+
+  return report;
 }
 
 async function loadIntakeForClassification(reportPublicUuid, allowedStatuses) {
@@ -113,7 +135,7 @@ export async function classifyIntakeAsServiceCase(actorPublicUuid, reportPublicU
   const casePublicUuid = randomUUID();
   const caseCode = generateCode("SC");
 
-  return createServiceCaseFromIntake({
+  const result = await createServiceCaseFromIntake({
     intake,
     intakeReportPublicUuid: reportPublicUuid,
     actorUserId: userRow.id,
@@ -126,6 +148,26 @@ export async function classifyIntakeAsServiceCase(actorPublicUuid, reportPublicU
       initialCaseStatusCode: "submitted",
     },
   });
+
+  // Notify the reporter that their intake has been reviewed and a service case opened.
+  try {
+    await createNotification({
+      notificationType:  "case_reply",
+      templateCode:      "intake_classified",
+      templateVars:      { case_code: result.service_case.case_code },
+      fallbackTitle:     "Your report has been reviewed",
+      fallbackBody:      `Your report has been reviewed and a service case (${result.service_case.case_code}) has been opened. Our team will follow up with you.`,
+      entityType:        "service_case",
+      entityId:          result.service_case.id,
+      recipientUserIds:  [intake.reporter_user_id],
+      createdByUserId:   userRow.id,
+      deliveryChannel:   "both",
+    });
+  } catch (err) {
+    console.error("Failed to send intake_classified notification:", err);
+  }
+
+  return result;
 }
 
 export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublicUuid, body) {
@@ -151,7 +193,7 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
     );
   }
 
-  return createEmergency999PathFromIntake({
+   const result = await createEmergency999PathFromIntake({
     intake,
     intakeReportPublicUuid: reportPublicUuid,
     actorUserId: userRow.id,
@@ -176,6 +218,25 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
       linkType: "primary_report",
     },
   });
+
+  try {
+    await createNotification({
+      notificationType:  "incident_update",
+      templateCode:      "intake_escalated",
+      templateVars:      { incident_code: result.emergency_incident.incident_code },
+      fallbackTitle:     "Your report has been escalated",
+      fallbackBody:      `Your intake report has been escalated to emergency incident ${result.emergency_incident.incident_code}.`,
+      entityType:        "emergency_incident",
+      entityId:          result.emergency_incident.id,
+      recipientUserIds:  [intake.reporter_user_id],
+      createdByUserId:   userRow.id,
+      deliveryChannel:   "both",
+    });
+  } catch (err) {
+    console.error("Failed to create emergency incident notification:", err);
+  }
+
+  return result;
 }
 
 export async function listMyIntakeReports(actorPublicUuid) {

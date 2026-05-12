@@ -849,6 +849,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
 
 function mapIncidentDetail(row) {
   return {
+    id: row.id,                          // internal DB id — needed for notification entityId
     public_uuid: row.public_uuid,
     incident_code: row.incident_code,
     title: row.title,
@@ -864,6 +865,31 @@ function mapIncidentDetail(row) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+/**
+ * Returns the distinct reporter_user_id values for all intake reports linked
+ * to a given incident. Returns an empty array when the incident was admin-created
+ * with no linked intake, or when no reporter is attached.
+ *
+ * Used by notification hooks that need to know who to notify about incident changes.
+ *
+ * @param {string} incidentPublicUuid
+ * @returns {Promise<number[]>}
+ */
+export async function getIncidentReporterUserIds(incidentPublicUuid) {
+  const result = await query(
+    `
+      SELECT DISTINCT ir.reporter_user_id
+      FROM emergency_incidents ei
+      INNER JOIN incident_report_links irl ON irl.incident_id = ei.id
+      INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+      WHERE ei.public_uuid = ?
+        AND ir.reporter_user_id IS NOT NULL
+    `,
+    [incidentPublicUuid],
+  );
+  return result.rows.map((r) => r.reporter_user_id);
 }
 
 export async function applyIncidentStatusChange(params) {

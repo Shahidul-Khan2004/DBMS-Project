@@ -156,9 +156,3 @@ INSERT INTO blood_groups (group_code, name) VALUES
 ('AB-','AB Negative'),
 ('O+','O Positive'),
 ('O-','O Negative');
-
-INSERT INTO notification_templates (template_code, channel, subject_template, body_template) VALUES
-('case_resolved_email','email','Your NIERS case has been resolved','Your case {{case_code}} has been addressed. Please check your dashboard for details.'),
-('case_reply_in_app','in_app',NULL,'An admin has replied to your case {{case_code}}.'),
-('case_escalated_email','email','Your NIERS case has been escalated','Your case {{case_code}} has been escalated to emergency response.'),
-('incident_update_in_app','in_app',NULL,'Emergency incident {{incident_code}} has been updated.');
