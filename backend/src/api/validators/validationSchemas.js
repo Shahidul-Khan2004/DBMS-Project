@@ -244,3 +244,23 @@ export const gateway999CreateSchema = z
       path: ["severityCode"],
     },
   );
+
+/** Query params for GET /notifications/my — all optional; service applies defaults. */
+export const listNotificationsQuerySchema = z.object({
+  unread_only: z.preprocess((val) => {
+    const v = Array.isArray(val) ? val[0] : val;
+    if (v === undefined || v === null || v === "") return undefined;
+    if (typeof v === "boolean") return v;
+    const s = String(v).toLowerCase().trim();
+    if (s === "true" || s === "1" || s === "yes") return true;
+    if (s === "false" || s === "0" || s === "no") return false;
+    return v;
+  }, z.boolean().optional()),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+/** Route params for PATCH /notifications/:notificationRecipientId/read */
+export const notificationRecipientIdParamSchema = z.object({
+  notificationRecipientId: z.coerce.number().int().positive(),
+});
