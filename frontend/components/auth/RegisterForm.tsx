@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, RegisterInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { publicPost } from "@/lib/api";
 import type { RegisterResponse } from "@/types/auth";
 
 interface RegisterFormProps {
@@ -55,9 +57,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
   const {
     register,
     handleSubmit,
@@ -79,30 +78,18 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     setApiError(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setApiError(
-          result?.error?.message ||
-            result?.message ||
-            "Registration failed. Please try again.",
-        );
-        return;
-      }
-
+      const result = await publicPost<RegisterResponse, RegisterInput>(
+        "/auth/register",
+        data,
+      );
       reset();
-      onSuccess?.(result as RegisterResponse);
-    } catch (error) {
-      console.error("Registration error:", error);
-      setApiError("An unexpected error occurred. Please try again.");
+      onSuccess?.(result);
+    } catch (err) {
+      setApiError(
+        err instanceof Error
+          ? err.message
+          : "Registration failed. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -111,9 +98,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {apiError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-800">{apiError}</p>
-        </div>
+        <ErrorAlert message={apiError} />
       )}
 
       <Input
@@ -158,7 +143,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             aria-pressed={showPassword}
             aria-label={showPassword ? "Hide password" : "Show password"}
             title={showPassword ? "Hide password" : "Show password"}
-            className="inline-flex items-center justify-center text-black transition-colors hover:text-gray-800"
+            className="inline-flex items-center justify-center text-[#002D62] transition-colors hover:text-[#006747]"
           >
             <PasswordToggleIcon visible={showPassword} />
           </button>
@@ -179,7 +164,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             aria-pressed={showConfirmPassword}
             aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             title={showConfirmPassword ? "Hide password" : "Show password"}
-            className="inline-flex items-center justify-center text-black transition-colors hover:text-gray-800"
+            className="inline-flex items-center justify-center text-[#002D62] transition-colors hover:text-[#006747]"
           >
             <PasswordToggleIcon visible={showConfirmPassword} />
           </button>

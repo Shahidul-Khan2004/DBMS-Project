@@ -1,33 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ShieldAlert } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { PageLoading } from "@/components/ui/StatusState";
 import { RoleAssignmentForm } from "@/components/admin/RoleAssignmentForm";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { LoginResponse } from "@/types/auth";
+
+function readSessionUser() {
+  if (typeof window === "undefined") return null;
+
+  const sessionUser = sessionStorage.getItem("loggedInUser");
+  if (!sessionUser) return null;
+
+  try {
+    return JSON.parse(sessionUser) as LoginResponse["user"];
+  } catch {
+    return null;
+  }
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const isCheckingAuth = useAuthGuard(["system_admin"]);
+  const user = readSessionUser();
 
   useEffect(() => {
-    const sessionUser = sessionStorage.getItem("loggedInUser");
-    if (sessionUser) {
-      try {
-        const parsedUser = JSON.parse(sessionUser);
-        setUser(parsedUser);
-        setIsLoading(false);
-      } catch {
-        router.push("/auth/login");
-      }
-    } else {
+    if (isCheckingAuth) return;
+
+    if (!user) {
       router.push("/auth/login");
     }
-  }, [router]);
+  }, [isCheckingAuth, router, user]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -35,12 +43,8 @@ export default function AdminDashboard() {
     router.push("/");
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+  if (isCheckingAuth || !user) {
+    return <PageLoading label="Loading admin console" />;
   }
 
   return (
@@ -49,81 +53,31 @@ export default function AdminDashboard() {
       subtitle="System administration and user management"
       onLogout={handleLogout}
     >
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Admin Info */}
-        <Card className="shadow-md md:col-span-3">
+      <div className="mx-auto max-w-screen-xl space-y-6">
+        <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
-              System Admin
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              Name: <span className="font-medium">{user?.full_name}</span>
-            </p>
-            <p className="mt-2 text-sm text-gray-500">User ID: {user?.id}</p>
-            <p className="mt-2 text-sm text-gray-500">{user?.email}</p>
-            <p className="mt-2 text-sm text-green-600 font-medium">
-              Full administrative access
-            </p>
-          </CardContent>
-        </Card>
-
-        <div className="md:col-span-3">
-          <RoleAssignmentForm />
-        </div>
-
-        {/* Admin Actions */}
-        <Card className="shadow-md md:col-span-3">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Management</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button>Manage Users</Button>
-              <Button>Assign Roles</Button>
-              <Button variant="secondary">View System Logs</Button>
-              <Button variant="secondary">System Settings</Button>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
+                <ShieldAlert className="h-5 w-5" aria-hidden />
+              </div>
+              <h2 className="text-lg font-semibold text-[#002D62]">
+                Current Admin
+              </h2>
             </div>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Email</dt>
+                <dd className="mt-1 break-words text-sm text-gray-900">
+                  {user?.email || "-"}
+                </dd>
+              </div>
+            </dl>
           </CardContent>
         </Card>
 
-        {/* System Stats */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Total Users</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">0</div>
-            <p className="mt-2 text-sm text-gray-600">Registered users</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Active Roles
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">0</div>
-            <p className="mt-2 text-sm text-gray-600">Dispatchers assigned</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
-              System Health
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm">
-              <p className="text-green-600 font-medium">Operational</p>
-              <p className="mt-1 text-gray-600">All services running</p>
-            </div>
-          </CardContent>
-        </Card>
+        <RoleAssignmentForm />
       </div>
     </DashboardLayout>
   );

@@ -13,7 +13,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={`
-        bg-white rounded-lg border border-gray-200 shadow-sm
+        rounded-3xl border border-[#002D62]/10 bg-zinc-200 shadow-lg shadow-[#002D62]/5
         ${className}
       `}
       {...props}
@@ -30,7 +30,7 @@ export const CardHeader: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`px-6 py-5 border-b border-gray-200 ${className}`}
+      className={`border-b border-[#002D62]/10 px-6 py-5 ${className}`}
       {...props}
     >
       {children}
@@ -57,7 +57,7 @@ export const CardFooter: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 ${className}`}
+      className={`flex gap-3 border-t border-[#002D62]/10 bg-[#EFF6FF]/70 px-6 py-4 ${className}`}
       {...props}
     >
       {children}

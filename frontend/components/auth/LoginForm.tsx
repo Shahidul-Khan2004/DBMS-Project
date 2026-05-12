@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { publicPost } from "@/lib/api";
 import type { LoginResponse } from "@/types/auth";
 
 interface LoginFormProps {
@@ -54,9 +56,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
   const {
     register,
     handleSubmit,
@@ -75,30 +74,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setApiError(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setApiError(
-          result?.error?.message ||
-            result?.message ||
-            "Login failed. Please try again.",
-        );
-        return;
-      }
-
+      const result = await publicPost<LoginResponse, LoginInput>(
+        "/auth/login",
+        data,
+      );
       reset();
-      onSuccess?.(result as LoginResponse);
-    } catch (error) {
-      console.error("Login error:", error);
-      setApiError("An unexpected error occurred. Please try again.");
+      onSuccess?.(result);
+    } catch (err) {
+      setApiError(
+        err instanceof Error ? err.message : "Login failed. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -107,9 +92,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {apiError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-800">{apiError}</p>
-        </div>
+        <ErrorAlert message={apiError} />
       )}
 
       <Input
@@ -134,7 +117,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             aria-pressed={showPassword}
             aria-label={showPassword ? "Hide password" : "Show password"}
             title={showPassword ? "Hide password" : "Show password"}
-            className="inline-flex items-center justify-center text-black transition-colors hover:text-gray-800"
+            className="inline-flex items-center justify-center text-[#002D62] transition-colors hover:text-[#006747]"
           >
             <PasswordToggleIcon visible={showPassword} />
           </button>

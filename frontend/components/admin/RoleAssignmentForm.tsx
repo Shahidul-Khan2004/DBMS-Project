@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { ApiError, apiPost } from "@/lib/api";
 import { getAuthSession } from "@/lib/auth-store";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 /** Display names aligned with `roles` seed in schema.sql */
 const ROLE_OPTIONS: { roleCode: string; name: string }[] = [
@@ -16,6 +15,37 @@ const ROLE_OPTIONS: { roleCode: string; name: string }[] = [
   { roleCode: "agency_representative", name: "Agency Representative" },
   { roleCode: "system_admin", name: "System Admin" },
 ];
+
+type RoleAssignmentResponse = {
+  message?: string;
+  userId?: string;
+  roleCode?: string;
+};
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function formatRoleAssignmentError(error: unknown) {
+  if (error instanceof ApiError) {
+    const hints: Record<string, string> = {
+      FORBIDDEN:
+        "You need the auth.manage_roles permission to assign roles.",
+      ROLE_NOT_FOUND:
+        "The role code does not exist. Use an existing role such as dispatcher or system_admin.",
+      USER_NOT_FOUND:
+        "No user was found for that public UUID.",
+      ROLE_ALREADY_ASSIGNED:
+        "That user already has this role.",
+    };
+
+    const hint = error.code ? hints[error.code] : undefined;
+    return `${error.code ? `${error.code}: ` : ""}${error.message}${
+      hint ? ` ${hint}` : ""
+    }`;
+  }
+
+  return error instanceof Error ? error.message : "Failed to assign role.";
+}
 
 export const RoleAssignmentForm: React.FC = () => {
   const assignableRoles = useMemo(() => {
@@ -28,57 +58,59 @@ export const RoleAssignmentForm: React.FC = () => {
 
   const [userId, setUserId] = useState("");
   const [selectedRoleCode, setSelectedRoleCode] = useState(
-    () => assignableRoles[0]?.roleCode ?? "citizen",
+    () => assignableRoles[0]?.roleCode ?? "dispatcher",
   );
   const [isAssigning, setIsAssigning] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [lastResult, setLastResult] = useState<RoleAssignmentResponse | null>(
+    null,
+  );
 
-  const handleAssignRole = async () => {
+  const handleAssignRole = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     const trimmedId = userId.trim();
+    const normalizedRoleCode = selectedRoleCode.trim().toLowerCase();
+
     if (!trimmedId) {
-      setMessage({ type: "error", text: "Please enter a user ID" });
+      setMessage({
+        type: "error",
+        text: "Enter the target user's public UUID.",
+      });
       return;
     }
 
-    if (!assignableRoles.some((r) => r.roleCode === selectedRoleCode)) {
-      setMessage({ type: "error", text: "Selected role is not available" });
+    if (!UUID_PATTERN.test(trimmedId)) {
+      setMessage({
+        type: "error",
+        text: "Target user public UUID must be a valid UUID.",
+      });
+      return;
+    }
+
+    if (!assignableRoles.some((r) => r.roleCode === normalizedRoleCode)) {
+      setMessage({ type: "error", text: "Selected role is not available." });
       return;
     }
 
     setIsAssigning(true);
     setMessage(null);
+    setLastResult(null);
 
     try {
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `${API_BASE}/users/${encodeURIComponent(trimmedId)}/roles`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            roleCode: selectedRoleCode,
-          }),
-        },
+      const data = await apiPost<RoleAssignmentResponse>(
+        `/users/${encodeURIComponent(trimmedId)}/roles`,
+        { roleCode: normalizedRoleCode },
       );
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const errMsg =
-          data?.error?.message ?? data?.message ?? "Failed to assign role";
-        throw new Error(typeof errMsg === "string" ? errMsg : "Request failed");
-      }
-
       const roleName =
-        assignableRoles.find((r) => r.roleCode === selectedRoleCode)?.name ??
-        selectedRoleCode;
+        assignableRoles.find((r) => r.roleCode === normalizedRoleCode)?.name ??
+        normalizedRoleCode;
 
+      setLastResult(data);
       setMessage({
         type: "success",
         text:
@@ -89,7 +121,7 @@ export const RoleAssignmentForm: React.FC = () => {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to assign role",
+        text: formatRoleAssignmentError(error),
       });
     } finally {
       setIsAssigning(false);
@@ -97,20 +129,33 @@ export const RoleAssignmentForm: React.FC = () => {
   };
 
   return (
-    <Card className="shadow-md">
+    <Card className="overflow-hidden shadow-md">
       <CardHeader>
-        <h2 className="text-lg font-semibold text-gray-900">Assign role</h2>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
+            <ShieldCheck className="h-5 w-5" aria-hidden />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-[#002D62]">
+              Assign Role
+            </h2>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="w-full space-y-4">
+        <form className="w-full space-y-5" onSubmit={handleAssignRole}>
           <div className="grid w-full gap-4 sm:grid-cols-2 sm:items-end">
             <div className="min-w-0">
               <Input
-                label="User ID"
+                label="Target User Public UUID"
                 value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="Target user UUID"
+                onChange={(e) => {
+                  setUserId(e.target.value);
+                  setMessage(null);
+                }}
+                placeholder="0d5fd834-a3fc-4180-b8ec-a6e664d130d0"
                 autoComplete="off"
+                required
               />
             </div>
 
@@ -124,8 +169,11 @@ export const RoleAssignmentForm: React.FC = () => {
               <select
                 id="role-assignment-role"
                 value={selectedRoleCode}
-                onChange={(e) => setSelectedRoleCode(e.target.value)}
-                className="block h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => {
+                  setSelectedRoleCode(e.target.value.toLowerCase());
+                  setMessage(null);
+                }}
+                className="block h-[46px] w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
               >
                 {assignableRoles.map(({ roleCode, name }) => (
                   <option key={roleCode} value={roleCode}>
@@ -137,26 +185,42 @@ export const RoleAssignmentForm: React.FC = () => {
           </div>
 
           <Button
-            onClick={handleAssignRole}
+            type="submit"
             isLoading={isAssigning}
             disabled={isAssigning}
-            className="bg-green-600 hover:bg-green-700"
           >
-            Assign role
+            Assign Role
           </Button>
 
           {message && (
             <div
-              className={`rounded-lg p-3 text-sm ${
+              className={`rounded-2xl border p-3 text-sm ${
                 message.type === "success"
-                  ? "bg-green-50 text-green-700"
-                  : "bg-red-50 text-red-700"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-red-200 bg-red-50 text-red-700"
               }`}
             >
               {message.text}
             </div>
           )}
-        </div>
+
+          {lastResult ? (
+            <dl className="grid gap-3 rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="font-medium text-gray-600">User ID</dt>
+                <dd className="mt-1 break-all text-gray-900">
+                  {lastResult.userId ?? userId.trim()}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-gray-600">Role Code</dt>
+                <dd className="mt-1 font-semibold text-[#002D62]">
+                  {lastResult.roleCode ?? selectedRoleCode}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </form>
       </CardContent>
     </Card>
   );

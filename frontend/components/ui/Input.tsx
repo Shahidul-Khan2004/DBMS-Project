@@ -1,4 +1,5 @@
-import React from "react";
+import { AlertCircle } from "lucide-react";
+import React, { useId } from "react";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -13,12 +14,20 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     { label, error, helpText, icon, endElement, className = "", ...props },
     ref,
   ) => {
+    const generatedId = useId();
+    const inputId = props.id ?? generatedId;
+    const errorId = `${inputId}-error`;
+    const helpId = `${inputId}-help`;
+
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor={inputId}
+            className="mb-2 block text-sm font-medium text-gray-700"
+          >
             {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
+            {props.required && <span className="ml-1 text-[#DA291C]">*</span>}
           </label>
         )}
         <div className="relative">
@@ -34,27 +43,36 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             ref={ref}
+            id={inputId}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : helpText ? helpId : undefined}
             className={`
-              w-full px-4 py-2.5 border border-gray-300 rounded-lg
+              w-full rounded-2xl border border-[#002D62]/20 bg-white px-4 py-2.5
               text-gray-900 placeholder-gray-500
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
               transition-colors duration-200
-              disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+              focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35
+              disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500
               ${icon ? "pl-10" : ""}
               ${endElement ? "pr-12" : ""}
-              ${error ? "border-red-500 focus:ring-red-500" : ""}
+              ${error ? "border-[#DA291C] focus:border-[#DA291C] focus:ring-[#DA291C]/30" : ""}
               ${className}
             `}
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-            <span>⚠</span> {error}
+          <p
+            id={errorId}
+            className="mt-2 flex items-center gap-1.5 text-sm text-[#B71C1C]"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+            {error}
           </p>
         )}
         {helpText && !error && (
-          <p className="mt-1 text-sm text-gray-500">{helpText}</p>
+          <p id={helpId} className="mt-2 text-sm text-gray-500">
+            {helpText}
+          </p>
         )}
       </div>
     );

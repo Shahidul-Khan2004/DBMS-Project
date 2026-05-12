@@ -2,59 +2,90 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, Clock3, FileText, MapPin, PlusCircle } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { PageHeader, PageLoading } from "@/components/ui/StatusState";
+import { apiGet } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { LoginResponse } from "@/types/auth";
-import type { IntakeReportStatsResponse } from "@/types/intake";
+import type {
+  IntakeReportStats,
+  IntakeReportStatsResponse,
+} from "@/types/intake";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+const EMPTY_STATS: IntakeReportStats = {
+  totalReports: 0,
+  pendingReports: 0,
+  resolvedReports: 0,
+};
+
+const STAT_CARDS = [
+  {
+    key: "totalReports",
+    label: "Total Reports",
+    description: "All reports submitted from your account",
+    icon: FileText,
+    accent: "bg-[#002D62] text-white",
+  },
+  {
+    key: "pendingReports",
+    label: "Pending Reports",
+    description: "Reports still being reviewed or coordinated",
+    icon: Clock3,
+    accent: "bg-amber-100 text-amber-800",
+  },
+  {
+    key: "resolvedReports",
+    label: "Resolved Reports",
+    description: "Reports closed after action or review",
+    icon: CheckCircle2,
+    accent: "bg-emerald-100 text-emerald-800",
+  },
+] as const;
 
 export default function CitizenDashboard() {
   const router = useRouter();
+  const isChecking = useAuthGuard(["citizen"]);
   const [user, setUser] = useState<LoginResponse["user"] | null>(null);
-  const [stats, setStats] = useState({
-    totalReports: 0,
-    pendingReports: 0,
-    resolvedReports: 0,
-  });
+  const [stats, setStats] = useState<IntakeReportStats>(EMPTY_STATS);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    if (isChecking) return;
+
     const loadDashboard = async () => {
       const sessionUser = sessionStorage.getItem("loggedInUser");
-      const accessToken = localStorage.getItem("accessToken");
 
-      if (!sessionUser || !accessToken) {
-        router.push("/auth/login");
-        return;
-      }
-
+      setIsLoading(true);
+      setError("");
       try {
-        const parsedUser = JSON.parse(sessionUser);
+        const parsedUser = sessionUser
+          ? (JSON.parse(sessionUser) as LoginResponse["user"])
+          : null;
         setUser(parsedUser);
 
-        const response = await fetch(`${API_BASE}/intake/reports/my/stats`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = (await response.json()) as IntakeReportStatsResponse;
-          setStats(data.stats);
-        }
-      } catch {
-        router.push("/auth/login");
-        return;
+        const data = await apiGet<IntakeReportStatsResponse>(
+          "/intake/reports/my/stats",
+        );
+        setStats(data.stats ?? EMPTY_STATS);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not load your dashboard stats.",
+        );
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadDashboard();
-  }, [router]);
+    void loadDashboard();
+  }, [isChecking]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -62,12 +93,8 @@ export default function CitizenDashboard() {
     router.push("/");
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+  if (isChecking || isLoading) {
+    return <PageLoading label="Loading citizen dashboard" />;
   }
 
   return (
@@ -76,71 +103,83 @@ export default function CitizenDashboard() {
       subtitle="Report incidents and emergencies"
       onLogout={handleLogout}
     >
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Welcome Card */}
+      <div className="space-y-6">
+        {error && <ErrorAlert message={error} />}
+
+        <PageHeader
+          eyebrow="Citizen dashboard"
+          title={`Welcome${user?.full_name ? `, ${user.full_name}` : ""}`}
+          description="Track submitted reports, update reported locations, and keep trusted places ready for future submissions."
+          meta={
+            user?.id ? (
+              <p className="break-all text-sm text-gray-600">
+                User ID: {user.id}
+              </p>
+            ) : null
+          }
+          actions={
+            <>
+              <Button
+                type="button"
+                onClick={() => router.push("/dashboard/citizen/report-new")}
+              >
+                <PlusCircle className="h-4 w-4" aria-hidden />
+                Report New Incident
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => router.push("/dashboard/citizen/locations")}
+              >
+                <MapPin className="h-4 w-4" aria-hidden />
+                Saved Locations
+              </Button>
+            </>
+          }
+        />
+
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Welcome</h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              Hello, <span className="font-medium">{user?.full_name}</span>
-            </p>
-            <p className="mt-2 text-sm text-gray-500">User ID: {user?.id}</p>
-            <p className="mt-2 text-sm text-gray-500">{user?.email}</p>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Actions</h2>
-          </CardHeader>
-          <CardContent>
-            <Button
-              fullWidth
-              className="mb-3"
-              onClick={() => router.push("/dashboard/citizen/report-new")}
-            >
-              Report New Incident
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => router.push("/dashboard/citizen/reports")}
-            >
-              View My Reports
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Incident Stats */}
-        <Card className="shadow-md md:col-span-2">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Your Reports
-            </h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold text-[#002D62]">
+                Your Reports
+              </h2>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/dashboard/citizen/reports")}
+              >
+                View My Reports
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-lg bg-blue-50 p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {stats.totalReports}
-                </div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-              </div>
-              <div className="rounded-lg bg-yellow-50 p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {stats.pendingReports}
-                </div>
-                <p className="text-sm text-gray-600">Pending</p>
-              </div>
-              <div className="rounded-lg bg-green-50 p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {stats.resolvedReports}
-                </div>
-                <p className="text-sm text-gray-600">Resolved</p>
-              </div>
+              {STAT_CARDS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.key}
+                    className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm"
+                  >
+                    <div
+                      className={`flex h-11 w-11 items-center justify-center rounded-2xl ${item.accent}`}
+                    >
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </div>
+                    <div className="mt-5 text-3xl font-bold text-[#002D62]">
+                      {stats[item.key]}
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-gray-600">
+                      {item.description}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
