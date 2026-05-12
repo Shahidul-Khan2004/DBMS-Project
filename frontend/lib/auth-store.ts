@@ -47,8 +47,7 @@ export function clearAuthSession() {
 }
 
 export function getValidAccessToken() {
-  const session = readStoredAuthSession();
-  const accessToken = session?.accessToken;
+  const { accessToken } = getAuthSession();
 
   if (!accessToken || isJwtExpired(accessToken)) {
     return null;

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { publicGet } from "@/lib/api";
+
+type HealthResponse = {
+  status?: string;
+};
 
 export function HealthBadge() {
   const [status, setStatus] = useState<"checking" | "running" | "down">(
@@ -13,10 +17,9 @@ export function HealthBadge() {
 
     async function checkHealth() {
       try {
-        const response = await fetch(`${API_BASE}/health`);
-        const data = await response.json().catch(() => ({}));
+        const data = await publicGet<HealthResponse>("/health");
         if (!cancelled) {
-          setStatus(response.ok && data?.status === "RUNNING" ? "running" : "down");
+          setStatus(data.status === "RUNNING" ? "running" : "down");
         }
       } catch {
         if (!cancelled) setStatus("down");

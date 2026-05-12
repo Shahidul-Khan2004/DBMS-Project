@@ -1,7 +1,9 @@
+import { MessageBanner } from "@/components/ui/StatusState";
+
 export function ErrorAlert({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <MessageBanner tone="error" title="Something went wrong">
       {message}
-    </div>
+    </MessageBanner>
   );
 }

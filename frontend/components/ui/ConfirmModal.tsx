@@ -23,8 +23,8 @@ export function ConfirmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      <div className="w-full max-w-md rounded-3xl border border-[#002D62]/10 bg-zinc-200 p-6 shadow-2xl shadow-[#002D62]/15">
+        <h2 className="text-lg font-semibold text-[#002D62]">{title}</h2>
         <p className="mt-2 text-sm leading-6 text-gray-600">{message}</p>
         <div className="mt-6 flex justify-end gap-3">
           <Button

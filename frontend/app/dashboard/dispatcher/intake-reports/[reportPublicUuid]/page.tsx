@@ -1,80 +1,59 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { clearAuthSession, getValidAccessToken } from "@/lib/auth-store";
+import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState, PageLoading } from "@/components/ui/StatusState";
+import { ApiError, apiJson, apiPost, ensureAuthSession } from "@/lib/api";
+import { clearAuthSession } from "@/lib/auth-store";
+import { formatBangladeshTime } from "@/lib/datetime";
+import type {
+  LocationPickerSelectionDetails,
+  LocationPickerValue,
+} from "@/components/location/LocationPicker";
+import type {
+  IntakeLocationHistoryItem,
+  IntakeLocationHistoryResponse,
+  UpdateIntakeLocationResponse,
+} from "@/types/intake";
 import type {
   OperationsIntakeReport,
   OperationsIntakeReportResponse,
 } from "@/types/operations-intake";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+const LocationPicker = dynamic(
+  () =>
+    import("@/components/location/LocationPicker").then((mod) => ({
+      default: mod.LocationPicker,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[420px] animate-pulse rounded-2xl bg-slate-100" />
+    ),
+  },
+);
+
+type IntakeLinkType = "supporting_report" | "follow_up_report";
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function formatLabel(value: string | null | undefined) {
   if (!value) return "-";
   return value.replace(/_/g, " ");
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return "-";
-
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-
-  return d.toLocaleString();
-}
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case "received":
-      return "bg-blue-100 text-blue-800";
-    case "under_review":
-      return "bg-yellow-100 text-yellow-800";
-    case "linked_to_case":
-      return "bg-indigo-100 text-indigo-800";
-    case "linked_to_incident":
-      return "bg-red-100 text-red-800";
-    case "closed":
-      return "bg-green-100 text-green-800";
-    case "duplicate":
-    case "false_report":
-      return "bg-gray-100 text-gray-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-function getUrgencyColor(urgency: string) {
-  switch (urgency) {
-    case "emergency":
-      return "bg-red-100 text-red-800";
-    case "non_emergency":
-      return "bg-green-100 text-green-800";
-    case "unknown":
-      return "bg-yellow-100 text-yellow-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-function Badge({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className: string;
-}) {
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize ${className}`}
-    >
-      {children}
-    </span>
-  );
 }
 
 function DetailRow({
@@ -85,10 +64,91 @@ function DetailRow({
   children: ReactNode;
 }) {
   return (
-    <div>
+    <dl>
       <dt className="text-sm font-medium text-gray-600">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-gray-900">{children}</dd>
-    </div>
+      <dd className="mt-1 wrap-break-word text-sm text-gray-900">{children}</dd>
+    </dl>
+  );
+}
+
+function formatLocation(
+  location: OperationsIntakeReport["location"] | IntakeLocationHistoryItem["location"],
+) {
+  if (!location) return "-";
+  return (
+    location.address_text ||
+    location.place_name ||
+    "Map location selected"
+  );
+}
+
+function getEmergencyAction(report: OperationsIntakeReport) {
+  const isEmergencyCall = report.channel_code === "emergency_call";
+
+  return {
+    href: isEmergencyCall
+      ? `/dashboard/dispatcher/intake-reports/${report.public_uuid}/classify/emergency`
+      : `/dashboard/dispatcher/intake-reports/${report.public_uuid}/promote/emergency`,
+    label: isEmergencyCall ? "Classify Emergency Call" : "Promote to Emergency",
+  };
+}
+
+function formatApiError(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    const hints: Record<string, string> = {
+      EMERGENCY_INCIDENT_REQUIRES_LOCATION:
+        "Add a reported location to this intake before linking it.",
+      INTAKE_ALREADY_LINKED:
+        "This intake report is already linked to an emergency incident.",
+      INTAKE_NOT_PROMOTABLE:
+        "This intake report cannot be linked in its current status.",
+      INCIDENT_NOT_LINKABLE:
+        "The selected incident cannot accept new intake links.",
+      INCIDENT_NOT_FOUND:
+        "Check the target incident public UUID and try again.",
+    };
+    const hint = error.code ? hints[error.code] : undefined;
+    const codePrefix = error.code ? `${error.code}: ` : "";
+    return `${codePrefix}${error.message}${hint ? ` ${hint}` : ""}`;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+}
+
+function LocationHistory({ history }: { history: IntakeLocationHistoryItem[] }) {
+  if (history.length === 0) {
+    return <p className="text-sm text-gray-600">No location changes recorded.</p>;
+  }
+
+  return (
+    <ul className="divide-y divide-[#002D62]/10">
+      {history.map((item, index) => (
+        <li key={`${item.changed_at}-${index}`} className="py-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold capitalize text-[#002D62]">
+                {formatBadgeLabel(item.change_kind)}
+              </p>
+              <p className="mt-1 text-sm text-gray-700">
+                {formatLocation(item.location)}
+              </p>
+              {item.previous_location && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Previous: {formatLocation(item.previous_location)}
+                </p>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 sm:text-right">
+              <p>{formatBangladeshTime(item.changed_at)}</p>
+              <p className="mt-1">
+                {item.changed_by?.full_name ?? "System"} |{" "}
+                {item.changed_by?.actor_kind ?? "system"}
+              </p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -98,9 +158,28 @@ export default function IntakeReportDetailPage() {
   const reportPublicUuid = params.reportPublicUuid as string;
 
   const [report, setReport] = useState<OperationsIntakeReport | null>(null);
+  const [history, setHistory] = useState<IntakeLocationHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [locationMessage, setLocationMessage] = useState("");
+  const [locationError, setLocationError] = useState("");
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [isLocationUpdateOpen, setIsLocationUpdateOpen] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [targetIncidentUuid, setTargetIncidentUuid] = useState("");
+  const [linkType, setLinkType] =
+    useState<IntakeLinkType>("supporting_report");
+  const [linkNote, setLinkNote] = useState("");
+  const [isLinkingIncident, setIsLinkingIncident] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [linkSuccess, setLinkSuccess] = useState("");
+  const [locationForm, setLocationForm] = useState({
+    latitude: "",
+    longitude: "",
+    addressText: "",
+    placeName: "",
+  });
 
   const redirectToLogin = useCallback(() => {
     sessionStorage.removeItem("loggedInUser");
@@ -109,7 +188,7 @@ export default function IntakeReportDetailPage() {
   }, [router]);
 
   const loadReport = useCallback(async () => {
-    const accessToken = getValidAccessToken();
+    const accessToken = await ensureAuthSession();
 
     if (!accessToken) {
       redirectToLogin();
@@ -120,52 +199,55 @@ export default function IntakeReportDetailPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/operations/intake-reports/${reportPublicUuid}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      );
+      const [detailData, historyData] = await Promise.all([
+        apiJson<OperationsIntakeReportResponse>(
+          `/operations/intake-reports/${reportPublicUuid}`,
+        ),
+        apiJson<IntakeLocationHistoryResponse>(
+          `/operations/intake-reports/${reportPublicUuid}/reported-location-history`,
+        ),
+      ]);
 
-      const data = (await response.json().catch(() => ({}))) as
-        | OperationsIntakeReportResponse
-        | { error?: { message?: string }; message?: string };
-
-      if (!response.ok) {
-        let errMsg = "Could not load intake report.";
-
-        if ("error" in data && data.error?.message) {
-          errMsg = data.error.message;
-        } else if ("message" in data && typeof data.message === "string") {
-          errMsg = data.message;
-        }
-
-        setError(errMsg);
-        setReport(null);
-        return;
-      }
-
-      setReport((data as OperationsIntakeReportResponse).intake_report);
-    } catch {
-      setError("Unexpected error while loading report.");
+      const nextReport = detailData.intake_report;
+      setReport(nextReport);
+      setHistory(historyData.history ?? []);
+      setLocationForm({
+        latitude: nextReport.location?.latitude?.toString() ?? "",
+        longitude: nextReport.location?.longitude?.toString() ?? "",
+        addressText: nextReport.location?.address_text ?? nextReport.location_text ?? "",
+        placeName: nextReport.location?.place_name ?? "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load intake report.");
       setReport(null);
+      setHistory([]);
     } finally {
       setLoading(false);
     }
   }, [reportPublicUuid, redirectToLogin]);
 
   useEffect(() => {
-    const sessionUser = sessionStorage.getItem("loggedInUser");
-    const accessToken = getValidAccessToken();
+    let cancelled = false;
 
-    if (!sessionUser || !accessToken) {
-      redirectToLogin();
-      return;
+    async function checkSession() {
+      const accessToken = await ensureAuthSession();
+      const sessionUser = sessionStorage.getItem("loggedInUser");
+
+      if (cancelled) return;
+
+      if (!sessionUser || !accessToken) {
+        redirectToLogin();
+        return;
+      }
+
+      setIsLoadingSession(false);
     }
 
-    setIsLoadingSession(false);
+    void checkSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [redirectToLogin]);
 
   useEffect(() => {
@@ -179,13 +261,124 @@ export default function IntakeReportDetailPage() {
     router.push("/");
   };
 
-  if (isLoadingSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+  const handleLocationChange = useCallback(
+    (
+      location: LocationPickerValue,
+      details?: LocationPickerSelectionDetails,
+    ) => {
+      setLocationForm((current) => ({
+        ...current,
+        latitude: location.latitude.toString(),
+        longitude: location.longitude.toString(),
+        addressText: details?.addressText ?? current.addressText,
+        placeName: details?.placeName ?? current.placeName,
+      }));
+      setLocationError("");
+      setLocationMessage("");
+    },
+    [],
+  );
+
+  async function handleLocationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLocationError("");
+    setLocationMessage("");
+
+    const latitude = Number(locationForm.latitude);
+    const longitude = Number(locationForm.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setLocationError("Choose a valid point on the map.");
+      return;
+    }
+
+    setSavingLocation(true);
+    try {
+      const data = await apiJson<UpdateIntakeLocationResponse>(
+        `/intake/reports/${reportPublicUuid}/location`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            location: {
+              latitude,
+              longitude,
+              address_text: locationForm.addressText.trim() || undefined,
+              place_name: locationForm.placeName.trim() || undefined,
+              source: "dispatcher_selected",
+            },
+          }),
+        },
+      );
+
+      setLocationMessage(data.message || "Reported location updated.");
+      await loadReport();
+      setIsLocationUpdateOpen(false);
+    } catch (err) {
+      setLocationError(
+        err instanceof Error ? err.message : "Could not update location.",
+      );
+    } finally {
+      setSavingLocation(false);
+    }
   }
+
+  async function handleLinkExistingIncident(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!report) return;
+
+    const trimmedIncidentUuid = targetIncidentUuid.trim();
+
+    if (!UUID_PATTERN.test(trimmedIncidentUuid)) {
+      setLinkError("Enter a valid target incident public UUID.");
+      return;
+    }
+
+    if (linkNote.trim().length > 500) {
+      setLinkError("Link note must be 500 characters or fewer.");
+      return;
+    }
+
+    setIsLinkingIncident(true);
+    setLinkError("");
+    setLinkSuccess("");
+
+    try {
+      const data = await apiPost<{ message?: string }>(
+        `/operations/incidents/${trimmedIncidentUuid}/intake-reports`,
+        {
+          intakeReportPublicUuid: report.public_uuid,
+          linkType,
+          note: linkNote.trim() || undefined,
+        },
+      );
+
+      setTargetIncidentUuid("");
+      setLinkType("supporting_report");
+      setLinkNote("");
+      setLinkModalOpen(false);
+      setLinkSuccess(data.message ?? "Intake report linked to incident.");
+      await loadReport();
+    } catch (err) {
+      setLinkError(formatApiError(err, "Could not link intake report."));
+    } finally {
+      setIsLinkingIncident(false);
+    }
+  }
+
+  if (isLoadingSession) {
+    return <PageLoading label="Loading intake details" />;
+  }
+
+  const selectedLocation =
+    locationForm.latitude.trim() &&
+    locationForm.longitude.trim() &&
+    Number.isFinite(Number(locationForm.latitude)) &&
+    Number.isFinite(Number(locationForm.longitude))
+      ? {
+          latitude: Number(locationForm.latitude),
+          longitude: Number(locationForm.longitude),
+        }
+      : null;
 
   return (
     <DashboardLayout
@@ -194,30 +387,136 @@ export default function IntakeReportDetailPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
+        {linkModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#002D62]">
+                    Link to Existing Incident
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    Enter the target incident public UUID and choose how this
+                    intake should be attached.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (isLinkingIncident) return;
+                    setLinkModalOpen(false);
+                    setLinkError("");
+                  }}
+                  disabled={isLinkingIncident}
+                >
+                  Close
+                </Button>
+              </div>
+
+              {linkError ? (
+                <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+                  {linkError}
+                </div>
+              ) : null}
+
+              <form
+                onSubmit={handleLinkExistingIncident}
+                className="mt-5 space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Target Incident Public UUID
+                  </label>
+                  <input
+                    value={targetIncidentUuid}
+                    onChange={(event) => {
+                      setTargetIncidentUuid(event.target.value);
+                      setLinkError("");
+                    }}
+                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                    placeholder="0d5fd834-a3fc-4180-b8ec-a6e664d130d0"
+                    disabled={isLinkingIncident}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Link Type
+                  </label>
+                  <select
+                    value={linkType}
+                    onChange={(event) =>
+                      setLinkType(event.target.value as IntakeLinkType)
+                    }
+                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                    disabled={isLinkingIncident}
+                  >
+                    <option value="supporting_report">Supporting Report</option>
+                    <option value="follow_up_report">Follow-up Report</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Note
+                  </label>
+                  <textarea
+                    value={linkNote}
+                    onChange={(event) => setLinkNote(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Optional link note"
+                    disabled={isLinkingIncident}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      if (isLinkingIncident) return;
+                      setLinkModalOpen(false);
+                      setLinkError("");
+                    }}
+                    disabled={isLinkingIncident}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={isLinkingIncident}
+                    disabled={isLinkingIncident || !targetIncidentUuid.trim()}
+                  >
+                    Link Intake Report
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
             variant="secondary"
+            size="sm"
             onClick={() => router.push("/dashboard/dispatcher/intake-reports")}
           >
-            &larr; Back to Reports
-          </Button>
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => void loadReport()}
-            disabled={loading}
-          >
-            {loading ? "Loading..." : "Refresh"}
+            Back to Reports
           </Button>
 
           {report && !report.has_incident ? (
-            <>
+            <div className="flex flex-wrap gap-3">
               {!report.has_service_case ? (
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() =>
                     router.push(
                       `/dashboard/dispatcher/intake-reports/${report.public_uuid}/classify/service-case`,
@@ -230,51 +529,43 @@ export default function IntakeReportDetailPage() {
 
               <Button
                 type="button"
-                onClick={() =>
-                  router.push(
-                    `/dashboard/dispatcher/intake-reports/${report.public_uuid}/promote/emergency`,
-                  )
-                }
+                size="sm"
+                onClick={() => router.push(getEmergencyAction(report).href)}
               >
-                Promote to Emergency
+                {getEmergencyAction(report).label}
               </Button>
 
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => {
-                  const query = new URLSearchParams({
-                    mode: "intake",
-                    intakeReportPublicUuid: report.public_uuid,
-                  });
-
-                  router.push(
-                    `/dashboard/dispatcher/incidents/create-incident?${query.toString()}`,
-                  );
+                  setLinkError("");
+                  setLinkSuccess("");
+                  setLinkModalOpen(true);
                 }}
               >
-                Link to Incident
+                Link to Existing Incident
               </Button>
-            </>
+            </div>
           ) : null}
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p>{error}</p>
-          </div>
-        )}
-
-        {loading && !report ? (
-          <div className="text-center text-sm text-gray-500">
-            Loading report...
+        {linkSuccess ? (
+          <div className="rounded-2xl bg-green-50 p-3 text-sm text-green-700">
+            {linkSuccess}
           </div>
         ) : null}
 
+        {error && <ErrorAlert message={error} />}
+
+        {loading && !report ? <LoadingSkeleton lines={8} /> : null}
+
         {!loading && !report && !error ? (
-          <div className="text-center text-sm text-gray-500">
-            Intake report was not found.
-          </div>
+          <EmptyState
+            title="Intake report not found"
+            description="The backend did not return an intake report for this identifier. Check the queue and try opening it again."
+          />
         ) : null}
 
         {report ? (
@@ -295,10 +586,10 @@ export default function IntakeReportDetailPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Badge className={getStatusColor(report.intake_status)}>
+                    <Badge tone={report.intake_status}>
                       {formatLabel(report.intake_status)}
                     </Badge>
-                    <Badge className={getUrgencyColor(report.urgency_type)}>
+                    <Badge tone={report.urgency_type}>
                       {formatLabel(report.urgency_type)}
                     </Badge>
                   </div>
@@ -316,7 +607,7 @@ export default function IntakeReportDetailPage() {
                 </div>
 
                 {report.final_disposition ? (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">
                     <h3 className="text-sm font-semibold text-gray-900">
                       Final Disposition
                     </h3>
@@ -330,7 +621,7 @@ export default function IntakeReportDetailPage() {
 
             <Card className="shadow-md">
               <CardHeader>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-[#002D62]">
                   Operations Snapshot
                 </h2>
               </CardHeader>
@@ -359,7 +650,151 @@ export default function IntakeReportDetailPage() {
 
             <Card className="shadow-md lg:col-span-3">
               <CardHeader>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-lg font-semibold text-[#002D62]">
+                    Reported Location
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setIsLocationUpdateOpen(true);
+                      setLocationError("");
+                      setLocationMessage("");
+                    }}
+                  >
+                    Update Location
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <DetailRow label="Location">
+                    {formatLocation(report.location)}
+                  </DetailRow>
+                  <DetailRow label="Source">
+                    {formatLabel(report.location?.source)}
+                  </DetailRow>
+                </dl>
+
+                {report.location && (
+                  <a
+                    href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
+                  >
+                    Open location in map
+                  </a>
+                )}
+
+                {locationMessage && (
+                  <div className="rounded-2xl bg-green-50 p-3 text-sm text-green-700">
+                    {locationMessage}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {isLocationUpdateOpen ? (
+              <Card className="shadow-md lg:col-span-3">
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-[#002D62]">
+                        Update Location
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Search, use live location, or click the map to correct
+                        the reported location.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        if (savingLocation) return;
+                        setIsLocationUpdateOpen(false);
+                        setLocationError("");
+                      }}
+                      disabled={savingLocation}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {locationError && (
+                    <div className="mb-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+                      {locationError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleLocationSubmit} className="space-y-4">
+                    <LocationPicker
+                      value={selectedLocation}
+                      onChange={handleLocationChange}
+                      selectedAddress={locationForm.addressText}
+                      selectedPlaceName={locationForm.placeName}
+                    />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Address Text
+                        </label>
+                        <input
+                          value={locationForm.addressText}
+                          onChange={(event) =>
+                            setLocationForm((current) => ({
+                              ...current,
+                              addressText: event.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900"
+                          placeholder="Optional address or landmark"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Place Name
+                        </label>
+                        <input
+                          value={locationForm.placeName}
+                          onChange={(event) =>
+                            setLocationForm((current) => ({
+                              ...current,
+                              placeName: event.target.value,
+                            }))
+                          }
+                          className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900"
+                          placeholder="Optional place name"
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" isLoading={savingLocation}>
+                      Save Location Correction
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Card className="shadow-md lg:col-span-3">
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-[#002D62]">
+                  Location History
+                </h2>
+              </CardHeader>
+              <CardContent>
+                <LocationHistory history={history} />
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-md lg:col-span-3">
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-[#002D62]">
                   Timeline
                 </h2>
               </CardHeader>
@@ -367,13 +802,13 @@ export default function IntakeReportDetailPage() {
               <CardContent>
                 <dl className="grid gap-4 sm:grid-cols-3">
                   <DetailRow label="Reported At">
-                    {formatDate(report.reported_at)}
+                    {formatBangladeshTime(report.reported_at)}
                   </DetailRow>
                   <DetailRow label="Created At">
-                    {formatDate(report.created_at)}
+                    {formatBangladeshTime(report.created_at)}
                   </DetailRow>
                   <DetailRow label="Updated At">
-                    {formatDate(report.updated_at)}
+                    {formatBangladeshTime(report.updated_at)}
                   </DetailRow>
                 </dl>
               </CardContent>

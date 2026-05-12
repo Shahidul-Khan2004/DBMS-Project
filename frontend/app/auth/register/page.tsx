@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 import { RegistrationCard } from "../../../components/auth/RegistrationCard";
 import { RegisterForm } from "../../../components/auth/RegisterForm";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { saveAuthSession, determineRole } from "../../../lib/auth-store";
 import type { RegisterResponse } from "../../../types/auth";
 
@@ -17,30 +18,28 @@ export default function RegisterPage() {
   const handleRegistrationSuccess = (data: RegisterResponse) => {
     setRegisteredUser(data);
     const role = determineRole(data.authz?.roleCodes ?? []);
-    // Store auth session for new user
     saveAuthSession(data.accessToken, data.refreshToken, role);
-    // Store user in session for dashboard
     sessionStorage.setItem("loggedInUser", JSON.stringify(data.user));
   };
 
   useEffect(() => {
-    if (registeredUser) {
-      // New users are citizens, redirect to citizen dashboard after 2 seconds
-      const timer = setTimeout(() => {
-        router.push("/dashboard/citizen");
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
+    if (!registeredUser) return;
+
+    const timer = setTimeout(() => {
+      router.push("/dashboard/citizen");
+    }, 1200);
+
+    return () => clearTimeout(timer);
   }, [registeredUser, router]);
 
   if (registeredUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-50 px-4">
-        <div className="w-full max-w-lg rounded-xl border border-emerald-200 bg-white p-8 shadow-lg">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-            <span className="text-2xl">✓</span>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200 px-4">
+        <div className="w-full max-w-lg rounded-3xl border border-[#006747]/20 bg-zinc-200 p-8 shadow-lg shadow-[#002D62]/5">
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#006747] text-white">
+            <CheckCircle2 className="h-7 w-7" aria-hidden />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-[#002D62]">
             Registration complete
           </h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -48,15 +47,15 @@ export default function RegisterPage() {
             <span className="font-medium text-slate-900">
               {registeredUser.user.full_name}
             </span>
-            . Redirecting to your dashboard...
+            . Redirecting to your dashboard.
           </p>
 
-          <div className="mt-6 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+          <div className="mt-6 rounded-2xl border border-[#002D62]/10 bg-white p-4 text-sm text-slate-700">
             <p>
               <span className="font-medium">Email:</span>{" "}
               {registeredUser.user.email}
             </p>
-            <p>
+            <p className="mt-2">
               <span className="font-medium">Phone:</span>{" "}
               {registeredUser.user.phone_number}
             </p>
@@ -71,11 +70,11 @@ export default function RegisterPage() {
       <div className="space-y-6">
         <RegisterForm onSuccess={handleRegistrationSuccess} />
 
-        <div className="border-t border-slate-200 pt-4 text-center text-sm text-slate-600">
+        <div className="border-t border-[#002D62]/10 pt-4 text-center text-sm text-slate-600">
           Already have an account?{" "}
           <Link
             href="/auth/login"
-            className="font-semibold text-blue-600 hover:text-blue-700"
+            className="font-semibold text-[#002D62] hover:text-[#006747]"
           >
             Login
           </Link>

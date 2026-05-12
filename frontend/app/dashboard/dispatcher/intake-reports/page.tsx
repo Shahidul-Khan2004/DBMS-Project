@@ -5,19 +5,31 @@ import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { EmptyState, PageHeader, PageLoading } from "@/components/ui/StatusState";
+import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
-import type { LoginResponse } from "@/types/auth";
+import { formatBangladeshTime } from "@/lib/datetime";
 import type {
   OperationsIntakeReport,
   OperationsIntakeReportsResponse,
 } from "@/types/operations-intake";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+function getCreateIncidentHref(reportPublicUuid: string) {
+  const query = new URLSearchParams({
+    mode: "intake",
+    intakeReportPublicUuid: reportPublicUuid,
+  });
+
+  return `/dashboard/dispatcher/incidents/create-incident?${query.toString()}`;
+}
+
+const fieldClassName =
+  "h-10.5 rounded-2xl border border-[#002D62]/20 bg-white px-3 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35";
 
 export default function IntakeReportsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<LoginResponse["user"] | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [reports, setReports] = useState<OperationsIntakeReport[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,11 +44,12 @@ export default function IntakeReportsPage() {
     urgency_type: "",
     categoryCode: "",
     sort: "reported_at_desc",
+    limit: 50,
   });
 
   const loadReports = useCallback(
     async (offset = 0) => {
-      const accessToken = localStorage.getItem("accessToken");
+      const accessToken = await ensureAuthSession();
 
       if (!accessToken) {
         router.push("/auth/login");
@@ -47,9 +60,9 @@ export default function IntakeReportsPage() {
       setError(null);
 
       try {
-        const response = await fetch(
-          `${API_BASE}/operations/intake-reports?${new URLSearchParams({
-            limit: "50",
+        const data = await apiGet<OperationsIntakeReportsResponse>(
+          `/operations/intake-reports?${new URLSearchParams({
+            limit: String(filters.limit),
             offset: String(offset),
             ...(filters.intake_status
               ? { intake_status: filters.intake_status }
@@ -58,37 +71,16 @@ export default function IntakeReportsPage() {
             ...(filters.categoryCode ? { categoryCode: filters.categoryCode } : {}),
             sort: filters.sort,
           }).toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
         );
 
-        const data = (await response.json().catch(() => ({}))) as
-          | OperationsIntakeReportsResponse
-          | { error?: { message?: string }; message?: string };
-
-        if (!response.ok) {
-          let errMsg = "Could not load intake reports.";
-
-          if ("error" in data && data.error?.message) {
-            errMsg = data.error.message;
-          } else if ("message" in data && typeof data.message === "string") {
-            errMsg = data.message;
-          }
-
-          setError(errMsg);
-          setReports([]);
-          return;
-        }
-
-        const responseData = data as OperationsIntakeReportsResponse;
-
-        setReports(responseData.intake_reports);
-        setPagination(responseData.pagination);
-      } catch {
-        setError("Unexpected error while loading reports.");
+        setReports(data.intake_reports);
+        setPagination(data.pagination);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unexpected error while loading reports.",
+        );
         setReports([]);
       } finally {
         setLoading(false);
@@ -98,23 +90,34 @@ export default function IntakeReportsPage() {
   );
 
   useEffect(() => {
-    const sessionUser = sessionStorage.getItem("loggedInUser");
-    const accessToken = localStorage.getItem("accessToken");
+    let cancelled = false;
 
-    if (!sessionUser || !accessToken) {
-      router.push("/auth/login");
-      return;
+    async function checkSession() {
+      const accessToken = await ensureAuthSession();
+      const sessionUser = sessionStorage.getItem("loggedInUser");
+
+      if (cancelled) return;
+
+      if (!sessionUser || !accessToken) {
+        router.push("/auth/login");
+        return;
+      }
+
+      try {
+        JSON.parse(sessionUser);
+      } catch {
+        router.push("/auth/login");
+        return;
+      }
+
+      setIsLoadingSession(false);
     }
 
-    try {
-      const parsedUser = JSON.parse(sessionUser);
-      setUser(parsedUser);
-    } catch {
-      router.push("/auth/login");
-      return;
-    }
+    void checkSession();
 
-    setIsLoadingSession(false);
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -128,22 +131,8 @@ export default function IntakeReportsPage() {
     router.push("/");
   };
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return "-";
-
-    const d = new Date(iso);
-
-    if (Number.isNaN(d.getTime())) return iso;
-
-    return d.toLocaleString();
-  };
-
   if (isLoadingSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <PageLoading label="Loading intake queue" />;
   }
 
   return (
@@ -153,18 +142,17 @@ export default function IntakeReportsPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Intake Reports
-            </h1>
-
-            <p className="mt-1 text-sm text-gray-600">
+        <PageHeader
+          eyebrow="Operations queue"
+          title="Intake Reports"
+          description="Review citizen and 999 intake reports pending classification or incident linking."
+          meta={
+            <p className="text-sm text-gray-600">
               Total: {pagination.total} | Showing: {reports.length}
             </p>
-          </div>
-
-          <div className="flex gap-2">
+          }
+          actions={
+            <>
             <Button
               type="button"
               variant="secondary"
@@ -181,22 +169,23 @@ export default function IntakeReportsPage() {
             >
               {loading ? "Loading..." : "Refresh"}
             </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p>{error}</p>
-          </div>
-        )}
+        {error && <ErrorAlert message={error} />}
 
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+            <h2 className="text-lg font-semibold text-[#002D62]">Filters</h2>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 md:grid-cols-5">
+              <label htmlFor="filter-intake-status" className="sr-only">
+                Intake status
+              </label>
               <select
+                id="filter-intake-status"
                 value={filters.intake_status}
                 onChange={(e) =>
                   setFilters((current) => ({
@@ -204,7 +193,7 @@ export default function IntakeReportsPage() {
                     intake_status: e.target.value,
                   }))
                 }
-                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                className={fieldClassName}
               >
                 <option value="">All statuses</option>
                 <option value="received">Received</option>
@@ -212,7 +201,11 @@ export default function IntakeReportsPage() {
                 <option value="linked_to_case">Linked to case</option>
                 <option value="linked_to_incident">Linked to incident</option>
               </select>
+              <label htmlFor="filter-urgency-type" className="sr-only">
+                Urgency type
+              </label>
               <select
+                id="filter-urgency-type"
                 value={filters.urgency_type}
                 onChange={(e) =>
                   setFilters((current) => ({
@@ -220,14 +213,18 @@ export default function IntakeReportsPage() {
                     urgency_type: e.target.value,
                   }))
                 }
-                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                className={fieldClassName}
               >
                 <option value="">All urgency</option>
                 <option value="unknown">Unknown</option>
                 <option value="non_emergency">Non-emergency</option>
                 <option value="emergency">Emergency</option>
               </select>
+              <label htmlFor="filter-category-code" className="sr-only">
+                Category code
+              </label>
               <select
+                id="filter-category-code"
                 value={filters.categoryCode}
                 onChange={(e) =>
                   setFilters((current) => ({
@@ -235,7 +232,7 @@ export default function IntakeReportsPage() {
                     categoryCode: e.target.value,
                   }))
                 }
-                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                className={fieldClassName}
               >
                 <option value="">All categories</option>
                 <option value="medical">Medical</option>
@@ -246,15 +243,38 @@ export default function IntakeReportsPage() {
                 <option value="relief_request">Relief Request</option>
                 <option value="blood_request">Blood Request</option>
               </select>
+              <label htmlFor="filter-sort" className="sr-only">
+                Sort order
+              </label>
               <select
+                id="filter-sort"
                 value={filters.sort}
                 onChange={(e) =>
                   setFilters((current) => ({ ...current, sort: e.target.value }))
                 }
-                className="h-[42px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                className={fieldClassName}
               >
                 <option value="reported_at_desc">Newest first</option>
                 <option value="reported_at_asc">Oldest first</option>
+              </select>
+              <label htmlFor="filter-limit" className="sr-only">
+                Results per page
+              </label>
+              <select
+                id="filter-limit"
+                value={filters.limit}
+                onChange={(e) =>
+                  setFilters((current) => ({
+                    ...current,
+                    limit: Number(e.target.value),
+                  }))
+                }
+                className={fieldClassName}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
               </select>
               <Button
                 type="button"
@@ -269,7 +289,7 @@ export default function IntakeReportsPage() {
 
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-[#002D62]">
               Reports Queue
             </h2>
           </CardHeader>
@@ -280,64 +300,79 @@ export default function IntakeReportsPage() {
                 Loading reports...
               </div>
             ) : reports.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm text-gray-500">
-                No intake reports found.
+              <div className="p-6">
+                <EmptyState
+                  title="No intake reports found"
+                  description="Try adjusting filters, or refresh when new backend intake reports are available."
+                />
               </div>
             ) : (
               <ul className="divide-y divide-gray-100">
                 {reports.map((report) => (
                   <li
                     key={report.public_uuid}
-                    className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                    className="space-y-4 border-b border-gray-100 px-4 py-5 sm:px-6"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                          {report.intake_status}
-                        </span>
-
-                        <span className="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                          {report.urgency_type}
-                        </span>
-
-                        <span className="inline-flex flex-col text-xs text-gray-500">
-                          <span className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                            Report ID
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                            {report.report_code}
                           </span>
-                          <span>{report.report_code}</span>
-                        </span>
+                          <Badge tone={report.intake_status}>
+                            {formatBadgeLabel(report.intake_status)}
+                          </Badge>
+                          <Badge tone={report.urgency_type}>
+                            {formatBadgeLabel(report.urgency_type)}
+                          </Badge>
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                            {report.category_code}
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-lg font-semibold text-slate-900">
+                          {report.summary}
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap gap-2 text-sm text-slate-600">
+                          <span>Reported: {formatBangladeshTime(report.reported_at)}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>Created: {formatBangladeshTime(report.created_at)}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>Updated: {formatBangladeshTime(report.updated_at)}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>Service case: {report.has_service_case ? "Yes" : "No"}</span>
+                          <span className="text-slate-300">|</span>
+                          <span>Incident: {report.has_incident ? "Yes" : "No"}</span>
+                        </div>
                       </div>
 
-                      <p className="mt-1 font-medium text-gray-900">
-                        {report.summary}
-                      </p>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {!report.has_incident ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              router.push(getCreateIncidentHref(report.public_uuid))
+                            }
+                          >
+                            Create Incident
+                          </Button>
+                        ) : null}
 
-                      <p className="mt-0.5 text-sm text-gray-600">
-                        <span className="font-medium text-gray-700">
-                          {report.category_code}
-                        </span>
-
-                        <span className="mx-1.5 text-gray-300">|</span>
-
-                        <span className="text-gray-500">
-                          Reported: {formatDate(report.reported_at)}
-                        </span>
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/dispatcher/intake-reports/${report.public_uuid}`
-                          )
-                        }
-                      >
-                        View Details
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/dispatcher/intake-reports/${report.public_uuid}`
+                            )
+                          }
+                        >
+                          View Details
+                        </Button>
+                      </div>
                     </div>
                   </li>
                 ))}

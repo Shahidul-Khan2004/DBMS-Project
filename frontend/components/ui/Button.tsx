@@ -1,7 +1,7 @@
 import React from "react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline";
+  variant?: "primary" | "secondary" | "outline" | "danger";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
   fullWidth?: boolean;
@@ -22,12 +22,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseStyles =
-      "font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+      "font-semibold rounded-2xl transition-colors duration-200 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]";
 
     const variants = {
-      primary: "bg-blue-600 text-white hover:bg-blue-700",
-      secondary: "bg-gray-200 text-gray-900 hover:bg-gray-300",
-      outline: "border-2 border-blue-600 text-blue-600 hover:bg-blue-50",
+      primary: "bg-[#002D62] text-white hover:bg-[#001F4A]",
+      secondary:
+        "border border-[#002D62]/20 bg-[#E8F2FF] text-[#002D62] hover:border-[#002D62]/30 hover:bg-[#DCEBFF]",
+      outline: "border-2 border-[#002D62] bg-white text-[#002D62] hover:bg-[#EFF6FF]",
+      danger: "bg-[#DA291C] text-white hover:bg-[#B71C1C]",
     };
 
     const sizes = {

@@ -6,24 +6,28 @@ export interface RegisterFormData {
   rePassword: string;
 }
 
+export interface AuthzInfo {
+  roleCodes: string[];
+  permissions?: string[];
+}
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+  full_name: string;
+  phone_number: string;
+  account_status: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RegisterResponse {
   message: string;
   accessToken: string;
   refreshToken: string;
-  authz: {
-    roleCodes: string[];
-    permissions?: string[];
-  };
-  user: {
-    id: string;
-    email: string;
-    full_name: string;
-    phone_number: string;
-    account_status: string;
-    is_active: boolean;
-    created_at: string;
-    updated_at: string;
-  };
+  authz: AuthzInfo;
+  user: AuthUser;
 }
 
 export interface LoginFormData {
@@ -35,18 +39,6 @@ export interface LoginResponse {
   message: string;
   accessToken: string;
   refreshToken: string;
-  authz: {
-    roleCodes: string[];
-    permissions?: string[];
-  };
-  user: {
-    id: string;
-    email: string;
-    full_name: string;
-    phone_number: string;
-    account_status: string;
-    is_active: boolean;
-    created_at: string;
-    updated_at: string;
-  };
+  authz: AuthzInfo;
+  user: AuthUser;
 }

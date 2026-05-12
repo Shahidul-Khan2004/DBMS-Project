@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import {
+  EmptyState,
+  PageHeader,
+  PageLoading,
+} from "@/components/ui/StatusState";
+import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { formatBangladeshTime } from "@/lib/datetime";
 import type { LoginResponse } from "@/types/auth";
-import type { DispatcherOverviewResponse } from "@/types/operations-overview";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+import type {
+  DispatcherOverviewRecentKind,
+  DispatcherOverviewResponse,
+} from "@/types/operations-overview";
 
 function formatAgeBrief(ageMinutes: number): string {
   const m = Math.max(0, Math.floor(ageMinutes));
@@ -21,11 +30,46 @@ function formatAgeBrief(ageMinutes: number): string {
   return `${d}d`;
 }
 
-function formatOccurredAt(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+function getKindStyles(kind: DispatcherOverviewRecentKind) {
+  return kind === "incident"
+    ? "emergency"
+    : kind === "service_case"
+      ? "in_progress"
+      : "under_review";
+}
+
+function getKindLabel(kind: DispatcherOverviewRecentKind) {
+  return kind === "intake_report"
+    ? "Intake Report"
+    : kind === "service_case"
+    ? "Service Case"
+    : "Incident";
+}
+
+function getIntakeCreateIncidentHref(publicUuid: string) {
+  const query = new URLSearchParams({
+    mode: "intake",
+    intakeReportPublicUuid: publicUuid,
+  });
+
+  return `/dashboard/dispatcher/incidents/create-incident?${query.toString()}`;
+}
+
+function getRecentDetailHref(row: {
+  kind: DispatcherOverviewRecentKind;
+  public_uuid: string;
+}) {
+  if (row.kind === "incident") {
+    return `/dashboard/dispatcher/incidents/${row.public_uuid}`;
+  }
+  if (row.kind === "intake_report") {
+    return `/dashboard/dispatcher/intake-reports/${row.public_uuid}`;
+  }
+  return null;
+}
+
+function getRecentActivityPreview(overview: DispatcherOverviewResponse | null) {
+  return overview?.recent.slice(0, 3) ?? [];
 }
 
 export default function DispatcherDashboard() {
@@ -39,7 +83,7 @@ export default function DispatcherDashboard() {
   const [overviewError, setOverviewError] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
-    const accessToken = localStorage.getItem("accessToken");
+    const accessToken = await ensureAuthSession();
     if (!accessToken) {
       router.push("/auth/login");
       return;
@@ -49,33 +93,16 @@ export default function DispatcherDashboard() {
     setOverviewError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/operations/dispatcher/overview`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const data = (await response.json().catch(() => ({}))) as
-        | DispatcherOverviewResponse
-        | { error?: { message?: string }; message?: string };
-
-      if (!response.ok) {
-        let errMsg = "Could not load dispatcher overview.";
-
-        if ("error" in data && data.error?.message) {
-          errMsg = data.error.message;
-        } else if ("message" in data && typeof data.message === "string") {
-          errMsg = data.message;
-        }
-
-        setOverviewError(errMsg);
-        setOverview(null);
-        return;
-      }
-
-      setOverview(data as DispatcherOverviewResponse);
-    } catch {
-      setOverviewError("Unexpected error while loading overview.");
+      const data = await apiGet<DispatcherOverviewResponse>(
+        "/operations/dispatcher/overview",
+      );
+      setOverview(data);
+    } catch (err) {
+      setOverviewError(
+        err instanceof Error
+          ? err.message
+          : "Unexpected error while loading overview.",
+      );
       setOverview(null);
     } finally {
       setOverviewLoading(false);
@@ -83,23 +110,35 @@ export default function DispatcherDashboard() {
   }, [router]);
 
   useEffect(() => {
-    const sessionUser = sessionStorage.getItem("loggedInUser");
-    const accessToken = localStorage.getItem("accessToken");
+    let cancelled = false;
 
-    if (!sessionUser || !accessToken) {
-      router.push("/auth/login");
-      return;
+    async function checkSession() {
+      const accessToken = await ensureAuthSession();
+      const sessionUser = sessionStorage.getItem("loggedInUser");
+
+      if (cancelled) return;
+
+      if (!sessionUser || !accessToken) {
+        router.push("/auth/login");
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(sessionUser);
+        setUser(parsedUser);
+      } catch {
+        router.push("/auth/login");
+        return;
+      }
+
+      setIsLoadingSession(false);
     }
 
-    try {
-      const parsedUser = JSON.parse(sessionUser);
-      setUser(parsedUser);
-    } catch {
-      router.push("/auth/login");
-      return;
-    }
+    void checkSession();
 
-    setIsLoadingSession(false);
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -114,11 +153,7 @@ export default function DispatcherDashboard() {
   };
 
   if (isLoadingSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Loading...
-      </div>
-    );
+    return <PageLoading label="Loading dispatcher console" />;
   }
 
   function renderMetricValue(display: ReactNode) {
@@ -134,6 +169,7 @@ export default function DispatcherDashboard() {
   }
 
   const counts = overview?.counts;
+  const recentActivityPreview = getRecentActivityPreview(overview);
 
   return (
     <DashboardLayout
@@ -142,19 +178,22 @@ export default function DispatcherDashboard() {
       onLogout={handleLogout}
     >
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="shadow-md md:col-span-3">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Dispatcher Info
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              Name: <span className="font-medium">{user?.full_name}</span>
-            </p>
-            <p className="mt-2 text-sm text-gray-500">User ID: {user?.id}</p>
-            <p className="mt-2 text-sm text-gray-500">{user?.email}</p>
-            <div className="mt-4 flex flex-wrap gap-3">
+        <div className="md:col-span-3">
+          <PageHeader
+            eyebrow="Dispatcher overview"
+            title={
+              user?.full_name
+                ? `Welcome, ${user.full_name}`
+                : "Dispatcher console"
+            }
+            description="Monitor active incidents, intake reports, and service cases from one operations workspace."
+            meta={
+              <p className="break-words text-sm text-gray-600">
+                {user?.email ?? "Signed in dispatcher"}
+              </p>
+            }
+            actions={
+              <>
               <Button
                 type="button"
                 variant="primary"
@@ -169,13 +208,14 @@ export default function DispatcherDashboard() {
               >
                 View Incidents
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </>
+            }
+          />
+        </div>
 
         {overviewError && (
-          <div className="md:col-span-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p>{overviewError}</p>
+          <div className="md:col-span-3">
+            <ErrorAlert message={overviewError} />
             <Button
               type="button"
               variant="secondary"
@@ -189,7 +229,7 @@ export default function DispatcherDashboard() {
 
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-[#002D62]">
               Active incidents
             </h2>
           </CardHeader>
@@ -209,7 +249,7 @@ export default function DispatcherDashboard() {
 
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-[#002D62]">
               Pending intakes
             </h2>
           </CardHeader>
@@ -231,12 +271,12 @@ export default function DispatcherDashboard() {
 
         <Card className="shadow-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-[#002D62]">
               Open service cases
             </h2>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">
+            <div className="text-3xl font-bold text-[#002D62]">
               {renderMetricValue(
                 <span aria-live="polite">
                   {counts !== undefined ? counts.service_cases_open : "—"}
@@ -252,7 +292,7 @@ export default function DispatcherDashboard() {
         <Card className="shadow-md md:col-span-3" id="recent-activity">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-[#002D62]">
                 Recent activity
               </h2>
               {!overviewLoading && (
@@ -275,41 +315,72 @@ export default function DispatcherDashboard() {
             ) : null}
 
             {overview && overview.recent.length === 0 && !overviewLoading ? (
-              <div className="border-t border-gray-100 px-6 py-10 text-center text-sm text-gray-500">
-                No pending intakes, active incidents, or open service cases in
-                the recent window.
+              <div className="p-6">
+                <EmptyState
+                  title="No recent operations activity"
+                  description="Pending intakes, active incidents, and open service cases will appear here as soon as the backend returns them."
+                />
               </div>
             ) : null}
 
-            {overview && overview.recent.length > 0 ? (
+            {overview && recentActivityPreview.length > 0 ? (
               <ul className="divide-y divide-gray-100 border-t border-gray-100">
-                {overview.recent.map((row) => (
+                {recentActivityPreview.map((row) => (
                   <li
                     key={`${row.kind}-${row.public_uuid}`}
-                    className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-4 sm:px-6"
+                    className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium uppercase text-gray-700">
-                          {row.kind.replace(/_/g, " ")}
-                        </span>
+                        <Badge tone={getKindStyles(row.kind)}>
+                          {getKindLabel(row.kind)}
+                        </Badge>
                         <span className="text-xs text-gray-500">
                           {formatAgeBrief(row.age_minutes)} ago
                         </span>
                       </div>
-                      <p className="mt-1 font-medium text-gray-900 line-clamp-2">
+                      <p className="mt-2 text-base font-semibold text-gray-900">
                         {row.summary?.trim() || "(No summary)"}
                       </p>
-                      <p className="mt-0.5 text-sm text-gray-600">
-                        <span className="font-medium text-gray-700">
-                          {row.status}
-                        </span>
-                        <span className="mx-1.5 text-gray-300">·</span>
-                        <span className="text-gray-500">{row.category}</span>
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                        <span className="font-medium text-gray-700">{row.status}</span>
+                        <span className="text-gray-300">·</span>
+                        <span>{row.category}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-700">ID:</span>
+                        <span>{row.public_uuid}</span>
+                      </div>
                     </div>
-                    <div className="shrink-0 text-xs text-gray-400 sm:text-right">
-                      {formatOccurredAt(row.occurred_at)}
+                    <div className="flex shrink-0 flex-col items-start gap-2 text-sm text-gray-500 sm:items-end">
+                      <p>{formatBangladeshTime(row.occurred_at)}</p>
+                      <p className="mt-1">Occurred</p>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {getRecentDetailHref(row) ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              const href = getRecentDetailHref(row);
+                              if (href) router.push(href);
+                            }}
+                          >
+                            Open
+                          </Button>
+                        ) : null}
+
+                        {row.kind === "intake_report" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              router.push(getIntakeCreateIncidentHref(row.public_uuid))
+                            }
+                          >
+                            Create Incident
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </li>
                 ))}

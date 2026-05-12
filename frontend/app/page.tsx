@@ -650,7 +650,7 @@ export default function Home() {
                 <br />
                 Ministry of Disaster Management and Relief
                 <br />
-                Government of the People's Republic of Bangladesh
+                Government of the People&apos;s Republic of Bangladesh
               </div>
             </div>
           </div>

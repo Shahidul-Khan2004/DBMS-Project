@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ensureAuthSession } from "@/lib/api";
 import {
   clearAuthSession,
   getAuthSession,
@@ -12,25 +13,46 @@ import {
 export function useAuthGuard(allowedRoles?: UserRole[]) {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const allowedRolesKey = allowedRoles?.join("|") ?? "";
+  const allowedRoleSet = useMemo(
+    () =>
+      new Set(
+        allowedRolesKey ? (allowedRolesKey.split("|") as UserRole[]) : [],
+      ),
+    [allowedRolesKey],
+  );
 
   useEffect(() => {
-    const sessionUser = sessionStorage.getItem("loggedInUser");
-    const { accessToken, userRole } = getAuthSession();
+    let cancelled = false;
 
-    if (!sessionUser || !accessToken) {
-      clearAuthSession();
-      sessionStorage.removeItem("loggedInUser");
-      router.push("/auth/login");
-      return;
+    async function checkSession() {
+      const accessToken = await ensureAuthSession();
+      const sessionUser = sessionStorage.getItem("loggedInUser");
+      const { userRole } = getAuthSession();
+
+      if (cancelled) return;
+
+      if (!sessionUser || !accessToken) {
+        clearAuthSession();
+        sessionStorage.removeItem("loggedInUser");
+        router.push("/auth/login");
+        return;
+      }
+
+      if (allowedRoleSet.size > 0 && !allowedRoleSet.has(userRole)) {
+        router.push(getDashboardUrl(userRole));
+        return;
+      }
+
+      setIsChecking(false);
     }
 
-    if (allowedRoles?.length && !allowedRoles.includes(userRole)) {
-      router.push(getDashboardUrl(userRole));
-      return;
-    }
+    void checkSession();
 
-    setIsChecking(false);
-  }, [allowedRoles, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, [allowedRoleSet, router]);
 
   return isChecking;
 }

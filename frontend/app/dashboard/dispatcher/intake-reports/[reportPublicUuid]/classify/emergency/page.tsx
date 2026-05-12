@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -22,20 +22,27 @@ import type {
 const labelClassName = "block text-sm font-medium text-gray-700";
 const fieldClassName =
   "mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35";
-const optionalLabelClassName = "text-xs font-normal text-gray-500";
 
-type PromotedIncidentResult = {
+type EmergencyIncidentResult = {
   public_uuid?: string;
   incident_code?: string;
   title?: string;
   severity_code?: string;
-  status_code?: string;
   reported_at?: string | null;
 };
 
-type PromoteEmergencyResponse = {
+type EmergencyCallResult = {
+  id?: number | string;
+  caller_phone_number?: string | null;
+  call_started_at?: string | null;
+  call_status?: string | null;
+};
+
+type ClassifyEmergencyResponse = {
   message?: string;
-  incident?: PromotedIncidentResult;
+  emergency_incident?: EmergencyIncidentResult;
+  incident?: EmergencyIncidentResult;
+  emergency_call?: EmergencyCallResult;
 };
 
 function formatApiError(error: unknown, fallback: string) {
@@ -43,10 +50,10 @@ function formatApiError(error: unknown, fallback: string) {
     const hints: Record<string, string> = {
       EMERGENCY_INCIDENT_REQUIRES_LOCATION:
         "Add or correct the reported location on this intake, then retry.",
-      INTAKE_NOT_PROMOTABLE:
-        "Refresh the intake details and check its current status.",
       INTAKE_ALREADY_LINKED:
         "Open the intake details to review the existing emergency link.",
+      INTAKE_NOT_CLASSIFIABLE:
+        "Refresh the intake details and check its current status.",
     };
     const hint = error.code ? hints[error.code] : undefined;
     const codePrefix = error.code ? `${error.code}: ` : "";
@@ -56,7 +63,7 @@ function formatApiError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-export default function PromoteIntakeToEmergencyPage() {
+export default function ClassifyIntakeAsEmergencyPage() {
   const router = useRouter();
   const params = useParams();
   const reportPublicUuid = params.reportPublicUuid as string;
@@ -71,8 +78,11 @@ export default function PromoteIntakeToEmergencyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [promotedIncident, setPromotedIncident] =
-    useState<PromotedIncidentResult | null>(null);
+  const [createdIncident, setCreatedIncident] =
+    useState<EmergencyIncidentResult | null>(null);
+  const [createdCall, setCreatedCall] = useState<EmergencyCallResult | null>(
+    null,
+  );
   const [refreshedReport, setRefreshedReport] =
     useState<OperationsIntakeReport | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -113,24 +123,21 @@ export default function PromoteIntakeToEmergencyPage() {
     router.push("/");
   };
 
-  async function promoteIntake() {
+  async function classifyEmergency() {
     setLoading(true);
     setError("");
     setSuccessMessage("");
-    setPromotedIncident(null);
+    setCreatedIncident(null);
+    setCreatedCall(null);
     setRefreshedReport(null);
 
     try {
       const token = await ensureAuthSession();
-
       if (!token) {
         redirectToLogin();
         return;
       }
 
-      const incidentTitleText = incidentTitle.trim();
-      const incidentDescriptionText = incidentDescription.trim();
-      const callerPhoneNumberText = callerPhoneNumber.trim();
       const callStartedAtPayload = callStartedAt || undefined;
       const reportedAtPayload = reportedAt || undefined;
 
@@ -144,20 +151,21 @@ export default function PromoteIntakeToEmergencyPage() {
         return;
       }
 
-      const data = await apiPost<PromoteEmergencyResponse>(
-        `/operations/intake-reports/${reportPublicUuid}/promote/emergency`,
+      const data = await apiPost<ClassifyEmergencyResponse>(
+        `/intake/reports/${reportPublicUuid}/classify/emergency`,
         {
           severityCode,
-          incidentTitle: incidentTitleText || undefined,
-          incidentDescription: incidentDescriptionText || undefined,
-          callerPhoneNumber: callerPhoneNumberText || undefined,
+          incidentTitle: incidentTitle.trim() || undefined,
+          incidentDescription: incidentDescription.trim() || undefined,
+          callerPhoneNumber: callerPhoneNumber.trim() || undefined,
           callStartedAt: callStartedAtPayload,
           reportedAt: reportedAtPayload,
         },
       );
 
-      setSuccessMessage(data.message || "Intake promoted to emergency incident.");
-      setPromotedIncident(data.incident ?? null);
+      setSuccessMessage(data.message || "Intake classified as emergency.");
+      setCreatedIncident(data.emergency_incident ?? data.incident ?? null);
+      setCreatedCall(data.emergency_call ?? null);
 
       try {
         const detailData = await apiGet<OperationsIntakeReportResponse>(
@@ -166,14 +174,14 @@ export default function PromoteIntakeToEmergencyPage() {
         setRefreshedReport(detailData.intake_report);
       } catch (refreshError) {
         setError(
-          `Promotion succeeded, but latest intake details could not be loaded. ${formatApiError(
+          `Classification succeeded, but latest intake details could not be loaded. ${formatApiError(
             refreshError,
             "Refresh failed.",
           )}`,
         );
       }
     } catch (err) {
-      setError(formatApiError(err, "Promotion failed."));
+      setError(formatApiError(err, "Classification failed."));
     } finally {
       setLoading(false);
       setConfirmOpen(false);
@@ -181,32 +189,33 @@ export default function PromoteIntakeToEmergencyPage() {
   }
 
   if (isLoadingSession) {
-    return <PageLoading label="Loading emergency promotion" />;
+    return <PageLoading label="Loading emergency classification" />;
   }
 
   return (
     <DashboardLayout
-      title="Promote Intake to Emergency"
-      subtitle={`Create an emergency incident from ${reportPublicUuid}`}
+      title="Classify as Emergency"
+      subtitle={`Mark intake ${reportPublicUuid} as emergency`}
       onLogout={handleLogout}
     >
       <div className="mx-auto max-w-3xl space-y-6">
         <ConfirmModal
           open={confirmOpen}
-          title="Promote intake to emergency?"
-          message="This will create an emergency incident from the intake report and move it onto the emergency path."
-          confirmLabel="Promote"
+          title="Classify as Emergency?"
+          message="This will classify the intake report as an emergency and create the emergency path for review."
+          confirmLabel="Classify"
           isLoading={loading}
-          onConfirm={() => void promoteIntake()}
+          onConfirm={() => void classifyEmergency()}
           onCancel={() => setConfirmOpen(false)}
         />
+
         <Card>
           <CardHeader>
             <h1 className="text-2xl font-bold text-gray-900">
-              Promote Intake to Emergency
+              Classify as Emergency
             </h1>
             <p className="text-sm text-gray-500">
-              Create an emergency incident from this intake report.
+              Send this intake report through the emergency classification workflow.
             </p>
           </CardHeader>
 
@@ -218,40 +227,42 @@ export default function PromoteIntakeToEmergencyPage() {
               </MessageBanner>
             )}
 
-            {promotedIncident || refreshedReport ? (
+            {createdIncident || createdCall || refreshedReport ? (
               <div className="mb-5 rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">
                 <h2 className="text-sm font-semibold text-[#002D62]">
-                  Created Emergency Incident
+                  Created Emergency Path
                 </h2>
                 <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                   <div>
                     <dt className="font-medium text-gray-600">Incident Code</dt>
                     <dd className="mt-1 text-gray-900">
-                      {promotedIncident?.incident_code ?? "-"}
+                      {createdIncident?.incident_code ?? "-"}
                     </dd>
                   </div>
                   <div>
                     <dt className="font-medium text-gray-600">Severity</dt>
                     <dd className="mt-1 capitalize text-gray-900">
-                      {promotedIncident?.severity_code ?? severityCode}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-600">Status</dt>
-                    <dd className="mt-1 text-gray-900">
-                      {promotedIncident?.status_code ?? "-"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-gray-600">Reported At</dt>
-                    <dd className="mt-1 text-gray-900">
-                      {formatBangladeshTime(promotedIncident?.reported_at)}
+                      {createdIncident?.severity_code ?? severityCode}
                     </dd>
                   </div>
                   <div className="sm:col-span-2">
-                    <dt className="font-medium text-gray-600">Title</dt>
+                    <dt className="font-medium text-gray-600">Incident Title</dt>
                     <dd className="mt-1 text-gray-900">
-                      {promotedIncident?.title ?? "-"}
+                      {createdIncident?.title ?? "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-600">Call Status</dt>
+                    <dd className="mt-1 text-gray-900">
+                      {createdCall?.call_status ?? "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-gray-600">
+                      Call Started At
+                    </dt>
+                    <dd className="mt-1 text-gray-900">
+                      {formatBangladeshTime(createdCall?.call_started_at)}
                     </dd>
                   </div>
                   <div>
@@ -265,7 +276,7 @@ export default function PromoteIntakeToEmergencyPage() {
                   <div>
                     <dt className="font-medium text-gray-600">Incident UUID</dt>
                     <dd className="mt-1 break-all text-gray-900">
-                      {promotedIncident?.public_uuid ?? "-"}
+                      {createdIncident?.public_uuid ?? "-"}
                     </dd>
                   </div>
                 </dl>
@@ -280,8 +291,11 @@ export default function PromoteIntakeToEmergencyPage() {
               className="space-y-4"
             >
               <div>
-                <label className={labelClassName}>Severity</label>
+                <label htmlFor="severityCode" className={labelClassName}>
+                  Severity
+                </label>
                 <select
+                  id="severityCode"
                   value={severityCode}
                   onChange={(e) => setSeverityCode(e.target.value)}
                   className={fieldClassName}
@@ -294,62 +308,66 @@ export default function PromoteIntakeToEmergencyPage() {
               </div>
 
               <div>
-                <label className={labelClassName}>
-                  Incident Title
+                <label htmlFor="incidentTitle" className={labelClassName}>
+                  Emergency Title
                 </label>
                 <input
+                  id="incidentTitle"
                   value={incidentTitle}
                   onChange={(e) => setIncidentTitle(e.target.value)}
                   className={fieldClassName}
-                  placeholder="Unconscious patient near gate 2"
+                  placeholder="Optional title for the emergency"
                 />
               </div>
 
               <div>
-                <label className={labelClassName}>
-                  Incident Description
-                  <span className={optionalLabelClassName}> (optional)</span>
+                <label htmlFor="incidentDescription" className={labelClassName}>
+                  Description
                 </label>
                 <textarea
+                  id="incidentDescription"
                   value={incidentDescription}
                   onChange={(e) => setIncidentDescription(e.target.value)}
                   className={fieldClassName}
                   rows={4}
-                  placeholder="Security team found a person unresponsive..."
+                  placeholder="Optional emergency description"
                 />
               </div>
 
-              <div>
-                <label className={labelClassName}>
-                  Caller Phone Number
-                  <span className={optionalLabelClassName}> (optional)</span>
-                </label>
-                <input
-                  value={callerPhoneNumber}
-                  onChange={(e) => setCallerPhoneNumber(e.target.value)}
-                  className={fieldClassName}
-                  placeholder="01700000000"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="callerPhoneNumber" className={labelClassName}>
+                    Caller Phone Number
+                  </label>
+                  <input
+                    id="callerPhoneNumber"
+                    value={callerPhoneNumber}
+                    onChange={(e) => setCallerPhoneNumber(e.target.value)}
+                    className={fieldClassName}
+                    placeholder="01700000000"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="callStartedAt" className={labelClassName}>
+                    Call Started At
+                  </label>
+                  <input
+                    id="callStartedAt"
+                    type="datetime-local"
+                    value={callStartedAt}
+                    onChange={(e) => setCallStartedAt(e.target.value)}
+                    className={fieldClassName}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className={labelClassName}>
-                  Call Started At
-                  <span className={optionalLabelClassName}> (optional)</span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={callStartedAt}
-                  onChange={(e) => setCallStartedAt(e.target.value)}
-                  className={fieldClassName}
-                />
-              </div>
-
-              <div>
-                <label className={labelClassName}>
+                <label htmlFor="reportedAt" className={labelClassName}>
                   Reported At
                 </label>
                 <input
+                  id="reportedAt"
                   type="datetime-local"
                   value={reportedAt}
                   onChange={(e) => setReportedAt(e.target.value)}
@@ -359,9 +377,8 @@ export default function PromoteIntakeToEmergencyPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button type="submit" disabled={loading || Boolean(successMessage)}>
-                  {loading ? "Promoting..." : "Promote to Emergency"}
+                  {loading ? "Classifying..." : "Classify as Emergency"}
                 </Button>
-
                 <Button
                   type="button"
                   variant="secondary"
@@ -373,20 +390,18 @@ export default function PromoteIntakeToEmergencyPage() {
                 >
                   {successMessage ? "Back to Intake" : "Cancel"}
                 </Button>
-
-                {promotedIncident?.public_uuid ? (
+                {createdIncident?.public_uuid ? (
                   <Button
                     type="button"
                     onClick={() =>
                       router.push(
-                        `/dashboard/dispatcher/incidents/${promotedIncident.public_uuid}`,
+                        `/dashboard/dispatcher/incidents/${createdIncident.public_uuid}`,
                       )
                     }
                   >
                     View Incident Details
                   </Button>
                 ) : null}
-
                 {successMessage ? (
                   <Button
                     type="button"

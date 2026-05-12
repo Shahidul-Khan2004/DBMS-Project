@@ -9,6 +9,16 @@ export interface OperationsIntakeReport {
   final_disposition: string | null;
   channel_code: string;
   category_code: string;
+  location?: {
+    public_uuid: string;
+    latitude: number;
+    longitude: number;
+    address_text: string | null;
+    place_name: string | null;
+    admin_area_id: number | null;
+    source: string;
+  } | null;
+  location_text?: string | null;
   has_service_case: boolean;
   has_incident: boolean;
   reported_at: string | null;
