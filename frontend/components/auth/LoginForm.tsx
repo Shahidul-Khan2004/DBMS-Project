@@ -2,16 +2,39 @@
 
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { publicPost } from "@/lib/api";
+import { ApiError, publicPost } from "@/lib/api";
 import type { LoginResponse } from "@/types/auth";
 
 interface LoginFormProps {
   onSuccess?: (data: LoginResponse) => void;
+}
+
+type LoginFieldName = keyof LoginInput;
+type LoginFieldErrors = Partial<Record<LoginFieldName, string>>;
+
+function getLoginFieldName(field: unknown): LoginFieldName | null {
+  if (field === "email" || field === "password") return field;
+  return null;
+}
+
+function getBackendFieldErrors(details: unknown): LoginFieldErrors {
+  if (!Array.isArray(details)) return {};
+
+  return details.reduce<LoginFieldErrors>((errors, detail) => {
+    if (!detail || typeof detail !== "object") return errors;
+
+    const item = detail as { field?: unknown; path?: unknown; message?: unknown };
+    const field = getLoginFieldName(item.field ?? item.path);
+    if (field && typeof item.message === "string" && !errors[field]) {
+      errors[field] = item.message;
+    }
+
+    return errors;
+  }, {});
 }
 
 function PasswordToggleIcon({ visible }: { visible: boolean }) {
@@ -54,15 +77,14 @@ function PasswordToggleIcon({ visible }: { visible: boolean }) {
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     reset,
   } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
       password: "",
@@ -70,17 +92,44 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   });
 
   async function onSubmit(data: LoginInput) {
+    const validation = loginSchema.safeParse(data);
+
+    if (!validation.success) {
+      const nextErrors: LoginFieldErrors = {};
+
+      for (const issue of validation.error.issues) {
+        const field = getLoginFieldName(issue.path[0]);
+        if (field && !nextErrors[field]) {
+          nextErrors[field] = issue.message;
+        }
+      }
+
+      setFieldErrors(nextErrors);
+      setApiError(null);
+      return;
+    }
+
     setIsLoading(true);
     setApiError(null);
+    setFieldErrors({});
 
     try {
       const result = await publicPost<LoginResponse, LoginInput>(
         "/auth/login",
-        data,
+        validation.data,
       );
       reset();
       onSuccess?.(result);
     } catch (err) {
+      if (err instanceof ApiError) {
+        const backendFieldErrors = getBackendFieldErrors(err.details);
+
+        if (Object.keys(backendFieldErrors).length > 0) {
+          setFieldErrors(backendFieldErrors);
+          return;
+        }
+      }
+
       setApiError(
         err instanceof Error ? err.message : "Login failed. Please try again.",
       );
@@ -89,8 +138,25 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     }
   }
 
+  function registerWithErrorReset(field: LoginFieldName) {
+    const fieldRegistration = register(field);
+
+    return {
+      ...fieldRegistration,
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+        fieldRegistration.onChange(event);
+        setFieldErrors((current) => {
+          if (!current[field]) return current;
+          const next = { ...current };
+          delete next[field];
+          return next;
+        });
+      },
+    };
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {apiError && (
         <ErrorAlert message={apiError} />
       )}
@@ -99,8 +165,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         label="Email Address"
         type="email"
         placeholder="Enter your email address"
-        {...register("email")}
-        error={errors.email?.message}
+        {...registerWithErrorReset("email")}
+        error={fieldErrors.email}
         required
       />
 
@@ -108,8 +174,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         label="Password"
         type={showPassword ? "text" : "password"}
         placeholder="Enter your password"
-        {...register("password")}
-        error={errors.password?.message}
+        {...registerWithErrorReset("password")}
+        error={fieldErrors.password}
         endElement={
           <button
             type="button"

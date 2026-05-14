@@ -166,14 +166,6 @@ export default function IntakeReportDetailPage() {
   const [locationError, setLocationError] = useState("");
   const [savingLocation, setSavingLocation] = useState(false);
   const [isLocationUpdateOpen, setIsLocationUpdateOpen] = useState(false);
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [targetIncidentUuid, setTargetIncidentUuid] = useState("");
-  const [linkType, setLinkType] =
-    useState<IntakeLinkType>("supporting_report");
-  const [linkNote, setLinkNote] = useState("");
-  const [isLinkingIncident, setIsLinkingIncident] = useState(false);
-  const [linkError, setLinkError] = useState("");
-  const [linkSuccess, setLinkSuccess] = useState("");
   const [locationForm, setLocationForm] = useState({
     latitude: "",
     longitude: "",
@@ -322,49 +314,6 @@ export default function IntakeReportDetailPage() {
     }
   }
 
-  async function handleLinkExistingIncident(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!report) return;
-
-    const trimmedIncidentUuid = targetIncidentUuid.trim();
-
-    if (!UUID_PATTERN.test(trimmedIncidentUuid)) {
-      setLinkError("Enter a valid target incident public UUID.");
-      return;
-    }
-
-    if (linkNote.trim().length > 500) {
-      setLinkError("Link note must be 500 characters or fewer.");
-      return;
-    }
-
-    setIsLinkingIncident(true);
-    setLinkError("");
-    setLinkSuccess("");
-
-    try {
-      const data = await apiPost<{ message?: string }>(
-        `/operations/incidents/${trimmedIncidentUuid}/intake-reports`,
-        {
-          intakeReportPublicUuid: report.public_uuid,
-          linkType,
-          note: linkNote.trim() || undefined,
-        },
-      );
-
-      setTargetIncidentUuid("");
-      setLinkType("supporting_report");
-      setLinkNote("");
-      setLinkModalOpen(false);
-      setLinkSuccess(data.message ?? "Intake report linked to incident.");
-      await loadReport();
-    } catch (err) {
-      setLinkError(formatApiError(err, "Could not link intake report."));
-    } finally {
-      setIsLinkingIncident(false);
-    }
-  }
-
   if (isLoadingSession) {
     return <PageLoading label="Loading intake details" />;
   }
@@ -387,118 +336,6 @@ export default function IntakeReportDetailPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        {linkModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#002D62]">
-                    Link to Existing Incident
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-gray-600">
-                    Enter the target incident public UUID and choose how this
-                    intake should be attached.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    if (isLinkingIncident) return;
-                    setLinkModalOpen(false);
-                    setLinkError("");
-                  }}
-                  disabled={isLinkingIncident}
-                >
-                  Close
-                </Button>
-              </div>
-
-              {linkError ? (
-                <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
-                  {linkError}
-                </div>
-              ) : null}
-
-              <form
-                onSubmit={handleLinkExistingIncident}
-                className="mt-5 space-y-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Target Incident Public UUID
-                  </label>
-                  <input
-                    value={targetIncidentUuid}
-                    onChange={(event) => {
-                      setTargetIncidentUuid(event.target.value);
-                      setLinkError("");
-                    }}
-                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
-                    placeholder="0d5fd834-a3fc-4180-b8ec-a6e664d130d0"
-                    disabled={isLinkingIncident}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Link Type
-                  </label>
-                  <select
-                    value={linkType}
-                    onChange={(event) =>
-                      setLinkType(event.target.value as IntakeLinkType)
-                    }
-                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
-                    disabled={isLinkingIncident}
-                  >
-                    <option value="supporting_report">Supporting Report</option>
-                    <option value="follow_up_report">Follow-up Report</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Note
-                  </label>
-                  <textarea
-                    value={linkNote}
-                    onChange={(event) => setLinkNote(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
-                    rows={3}
-                    maxLength={500}
-                    placeholder="Optional link note"
-                    disabled={isLinkingIncident}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      if (isLinkingIncident) return;
-                      setLinkModalOpen(false);
-                      setLinkError("");
-                    }}
-                    disabled={isLinkingIncident}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    isLoading={isLinkingIncident}
-                    disabled={isLinkingIncident || !targetIncidentUuid.trim()}
-                  >
-                    Link Intake Report
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
@@ -534,28 +371,9 @@ export default function IntakeReportDetailPage() {
               >
                 {getEmergencyAction(report).label}
               </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setLinkError("");
-                  setLinkSuccess("");
-                  setLinkModalOpen(true);
-                }}
-              >
-                Link to Existing Incident
-              </Button>
             </div>
           ) : null}
         </div>
-
-        {linkSuccess ? (
-          <div className="rounded-2xl bg-green-50 p-3 text-sm text-green-700">
-            {linkSuccess}
-          </div>
-        ) : null}
 
         {error && <ErrorAlert message={error} />}
 
@@ -706,8 +524,8 @@ export default function IntakeReportDetailPage() {
                         Update Location
                       </h2>
                       <p className="mt-1 text-sm text-gray-600">
-                        Search, use live location, or click the map to correct
-                        the reported location.
+                        Search or click the map to correct the reported
+                        location.
                       </p>
                     </div>
                     <Button
@@ -738,6 +556,8 @@ export default function IntakeReportDetailPage() {
                       onChange={handleLocationChange}
                       selectedAddress={locationForm.addressText}
                       selectedPlaceName={locationForm.placeName}
+                      syncSearchQueryToSelectedLabel={false}
+                      showCurrentLocation={false}
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>

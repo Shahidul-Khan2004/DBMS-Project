@@ -12,7 +12,9 @@ import { ApiError, apiGet, apiPost, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import {
   formatBangladeshTime,
+  getCurrentBangladeshDatetimeLocal,
   isValidBangladeshLocalDatetime,
+  toBangladeshIsoDatetime,
 } from "@/lib/datetime";
 import type {
   OperationsIntakeReport,
@@ -65,8 +67,10 @@ export default function PromoteIntakeToEmergencyPage() {
   const [incidentTitle, setIncidentTitle] = useState("");
   const [incidentDescription, setIncidentDescription] = useState("");
   const [callerPhoneNumber, setCallerPhoneNumber] = useState("");
-  const [callStartedAt, setCallStartedAt] = useState("");
-  const [reportedAt, setReportedAt] = useState("");
+  const [callStartedAt, setCallStartedAt] = useState(
+    getCurrentBangladeshDatetimeLocal(),
+  );
+  const [reportedAt, setReportedAt] = useState(getCurrentBangladeshDatetimeLocal());
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -131,8 +135,6 @@ export default function PromoteIntakeToEmergencyPage() {
       const incidentTitleText = incidentTitle.trim();
       const incidentDescriptionText = incidentDescription.trim();
       const callerPhoneNumberText = callerPhoneNumber.trim();
-      const callStartedAtPayload = callStartedAt || undefined;
-      const reportedAtPayload = reportedAt || undefined;
 
       if (callStartedAt && !isValidBangladeshLocalDatetime(callStartedAt)) {
         setError("Call started time must be a valid Bangladesh date and time.");
@@ -151,8 +153,8 @@ export default function PromoteIntakeToEmergencyPage() {
           incidentTitle: incidentTitleText || undefined,
           incidentDescription: incidentDescriptionText || undefined,
           callerPhoneNumber: callerPhoneNumberText || undefined,
-          callStartedAt: callStartedAtPayload,
-          reportedAt: reportedAtPayload,
+          callStartedAt: toBangladeshIsoDatetime(callStartedAt),
+          reportedAt: toBangladeshIsoDatetime(reportedAt),
         },
       );
 

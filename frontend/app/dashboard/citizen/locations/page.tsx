@@ -232,6 +232,7 @@ export default function CitizenLocationsPage() {
                 onChange={handleLocationChange}
                 selectedAddress={form.addressText}
                 selectedPlaceName={form.placeName}
+                syncSearchQueryToSelectedLabel={false}
               />
 
               <div className="rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">

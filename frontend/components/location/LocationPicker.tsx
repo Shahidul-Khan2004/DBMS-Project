@@ -9,6 +9,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import { LocateFixed, Search } from "lucide-react";
+import { apiGet } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -19,10 +20,6 @@ const BANGALADESH_BOUNDS: [[number, number], [number, number]] = [
   [20.7421, 88.0840],
   [26.7100, 92.6720],
 ];
-const GEOAPIFY_BANGLADESH_FILTER = "countrycode:bd";
-const GEOAPIFY_DHAKA_BIAS = "proximity:90.4125,23.8103";
-const GEOAPIFY_SEARCH_TIMEOUT_MS = 18_000;
-const API_KEY_PLACEHOLDER_PATTERN = /your_|example|api_key|geoapify_key_here/i;
 
 export type LocationPickerValue = {
   latitude: number;
@@ -48,13 +45,6 @@ function isLocationInBangladesh(location: LocationPickerValue) {
   );
 }
 
-function isGeoapifyAuthError(error: unknown) {
-  return (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("geoapify rejected")
-  );
-}
-
 function getLocationSearchErrorMessage(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") {
     return "Could not search places right now. Location search took too long. Please try again.";
@@ -65,44 +55,17 @@ function getLocationSearchErrorMessage(error: unknown) {
     : "Could not search places right now. Please try again.";
 }
 
-type GeoapifyFeature = {
-  properties?: {
-    place_id?: string;
-    name?: string;
-    formatted?: string;
-    address_line1?: string;
-    address_line2?: string;
-    lat?: number;
-    lon?: number;
-  };
-  geometry?: {
-    coordinates?: [number, number];
-  };
-};
-
-type GeoapifyResult = {
-  place_id?: string;
-  name?: string;
-  formatted?: string;
-  address_line1?: string;
-  address_line2?: string;
-  lat?: number;
-  lon?: number;
-};
-
-type GeoapifyResponse = {
-  results?: GeoapifyResult[];
-  features?: GeoapifyFeature[];
-};
-
-type GeoapifyErrorResponse = {
-  message?: string;
-  error?: string;
-  statusCode?: number;
-};
-
 type SearchResult = {
   id: string;
+  latitude: number;
+  longitude: number;
+  label: string;
+  addressText?: string;
+  placeName?: string;
+};
+
+type BackendLocationSearchResult = {
+  id?: string;
   latitude: number;
   longitude: number;
   label: string;
@@ -118,98 +81,12 @@ type LocationPickerProps = {
   ) => void;
   selectedAddress?: string;
   selectedPlaceName?: string;
+  syncSearchQueryToSelectedLabel?: boolean;
+  showCurrentLocation?: boolean;
   disabled?: boolean;
   className?: string;
 };
 
-async function fetchWithTimeout(
-  url: string,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
-function getGeoJsonFeatureLocation(feature: GeoapifyFeature) {
-  const lat = feature.properties?.lat;
-  const lon = feature.properties?.lon;
-
-  if (Number.isFinite(lat) && Number.isFinite(lon)) {
-    return { latitude: lat as number, longitude: lon as number };
-  }
-
-  const [lngFromGeometry, latFromGeometry] = feature.geometry?.coordinates ?? [];
-  if (Number.isFinite(latFromGeometry) && Number.isFinite(lngFromGeometry)) {
-    return {
-      latitude: latFromGeometry as number,
-      longitude: lngFromGeometry as number,
-    };
-  }
-
-  return null;
-}
-
-function toGeoJsonSearchResult(
-  feature: GeoapifyFeature,
-  index: number,
-): SearchResult | null {
-  const location = getGeoJsonFeatureLocation(feature);
-  if (!location) return null;
-
-  const properties = feature.properties ?? {};
-  const label =
-    properties.formatted ||
-    [properties.address_line1, properties.address_line2]
-      .filter(Boolean)
-      .join(", ") ||
-    properties.name ||
-    "Matched map location";
-
-  return {
-    id:
-      properties.place_id ||
-      `${location.latitude}-${location.longitude}-${index.toString()}`,
-    ...location,
-    label,
-    addressText: properties.formatted,
-    placeName: properties.name || properties.address_line1,
-  };
-}
-
-function toJsonSearchResult(
-  result: GeoapifyResult,
-  index: number,
-): SearchResult | null {
-  if (!Number.isFinite(result.lat) || !Number.isFinite(result.lon)) {
-    return null;
-  }
-
-  const location = {
-    latitude: result.lat as number,
-    longitude: result.lon as number,
-  };
-  const label =
-    result.formatted ||
-    [result.address_line1, result.address_line2].filter(Boolean).join(", ") ||
-    result.name ||
-    "Matched map location";
-
-  return {
-    id:
-      result.place_id ||
-      `${location.latitude}-${location.longitude}-${index.toString()}`,
-    ...location,
-    label,
-    addressText: result.formatted,
-    placeName: result.name || result.address_line1,
-  };
-}
 
 function getSearchResultSignature(result: SearchResult) {
   return [
@@ -288,18 +165,44 @@ function MapRecenter({ value }: { value: LocationPickerValue | null }) {
   return null;
 }
 
+function MapResizeHandler() {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    const mapContainer = map.getContainer();
+    if (mapContainer) {
+      resizeObserver.observe(mapContainer);
+    }
+
+    window.addEventListener("resize", handleResize);
+
+    // Invalidate size once on mount to ensure proper initialization
+    setTimeout(() => map.invalidateSize(), 100);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
+    };
+  }, [map]);
+
+  return null;
+}
+
 export function LocationPicker({
   value,
   onChange,
   selectedAddress,
   selectedPlaceName,
+  syncSearchQueryToSelectedLabel = true,
+  showCurrentLocation = true,
   disabled = false,
   className = "",
 }: LocationPickerProps) {
-  const apiKey = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY?.trim();
-  const hasUsableApiKey = Boolean(
-    apiKey && !API_KEY_PLACEHOLDER_PATTERN.test(apiKey),
-  );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -315,7 +218,7 @@ export function LocationPicker({
     ? ([value.latitude, value.longitude] as [number, number])
     : DEFAULT_CENTER;
 
-  const isSearchDisabled = disabled || !hasUsableApiKey || isSearching;
+  const isSearchDisabled = disabled || isSearching;
   const selectedLabel = selectedPlaceName || selectedAddress;
 
   useEffect(() => {
@@ -325,24 +228,16 @@ export function LocationPicker({
   }, [value]);
 
   useEffect(() => {
+    if (!syncSearchQueryToSelectedLabel) return;
     if (!selectedLabel) return;
     if (lastSyncedSelectedLabelRef.current === selectedLabel) return;
 
     lastSyncedSelectedLabelRef.current = selectedLabel;
     setQuery(selectedLabel);
-  }, [selectedLabel]);
+  }, [selectedLabel, syncSearchQueryToSelectedLabel]);
 
   const handleSearch = async () => {
     setLocationError("");
-
-    if (!hasUsableApiKey || !apiKey) {
-      setSearchError(
-        "Geoapify search needs a real NEXT_PUBLIC_GEOAPIFY_API_KEY value.",
-      );
-      setResults([]);
-      setHasSearched(false);
-      return;
-    }
 
     const trimmedQuery = query.trim();
     if (trimmedQuery.length < 2) {
@@ -357,48 +252,8 @@ export function LocationPicker({
     setHasSearched(true);
 
     try {
-      const searchResponses = await Promise.allSettled([
-        searchGeoapifyLocations(
-          "autocomplete",
-          trimmedQuery,
-        ),
-        searchGeoapifyLocations("search", trimmedQuery),
-      ]);
-      const rejectedResponse = searchResponses.find(
-        (response) => response.status === "rejected",
-      );
-      const authError = searchResponses.find(
-        (response) =>
-          response.status === "rejected" &&
-          isGeoapifyAuthError(response.reason),
-      );
-      const resultSet = searchResponses
-        .filter(
-          (
-            response,
-          ): response is PromiseFulfilledResult<SearchResult[]> =>
-            response.status === "fulfilled",
-        )
-        .map((response) => response.value)
-        .find((responseResults) => responseResults.length > 0);
-
-      if (authError?.status === "rejected") {
-        throw authError.reason;
-      }
-
-      if (resultSet) {
-        setResults(normalizeSearchResults(resultSet));
-        return;
-      }
-
-      if (
-        rejectedResponse &&
-        searchResponses.every((response) => response.status === "rejected")
-      ) {
-        throw rejectedResponse.reason;
-      }
-
-      setResults([]);
+      const nextResults = await searchBarikoiPlaces(trimmedQuery);
+      setResults(normalizeSearchResults(nextResults));
     } catch (error) {
       setSearchError(getLocationSearchErrorMessage(error));
       setResults([]);
@@ -413,61 +268,36 @@ export function LocationPicker({
     void handleSearch();
   };
 
-  const searchGeoapifyLocations = async (
-    endpoint: "autocomplete" | "search",
-    text: string,
-  ) => {
-    if (!apiKey) return [];
+  const searchBarikoiPlaces = async (text: string) => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 18_000);
 
-    const params = new URLSearchParams({
-      text,
-      apiKey,
-      limit: "8",
-      lang: "en",
-      format: "json",
-      filter: GEOAPIFY_BANGLADESH_FILTER,
-      bias: GEOAPIFY_DHAKA_BIAS,
-    });
-
-    const response = await fetchWithTimeout(
-      `https://api.geoapify.com/v1/geocode/${endpoint}?${params.toString()}`,
-      GEOAPIFY_SEARCH_TIMEOUT_MS,
-    );
-
-    if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as
-        | GeoapifyErrorResponse
-        | undefined;
-      const apiMessage = errorData?.message;
-
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(
-          "Geoapify rejected the API key. Check NEXT_PUBLIC_GEOAPIFY_API_KEY and any allowed-domain restrictions.",
-        );
-      }
-
-      throw new Error(
-        apiMessage || `Search failed with status ${response.status}.`,
+    try {
+      const response = await apiGet<{ places?: BackendLocationSearchResult[] }>(
+        `/locations/search?query=${encodeURIComponent(text)}`,
+        { signal: controller.signal },
       );
-    }
 
-    const data = (await response.json()) as GeoapifyResponse;
-    const nextResults = data.results
-      ? data.results
-          .map((result, index) => toJsonSearchResult(result, index))
-          .filter((result): result is SearchResult => Boolean(result))
-      : (data.features ?? [])
-          .map((feature, index) => toGeoJsonSearchResult(feature, index))
-          .filter((result): result is SearchResult => Boolean(result));
-
-    return normalizeSearchResults(
-      nextResults.filter((result) =>
-        isLocationInBangladesh({
+      return (response.places ?? [])
+        .map((result, index) => ({
+          id:
+            result.id ||
+            `${result.latitude}-${result.longitude}-${index}`,
           latitude: result.latitude,
           longitude: result.longitude,
-        }),
-      ),
-    );
+          label: result.label,
+          addressText: result.addressText,
+          placeName: result.placeName,
+        }))
+        .filter((result) =>
+          isLocationInBangladesh({
+            latitude: result.latitude,
+            longitude: result.longitude,
+          }),
+        );
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   };
 
   const handleResultSelect = (result: SearchResult) => {
@@ -488,41 +318,17 @@ export function LocationPicker({
   const resolveLocationDetails = async (
     location: LocationPickerValue,
   ): Promise<LocationPickerSelectionDetails> => {
-    if (!hasUsableApiKey || !apiKey) {
-      return {};
-    }
-
     const resolvingRequestId = resolvingRequestRef.current + 1;
     resolvingRequestRef.current = resolvingRequestId;
     setIsResolvingLocation(true);
     try {
-      const params = new URLSearchParams({
-        lat: location.latitude.toString(),
-        lon: location.longitude.toString(),
-        apiKey,
-        format: "json",
-        lang: "en",
-        filter: GEOAPIFY_BANGLADESH_FILTER,
-      });
-      const response = await fetch(
-        `https://api.geoapify.com/v1/geocode/reverse?${params.toString()}`,
+      const response = await apiGet<{ addressText?: string; placeName?: string }>(
+        `/locations/reverse?latitude=${location.latitude}&longitude=${location.longitude}`,
       );
 
-      if (!response.ok) {
-        return {};
-      }
-
-      const data = (await response.json()) as GeoapifyResponse;
-      const result = data.results?.[0]
-        ? toJsonSearchResult(data.results[0], 0)
-        : data.features?.[0]
-          ? toGeoJsonSearchResult(data.features[0], 0)
-          : null;
-
       return {
-        addressText:
-          result?.addressText || result?.label,
-        placeName: result?.placeName,
+        addressText: response.addressText,
+        placeName: response.placeName,
       };
     } catch {
       return {};
@@ -617,7 +423,9 @@ export function LocationPicker({
             Find Location
           </p>
           <p className="text-xs leading-5 text-gray-600">
-            Search, use live location, or click directly on the map.
+            {showCurrentLocation
+              ? "Search, use live location, or click directly on the map."
+              : "Search or click directly on the map."}
           </p>
         </div>
 
@@ -627,10 +435,10 @@ export function LocationPicker({
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder="Search for an area, road, landmark, or address"
-            disabled={disabled || !hasUsableApiKey}
+            disabled={disabled || isSearching}
             aria-label="Search for a location"
           />
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className={showCurrentLocation ? "grid gap-2 sm:grid-cols-2" : "grid gap-2"}>
             <Button
               type="button"
               variant="secondary"
@@ -643,27 +451,23 @@ export function LocationPicker({
               <Search className="h-4 w-4" aria-hidden />
               Search
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              isLoading={isLocating}
-              disabled={disabled || isLocating}
-              onClick={handleCurrentLocation}
-              fullWidth
-              className="h-[46px] whitespace-nowrap text-sm"
-            >
-              <LocateFixed className="h-4 w-4" aria-hidden />
-              My Location
-            </Button>
+            {showCurrentLocation ? (
+              <Button
+                type="button"
+                variant="outline"
+                isLoading={isLocating}
+                disabled={disabled || isLocating}
+                onClick={handleCurrentLocation}
+                fullWidth
+                className="h-[46px] whitespace-nowrap text-sm"
+              >
+                <LocateFixed className="h-4 w-4" aria-hidden />
+                My Location
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        {!hasUsableApiKey && (
-          <p className="mt-2 rounded-2xl bg-[#EFF6FF] px-3 py-2 text-xs leading-5 text-slate-700">
-            Place search needs a real NEXT_PUBLIC_GEOAPIFY_API_KEY value. Live
-            location and map selection still work.
-          </p>
-        )}
 
         {searchError && (
           <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -722,6 +526,7 @@ export function LocationPicker({
             maxZoom={19}
           />
           <MapClickHandler disabled={disabled} onPick={handleMapPick} />
+          <MapResizeHandler />
           <MapRecenter value={value} />
           {value && (
             <CircleMarker
