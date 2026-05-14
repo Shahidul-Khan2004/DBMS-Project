@@ -2,6 +2,8 @@ import express from "express";
 import {
   getLocationByPublicUuid,
   getMyLocations,
+  getLocationReverse,
+  getLocationSearch,
   postLocation,
 } from "../controllers/locations.js";
 import { requireAuth } from "../middlewares/auth.js";
@@ -16,6 +18,8 @@ router.use(requireAuth);
 
 router.post("/", validateCreateLocation, postLocation);
 router.get("/my", getMyLocations);
+router.get("/search", getLocationSearch);
+router.get("/reverse", getLocationReverse);
 router.get("/:publicUuid", validateLocationPublicUuidParam, getLocationByPublicUuid);
 
 export default router;

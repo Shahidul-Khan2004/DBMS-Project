@@ -31,6 +31,16 @@ const DEFAULT_TIMEOUT_MS = 5_000;
  */
 
 /**
+ * @typedef {object} BarikoiSearchPlaceResult
+ * @property {string | null} placeCode
+ * @property {string | null} address
+ * @property {string | null} name
+ * @property {string | null} city
+ * @property {string | null} area
+ * @property {string | null} latitude
+ * @property {string | null} longitude
+ * @property {unknown} rawPlace
+ *
  * @typedef {object} BarikoiReverseGeocodeResult
  * @property {BarikoiPlaceNormalized} place
  * @property {number | null} httpStatus
@@ -137,6 +147,141 @@ export function normalizeBarikoiPlace(place) {
     address: pickString(p.address),
     rawPlace: place,
   };
+}
+
+function parseBarikoiNumber(value) {
+  if (value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeBarikoiSearchPlace(place) {
+  if (!place || typeof place !== "object") {
+    return null;
+  }
+
+  const p = /** @type {Record<string, unknown>} */ (place);
+  const latitude = parseBarikoiNumber(p.latitude ?? p.lat);
+  const longitude = parseBarikoiNumber(p.longitude ?? p.lon);
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  const address = pickString(p.address);
+  const name = pickString(p.name);
+  const label = address || name ||
+    [pickString(p.area), pickString(p.city), pickString(p.thana)]
+      .filter(Boolean)
+      .join(", ") ||
+    "Matched map location";
+
+  return {
+    placeCode: pickString(p.place_code ?? p.uCode),
+    address,
+    name,
+    city: pickString(p.city),
+    area: pickString(p.area),
+    latitude: String(latitude),
+    longitude: String(longitude),
+    rawPlace: place,
+    label,
+  };
+}
+
+/**
+ * @typedef {object} BarikoiSearchResult
+ * @property {string} id
+ * @property {number} latitude
+ * @property {number} longitude
+ * @property {string} label
+ * @property {string | null} addressText
+ * @property {string | null} placeName
+ * @property {unknown} rawPlace
+ */
+
+/**
+ * @param {object} opts
+ * @param {string} opts.query
+ * @param {number} [opts.limit]
+ * @param {typeof fetch} [opts.fetchFn] — for tests
+ * @param {string} [opts.apiKey] — defaults to process.env.BARIKOI_API_KEY
+ * @param {string} [opts.baseUrl] — override full endpoint URL
+ * @param {number} [opts.timeoutMs]
+ * @returns {Promise<{places: BarikoiSearchResult[]; httpStatus: number | null; providerPayload: unknown; authOrQuotaFailure: BarikoiAuthOrQuotaFailure | null;}>>
+ */
+export async function searchPlacesBarikoi(opts) {
+  const apiKey = opts.apiKey ?? process.env.BARIKOI_API_KEY;
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const baseUrl = opts.baseUrl ?? "https://barikoi.xyz/v2/api/search/autocomplete/place";
+
+  if (!apiKey || !fetchFn) {
+    return {
+      places: [],
+      httpStatus: null,
+      providerPayload: null,
+      authOrQuotaFailure: null,
+    };
+  }
+
+  const params = new URLSearchParams({
+    api_key: String(apiKey),
+    q: String(opts.query),
+    country_code: "bd",
+    bangla: "false",
+  });
+
+  const url = `${baseUrl}?${params.toString()}`;
+
+  try {
+    const res = await fetchFn(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const httpStatus = res.status;
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+
+    const authOrQuotaFailure = classifyBarikoiAuthOrQuotaFailure(httpStatus, body);
+    const rawPlaces =
+      body && typeof body === "object" && Array.isArray(body.places)
+        ? body.places
+        : [];
+
+    const places = rawPlaces
+      .map(normalizeBarikoiSearchPlace)
+      .filter((result) => result !== null)
+      .map((result, index) => ({
+        id:
+          result.placeCode ||
+          `${result.latitude}-${result.longitude}-${index}`,
+        latitude: Number(result.latitude),
+        longitude: Number(result.longitude),
+        label: result.label,
+        addressText: result.address || undefined,
+        placeName: result.name || undefined,
+        rawPlace: result.rawPlace,
+      }));
+
+    return {
+      places: typeof opts.limit === "number" ? places.slice(0, opts.limit) : places,
+      httpStatus,
+      providerPayload: body,
+      authOrQuotaFailure,
+    };
+  } catch {
+    return {
+      places: [],
+      httpStatus: null,
+      providerPayload: null,
+      authOrQuotaFailure: null,
+    };
+  }
 }
 
 /**
