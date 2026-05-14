@@ -264,3 +264,48 @@ export const listNotificationsQuerySchema = z.object({
 export const notificationRecipientIdParamSchema = z.object({
   notificationRecipientId: z.coerce.number().int().positive(),
 });
+
+/** GET /operations/service-cases */
+export const operationsListServiceCasesQuerySchema = z.object({
+  status: z.string().trim().optional(),
+  categoryCode: z.string().trim().optional(),
+  assignedTo: z.uuid({ message: "assignedTo must be a user public UUID" }).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const operationsServiceCasePublicUuidParamSchema = z.object({
+  publicUuid: z.uuid({ message: "Invalid service case id" }),
+});
+
+export const operationsPatchServiceCaseStatusSchema = z.object({
+  statusCode: z.string().trim().min(1, "statusCode is required"),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const operationsPostServiceCaseMessageSchema = z.object({
+  title: z.string().trim().min(1, "title is required").max(255),
+  description: z.string().optional(),
+});
+
+export const operationsPostServiceCaseAssignmentSchema = z.object({
+  assignedToUserPublicUuid: z.uuid({ message: "assignedToUserPublicUuid must be a user public UUID" }),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const operationsPostServiceCaseResolveSchema = z.object({
+  resolutionType: z.enum([
+    "advice_given",
+    "referred_to_facility",
+    "escalated",
+    "no_action_needed",
+    "duplicate",
+  ]),
+  resolutionText: z.string().trim().min(1, "resolutionText is required"),
+  recommendedFacilityId: z.coerce.number().int().positive().optional(),
+});
+
+/** POST /intake/reports/:reportPublicUuid/escalate — service case → emergency incident */
+export const intakeEscalateServiceCaseToEmergencySchema = classifyEmergency999Schema.extend({
+  escalationReason: z.string().trim().min(1, "escalationReason is required").max(1000),
+});
