@@ -74,6 +74,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/service-case` | Roles `dispatcher` / `system_admin` |
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/emergency` | Same roles |
 | Intake | GET | `/intake/reports/my/service-cases` | Reporter: list linked service cases |
+| Intake | POST | `/intake/service-cases/:publicUuid/messages` | Reporter JWT only (`service_cases.reporter_user_id`) |
 | Intake | POST | `/intake/reports/:reportPublicUuid/escalate` | Roles `dispatcher` / `system_admin`; permissions `case.escalate` + `incident.create` |
 | Operations | GET | `/operations/dispatcher/overview` | Permission `incident.classify` |
 | Operations | GET | `/operations/intake-reports` | `incident.classify` |
@@ -715,6 +716,26 @@ Lists **service cases** where the authenticated user is the reporter (`service_c
 
 `location` is taken from `COALESCE(service_cases.current_location_id, intake_reports.reported_location_id)` when present.
 
+### POST `/intake/service-cases/:publicUuid/messages`
+
+**Access:** Bearer JWT. The authenticated user must be the case reporter (`service_cases.reporter_user_id` matches the token’s internal user id).
+
+**Body:** `{ "title": "…", "description": "optional" }` — `title` required (trimmed, max 255); `description` optional. Same encoding as operations messages: `case_messages.message_body` is `Subject: <title>\n\n<description>`.
+
+**Behavior (single DB transaction for case writes):** Inserts `case_messages` with `message_type` **`user_message`**. If the case’s current status is **`awaiting_user_response`**, the server also inserts **`case_status_history`** to **`under_review`** (allowed transition; trigger updates `service_cases.current_status_id`) and writes an **`audit_log`** row for the status change (`service_case.status_patch`, with `via: "citizen_message"` in details). Always writes **`service_case.message_posted`** audit for the new message.
+
+**Notifications (best-effort, after commit):** If there is an **active** `case_assignments` row (`assignment_status = 'active'`, `ended_at IS NULL`), the server queues in-app + email delivery for the assignee with fallback copy **"Citizen replied to service case"** (same text as title and body when templates are missing). If there is no active assignee, no notification is sent. Notification failures do **not** roll back the message or status change.
+
+**Response (201):** `{ "message": "Citizen reply recorded", "case_message": { "id", "message_type": "user_message", "message_body", "created_at" } }`.
+
+**Errors:**
+
+- `401` — missing/invalid `Authorization` bearer token.
+- `403` `FORBIDDEN` — service case exists but the caller is not the reporter (`"You are not the reporter for this service case"`).
+- `404` `SERVICE_CASE_NOT_FOUND` — unknown `publicUuid`.
+- `409` `SERVICE_CASE_NOT_UPDATABLE` — terminal case (cannot add messages).
+- `422` `VALIDATION_ERROR` — invalid body or invalid `publicUuid` param.
+
 ### POST `/intake/reports/:reportPublicUuid/escalate`
 
 Promotes an intake that is already on the **service case** path (`intake_status` must be `linked_to_case`) to an **emergency incident**, with a linked `case_escalations` row and case status `escalated_to_emergency`. **Roles:** `dispatcher` or `system_admin`. **Permissions:** `case.escalate` **and** `incident.create`.
@@ -733,7 +754,7 @@ Promotes an intake that is already on the **service case** path (`intake_status`
 
 **Note:** Database tables `work_queues` and `queue_items` exist for future workload features; **these HTTP endpoints do not read or write them**. The operator queue is the paginated **`GET /operations/service-cases`** list.
 
-**Dispatcher messages:** `case_messages.message_body` stores `Subject: <title>\n\n<description>` (there is no separate `title` column). The API accepts JSON `title` + optional `description`; clients read back `message_body` or parse the subject line.
+**Dispatcher / operator messages:** `case_messages.message_body` stores `Subject: <title>\n\n<description>` (there is no separate `title` column). The API accepts JSON `title` + optional `description`; clients read back `message_body` or parse the subject line. Persisted `message_type` for this endpoint is **`admin_reply`** (dispatcher/operator reply in the DB enum).
 
 ### GET `/operations/service-cases`
 
@@ -784,9 +805,13 @@ Terminal cases cannot change status (`409` `INVALID_STATUS_TRANSITION`).
 
 **Body:** `{ "title": "…", "description": "optional" }` — `title` required, max 255.
 
-**Response (201):** `{ "message": "Dispatcher response recorded", "case_message": { "id", "message_type", "message_body", "created_at" } }`.
+**Behavior (single DB transaction for case writes):** Inserts `case_messages` with `message_type` **`admin_reply`**. If the case’s current status is **`under_review`**, the server also inserts **`case_status_history`** to **`awaiting_user_response`** (trigger updates `service_cases.current_status_id`) and writes **`audit_log`** for that status change (`service_case.status_patch`, with `via: "dispatcher_message"` in details). Always writes **`service_case.message_posted`** for the new message.
 
-**Errors:** `409` `SERVICE_CASE_NOT_UPDATABLE` on terminal cases.
+**Notifications (best-effort, after commit):** When the case has a reporter user, the server queues in-app + email for the reporter with fallback copy **"Dispatcher replied to your service case"** (same text as title and body when templates are missing). Notification failures do **not** roll back the message or status change.
+
+**Response (201):** `{ "message": "Dispatcher response recorded", "case_message": { "id", "message_type": "admin_reply", "message_body", "created_at" } }`.
+
+**Errors:** `409` `SERVICE_CASE_NOT_UPDATABLE` on terminal cases; `422` `VALIDATION_ERROR` for invalid body or param.
 
 ### POST `/operations/service-cases/:publicUuid/assignments`
 

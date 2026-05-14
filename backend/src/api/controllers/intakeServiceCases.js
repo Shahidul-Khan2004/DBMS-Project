@@ -5,6 +5,21 @@ export async function getMyServiceCases(req, res) {
   res.status(200).json(result);
 }
 
+export async function postIntakeServiceCaseMessage(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const caseMessage = await serviceCaseOperationsService.intakePostServiceCaseMessage(
+    req.actorUserId,
+    params.publicUuid,
+    body,
+    req,
+  );
+  res.status(201).json({
+    message: "Citizen reply recorded",
+    case_message: caseMessage,
+  });
+}
+
 export async function postIntakeReportEscalateToEmergency(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;

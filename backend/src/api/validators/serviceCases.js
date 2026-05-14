@@ -52,3 +52,14 @@ export const validateIntakeReportUuidParamForEscalate = validate(
   intakeReportPublicUuidParamSchema,
   "params",
 );
+
+export const validateIntakeServiceCasePublicUuidParam = validate(
+  "intake service case id",
+  operationsServiceCasePublicUuidParamSchema,
+  "params",
+);
+
+export const validateIntakePostServiceCaseMessage = validate(
+  "intake post service case message",
+  operationsPostServiceCaseMessageSchema,
+);
