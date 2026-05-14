@@ -12,8 +12,17 @@ import {
 import {
   forbidEmergencyUrgencyWithoutIncidentClassify,
   requireAuth,
+  requirePermission,
   requireRole,
 } from "../middlewares/auth.js";
+import {
+  getMyServiceCases,
+  postIntakeReportEscalateToEmergency,
+} from "../controllers/intakeServiceCases.js";
+import {
+  validateIntakeEscalateServiceCaseBody,
+  validateIntakeReportUuidParamForEscalate,
+} from "../validators/serviceCases.js";
 import { ROLE_CODES } from "../../services/rbacService.js";
 import {
   validateClassifyEmergency999,
@@ -29,6 +38,7 @@ router.use(requireAuth);
 
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
+router.get("/reports/my/service-cases", getMyServiceCases);
 router.get("/reports/:reportPublicUuid", validateIntakeReportUuidParam, getMyIntakeReportByPublicUuid);
 router.get(
   "/reports/:reportPublicUuid/reported-location-history",
@@ -61,6 +71,16 @@ router.post(
   requireRole(...operatorRoles),
   validateClassifyEmergency999,
   classifyEmergency999,
+);
+
+router.post(
+  "/reports/:reportPublicUuid/escalate",
+  requireRole(...operatorRoles),
+  requirePermission("case.escalate"),
+  requirePermission("incident.create"),
+  validateIntakeReportUuidParamForEscalate,
+  validateIntakeEscalateServiceCaseBody,
+  postIntakeReportEscalateToEmergency,
 );
 
 export default router;
