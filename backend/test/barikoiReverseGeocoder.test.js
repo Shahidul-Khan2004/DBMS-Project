@@ -4,6 +4,7 @@ import {
   classifyBarikoiAuthOrQuotaFailure,
   normalizeBarikoiPlace,
   reverseGeocodeBarikoi,
+  searchPlacesBarikoi,
 } from "../src/integrations/barikoiReverseGeocoder.js";
 
 describe("classifyBarikoiAuthOrQuotaFailure", () => {
@@ -32,6 +33,44 @@ describe("classifyBarikoiAuthOrQuotaFailure", () => {
 });
 
 describe("barikoiReverseGeocoder", () => {
+  it("parses Barikoi autocomplete search places with coordinates", async () => {
+    const requestedUrls = [];
+    const body = {
+      status: 200,
+      places: [
+        {
+          id: 635085,
+          longitude: 90.369999116958,
+          latitude: 23.83729875602,
+          address: "Mirpur DOHS, Mirpur DOHS",
+          city: "Dhaka",
+          area: "Mirpur",
+          uCode: "PFSU6037",
+        },
+      ],
+    };
+
+    const r = await searchPlacesBarikoi({
+      query: "mirpur",
+      apiKey: "test-key",
+      fetchFn: async (url) => {
+        requestedUrls.push(String(url));
+        return {
+          status: 200,
+          json: async () => body,
+        };
+      },
+    });
+
+    assert.equal(r.places.length, 1);
+    assert.equal(r.places[0].id, "PFSU6037");
+    assert.equal(r.places[0].latitude, 23.83729875602);
+    assert.equal(r.places[0].longitude, 90.369999116958);
+    assert.equal(r.places[0].label, "Mirpur DOHS, Mirpur DOHS");
+    assert.match(requestedUrls[0], /\/v2\/api\/search\/autocomplete\/place\?/);
+    assert.match(requestedUrls[0], /country_code=bd/);
+  });
+
   it("normalizeBarikoiPlace maps sub_district to upazila", () => {
     const p = normalizeBarikoiPlace({
       division: "Dhaka",
