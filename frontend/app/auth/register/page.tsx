@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import { RegistrationCard } from "../../../components/auth/RegistrationCard";
-import { RegisterForm } from "../../../components/auth/RegisterForm";
+import { RegisterStepper } from "../../../components/auth/RegisterStepper";
 import { saveAuthSession, determineRole } from "../../../lib/auth-store";
 import type { RegisterResponse } from "../../../types/auth";
 
@@ -65,21 +63,5 @@ export default function RegisterPage() {
     );
   }
 
-  return (
-    <RegistrationCard>
-      <div className="space-y-6">
-        <RegisterForm onSuccess={handleRegistrationSuccess} />
-
-        <div className="border-t border-[#002D62]/10 pt-4 text-center text-sm text-slate-600">
-          Already have an account?{" "}
-          <Link
-            href="/auth/login"
-            className="font-semibold text-[#002D62] hover:text-[#006747]"
-          >
-            Login
-          </Link>
-        </div>
-      </div>
-    </RegistrationCard>
-  );
+  return <RegisterStepper onSuccess={handleRegistrationSuccess} />;
 }
