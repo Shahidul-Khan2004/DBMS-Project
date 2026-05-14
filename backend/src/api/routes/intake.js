@@ -18,10 +18,13 @@ import {
 import {
   getMyServiceCases,
   postIntakeReportEscalateToEmergency,
+  postIntakeServiceCaseMessage,
 } from "../controllers/intakeServiceCases.js";
 import {
   validateIntakeEscalateServiceCaseBody,
+  validateIntakePostServiceCaseMessage,
   validateIntakeReportUuidParamForEscalate,
+  validateIntakeServiceCasePublicUuidParam,
 } from "../validators/serviceCases.js";
 import { ROLE_CODES } from "../../services/rbacService.js";
 import {
@@ -39,6 +42,12 @@ router.use(requireAuth);
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
 router.get("/reports/my/service-cases", getMyServiceCases);
+router.post(
+  "/service-cases/:publicUuid/messages",
+  validateIntakeServiceCasePublicUuidParam,
+  validateIntakePostServiceCaseMessage,
+  postIntakeServiceCaseMessage,
+);
 router.get("/reports/:reportPublicUuid", validateIntakeReportUuidParam, getMyIntakeReportByPublicUuid);
 router.get(
   "/reports/:reportPublicUuid/reported-location-history",

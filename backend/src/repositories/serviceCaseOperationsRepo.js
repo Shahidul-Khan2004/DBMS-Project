@@ -629,6 +629,37 @@ export async function postServiceCaseMessageInTransaction(params) {
       [meta.caseId, params.actorUserId, messageBody],
     );
 
+    if (meta.fromStatusCode === "under_review") {
+      assertCaseStatusTransition(meta.fromStatusCode, "awaiting_user_response");
+      const awaitingStatusId = await findCaseStatusId(conn, "awaiting_user_response");
+      await conn.execute(
+        `
+          INSERT INTO case_status_history (
+            case_id,
+            status_id,
+            changed_by_user_id,
+            note
+          )
+          VALUES (?, ?, ?, NULL)
+        `,
+        [meta.caseId, awaitingStatusId, params.actorUserId ?? null],
+      );
+      await insertAuditLog(conn, {
+        actorUserId: params.actorUserId,
+        action: "service_case.status_patch",
+        entityType: "service_case",
+        entityId: meta.caseId,
+        relatedCaseId: meta.caseId,
+        detailsJson: {
+          from_status: meta.fromStatusCode,
+          to_status: "awaiting_user_response",
+          via: "dispatcher_message",
+        },
+        ipAddress: params.ipAddress ?? null,
+        userAgent: params.userAgent ?? null,
+      });
+    }
+
     const [createdRow] = await conn.execute(
       `SELECT created_at FROM case_messages WHERE id = ? LIMIT 1`,
       [msgResult.insertId],
@@ -640,7 +671,7 @@ export async function postServiceCaseMessageInTransaction(params) {
       entityType: "service_case",
       entityId: meta.caseId,
       relatedCaseId: meta.caseId,
-      detailsJson: { case_message_id: msgResult.insertId },
+      detailsJson: { case_message_id: msgResult.insertId, message_type: "admin_reply" },
       ipAddress: params.ipAddress ?? null,
       userAgent: params.userAgent ?? null,
     });
@@ -657,6 +688,131 @@ export async function postServiceCaseMessageInTransaction(params) {
       reporterUserId: meta.reporterUserId,
       caseId: meta.caseId,
       caseCode,
+    };
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
+async function getActiveCaseAssigneeUserId(conn, caseId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT assigned_admin_id
+      FROM case_assignments
+      WHERE case_id = ?
+        AND assignment_status = 'active'
+        AND ended_at IS NULL
+      LIMIT 1
+    `,
+    [caseId],
+  );
+  const id = rows[0]?.assigned_admin_id;
+  return id != null ? Number(id) : null;
+}
+
+export async function postCitizenServiceCaseMessageInTransaction(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const meta = await lockServiceCaseForStatusChange(conn, params.casePublicUuid);
+    if (Number(meta.reporterUserId) !== Number(params.actorUserId)) {
+      throw new BackendError(403, "FORBIDDEN", "You are not the reporter for this service case");
+    }
+    if (meta.isTerminal) {
+      throw new BackendError(
+        409,
+        "SERVICE_CASE_NOT_UPDATABLE",
+        "Cannot add messages to a terminal service case",
+      );
+    }
+
+    const [hdr] = await conn.execute(
+      `SELECT case_code FROM service_cases WHERE id = ? LIMIT 1`,
+      [meta.caseId],
+    );
+    const caseCode = hdr[0]?.case_code ?? null;
+
+    const messageBody = encodeDispatcherMessageBody(params.title, params.description ?? "");
+
+    const [msgResult] = await conn.execute(
+      `
+        INSERT INTO case_messages (
+          case_id,
+          sender_user_id,
+          message_type,
+          message_body,
+          is_internal
+        )
+        VALUES (?, ?, 'user_message', ?, FALSE)
+      `,
+      [meta.caseId, params.actorUserId, messageBody],
+    );
+
+    if (meta.fromStatusCode === "awaiting_user_response") {
+      assertCaseStatusTransition(meta.fromStatusCode, "under_review");
+      const underReviewStatusId = await findCaseStatusId(conn, "under_review");
+      await conn.execute(
+        `
+          INSERT INTO case_status_history (
+            case_id,
+            status_id,
+            changed_by_user_id,
+            note
+          )
+          VALUES (?, ?, ?, NULL)
+        `,
+        [meta.caseId, underReviewStatusId, params.actorUserId ?? null],
+      );
+      await insertAuditLog(conn, {
+        actorUserId: params.actorUserId,
+        action: "service_case.status_patch",
+        entityType: "service_case",
+        entityId: meta.caseId,
+        relatedCaseId: meta.caseId,
+        detailsJson: {
+          from_status: meta.fromStatusCode,
+          to_status: "under_review",
+          via: "citizen_message",
+        },
+        ipAddress: params.ipAddress ?? null,
+        userAgent: params.userAgent ?? null,
+      });
+    }
+
+    const assigneeUserId = await getActiveCaseAssigneeUserId(conn, meta.caseId);
+
+    const [createdRow] = await conn.execute(
+      `SELECT created_at FROM case_messages WHERE id = ? LIMIT 1`,
+      [msgResult.insertId],
+    );
+
+    await insertAuditLog(conn, {
+      actorUserId: params.actorUserId,
+      action: "service_case.message_posted",
+      entityType: "service_case",
+      entityId: meta.caseId,
+      relatedCaseId: meta.caseId,
+      detailsJson: { case_message_id: msgResult.insertId, message_type: "user_message" },
+      ipAddress: params.ipAddress ?? null,
+      userAgent: params.userAgent ?? null,
+    });
+
+    await conn.commit();
+
+    return {
+      message: {
+        id: String(msgResult.insertId),
+        message_type: "user_message",
+        message_body: messageBody,
+        created_at: createdRow[0]?.created_at ?? null,
+      },
+      caseId: meta.caseId,
+      caseCode,
+      assigneeUserId,
     };
   } catch (e) {
     await conn.rollback();

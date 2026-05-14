@@ -6,6 +6,7 @@ import {
   listMyServiceCasesByReporterUserId,
   listServiceCasesForOperations,
   patchServiceCaseStatusInTransaction,
+  postCitizenServiceCaseMessageInTransaction,
   postServiceCaseAssignmentInTransaction,
   postServiceCaseMessageInTransaction,
   resolveServiceCaseInTransaction,
@@ -80,12 +81,13 @@ export async function operationsPostServiceCaseMessage(actorUserId, casePublicUu
 
   try {
     if (result.reporterUserId != null) {
+      const line = "Dispatcher replied to your service case";
       await createNotification({
         notificationType: "case_reply",
         templateCode: "intake_classified",
         templateVars: { case_code: result.caseCode ?? "" },
-        fallbackTitle: "Update on your service case",
-        fallbackBody: `There is a new response on service case ${result.caseCode ?? ""}. Please sign in to the portal to read the full message.`,
+        fallbackTitle: line,
+        fallbackBody: line,
         entityType: "service_case",
         entityId: result.caseId,
         recipientUserIds: [result.reporterUserId],
@@ -152,6 +154,39 @@ export async function listMyServiceCases(actorPublicUuid) {
   }
   const cases = await listMyServiceCasesByReporterUserId(userRow.id);
   return { service_cases: cases };
+}
+
+export async function intakePostServiceCaseMessage(actorUserId, casePublicUuid, body, req) {
+  const meta = auditMetaFromRequest(req);
+  const result = await postCitizenServiceCaseMessageInTransaction({
+    casePublicUuid,
+    actorUserId,
+    title: body.title,
+    description: body.description ?? null,
+    ...meta,
+  });
+
+  const line = "Citizen replied to service case";
+  try {
+    if (result.assigneeUserId != null) {
+      await createNotification({
+        notificationType: "case_reply",
+        templateCode: "intake_classified",
+        templateVars: { case_code: result.caseCode ?? "" },
+        fallbackTitle: line,
+        fallbackBody: line,
+        entityType: "service_case",
+        entityId: result.caseId,
+        recipientUserIds: [result.assigneeUserId],
+        createdByUserId: actorUserId,
+        deliveryChannel: "both",
+      });
+    }
+  } catch (err) {
+    console.error("Failed to send citizen service case message notification:", err);
+  }
+
+  return result.message;
 }
 
 export async function escalateIntakeFromServiceCase(actorUserId, reportPublicUuid, body, req) {
