@@ -12,7 +12,16 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { ApiError, apiGet, apiPatch, apiPost, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
-import { formatBangladeshTime } from "@/lib/datetime";
+import {
+  formatBangladeshTime,
+  getCurrentBangladeshDatetimeLocal,
+  isValidBangladeshLocalDatetime,
+  toBangladeshIsoDatetime,
+} from "@/lib/datetime";
+import {
+  type OperationsIntakeReport,
+  type OperationsIntakeReportsResponse,
+} from "@/types/operations-intake";
 
 interface IncidentDetail {
   public_uuid: string;
@@ -188,7 +197,9 @@ export default function IncidentDetailPage() {
   );
   const [noteTitle, setNoteTitle] = useState("");
   const [noteDescription, setNoteDescription] = useState("");
-  const [noteEventTime, setNoteEventTime] = useState("");
+  const [noteEventTime, setNoteEventTime] = useState(
+    getCurrentBangladeshDatetimeLocal(),
+  );
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [noteSuccess, setNoteSuccess] = useState<string | null>(null);
@@ -200,6 +211,8 @@ export default function IncidentDetailPage() {
   const [isLinkingIntake, setIsLinkingIntake] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+  const [recentIntakeReports, setRecentIntakeReports] = useState<OperationsIntakeReport[]>([]);
+  const [loadingRecentReports, setLoadingRecentReports] = useState(false);
 
   const redirectToLogin = useCallback(() => {
     sessionStorage.removeItem("loggedInUser");
@@ -234,6 +247,21 @@ export default function IncidentDetailPage() {
     }
   }, [incidentPublicUuid, redirectToLogin]);
 
+  const loadRecentIntakeReports = useCallback(async () => {
+    setLoadingRecentReports(true);
+    try {
+      const data = await apiGet<OperationsIntakeReportsResponse>(
+        `/operations/intake-reports?limit=10&sort=reported_at_desc`,
+      );
+      setRecentIntakeReports(data.intake_reports ?? []);
+    } catch (err) {
+      console.error("Failed to load recent intake reports:", err);
+      setRecentIntakeReports([]);
+    } finally {
+      setLoadingRecentReports(false);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -262,6 +290,11 @@ export default function IncidentDetailPage() {
     if (isLoadingSession || !incidentPublicUuid) return;
     void loadIncident();
   }, [isLoadingSession, incidentPublicUuid, loadIncident]);
+
+  useEffect(() => {
+    if (isLoadingSession) return;
+    void loadRecentIntakeReports();
+  }, [isLoadingSession, loadRecentIntakeReports]);
 
   useEffect(() => {
     if (!incident) return;
@@ -336,21 +369,25 @@ export default function IncidentDetailPage() {
     setNoteError(null);
     setNoteSuccess(null);
 
+    if (noteEventTime && !isValidBangladeshLocalDatetime(noteEventTime)) {
+      setNoteError("Event time must be a valid Bangladesh date and time.");
+      setIsAddingNote(false);
+      return;
+    }
+
     try {
       const responseData = await apiPost<NoteResponse>(
         `/operations/incidents/${incidentPublicUuid}/notes`,
         {
           title: noteTitle.trim(),
           description: noteDescription.trim() || undefined,
-          eventTime: noteEventTime
-            ? new Date(noteEventTime).toISOString()
-            : undefined,
+          eventTime: toBangladeshIsoDatetime(noteEventTime),
         },
       );
 
       setNoteTitle("");
       setNoteDescription("");
-      setNoteEventTime("");
+      setNoteEventTime(getCurrentBangladeshDatetimeLocal());
       setNoteSuccess(responseData.message ?? "Operator note added.");
       await loadIncident();
     } catch (err) {
@@ -408,6 +445,7 @@ export default function IncidentDetailPage() {
       setLinkModalOpen(false);
       setLinkSuccess(data.message ?? "Intake report linked to incident.");
       await loadIncident();
+      await loadRecentIntakeReports();
     } catch (err) {
       setLinkError(formatApiError(err, "Could not link intake report."));
     } finally {
@@ -662,6 +700,80 @@ export default function IncidentDetailPage() {
                       value={formatBangladeshTime(incident.updated_at)}
                     />
                   </dl>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md">
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-[#002D62]">
+                        Recent Intake Reports
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Recently reported intake reports that can be linked to this incident.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void loadRecentIntakeReports()}
+                      disabled={loadingRecentReports}
+                    >
+                      {loadingRecentReports ? "Loading..." : "Refresh"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loadingRecentReports ? (
+                    <LoadingSkeleton lines={3} />
+                  ) : recentIntakeReports.length === 0 ? (
+                    <EmptyState
+                      title="No recent intake reports"
+                      description="No recent intake reports were found."
+                    />
+                  ) : (
+                    <div className="space-y-4">
+                      {recentIntakeReports.map((report) => (
+                        <div
+                          key={report.public_uuid}
+                          className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
+                        >
+                          <div className="flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#002D62]">
+                                {report.report_code}
+                              </span>
+                              <Badge tone={report.urgency_type}>
+                                {formatBadgeLabel(report.urgency_type)}
+                              </Badge>
+                              <Badge tone={report.category_code}>
+                                {formatBadgeLabel(report.category_code)}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-600">
+                              Reported {formatBangladeshTime(report.reported_at)}
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {report.summary || report.description || "No summary available."}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              setLinkIntakeUuid(report.public_uuid);
+                              setLinkModalOpen(true);
+                            }}
+                            disabled={currentStatusIsTerminal || report.has_incident}
+                          >
+                            {report.has_incident ? "Already linked" : "Link"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

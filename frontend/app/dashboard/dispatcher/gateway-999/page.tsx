@@ -745,6 +745,8 @@ export default function Gateway999Page() {
               onChange={handleLocationChange}
               selectedAddress={form.addressText}
               selectedPlaceName={form.placeName}
+              syncSearchQueryToSelectedLabel={false}
+              showCurrentLocation={false}
             />
 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">

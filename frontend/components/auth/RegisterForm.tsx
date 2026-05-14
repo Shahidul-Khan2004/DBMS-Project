@@ -2,16 +2,53 @@
 
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, RegisterInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { publicPost } from "@/lib/api";
+import { ApiError, publicPost } from "@/lib/api";
 import type { RegisterResponse } from "@/types/auth";
 
 interface RegisterFormProps {
   onSuccess?: (data: RegisterResponse) => void;
+}
+
+type RegisterFieldName = keyof RegisterInput;
+type RegisterFieldErrors = Partial<Record<RegisterFieldName, string>>;
+
+function getRegisterFieldName(field: unknown): RegisterFieldName | null {
+  if (typeof field !== "string") return null;
+
+  const fieldMap: Record<string, RegisterFieldName> = {
+    email: "email",
+    fullName: "fullName",
+    full_name: "fullName",
+    phone: "phoneNumber",
+    phoneNumber: "phoneNumber",
+    phone_number: "phoneNumber",
+    password: "password",
+    confirmPassword: "rePassword",
+    confirm_password: "rePassword",
+    rePassword: "rePassword",
+  };
+
+  return fieldMap[field] ?? null;
+}
+
+function getBackendFieldErrors(details: unknown): RegisterFieldErrors {
+  if (!Array.isArray(details)) return {};
+
+  return details.reduce<RegisterFieldErrors>((errors, detail) => {
+    if (!detail || typeof detail !== "object") return errors;
+
+    const item = detail as { field?: unknown; path?: unknown; message?: unknown };
+    const field = getRegisterFieldName(item.field ?? item.path);
+    if (field && typeof item.message === "string" && !errors[field]) {
+      errors[field] = item.message;
+    }
+
+    return errors;
+  }, {});
 }
 
 function PasswordToggleIcon({ visible }: { visible: boolean }) {
@@ -54,16 +91,15 @@ function PasswordToggleIcon({ visible }: { visible: boolean }) {
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     reset,
   } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
       fullName: "",
@@ -74,17 +110,44 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   });
 
   async function onSubmit(data: RegisterInput) {
+    const validation = registerSchema.safeParse(data);
+
+    if (!validation.success) {
+      const nextErrors: RegisterFieldErrors = {};
+
+      for (const issue of validation.error.issues) {
+        const field = getRegisterFieldName(issue.path[0]);
+        if (field && !nextErrors[field]) {
+          nextErrors[field] = issue.message;
+        }
+      }
+
+      setFieldErrors(nextErrors);
+      setApiError(null);
+      return;
+    }
+
     setIsLoading(true);
     setApiError(null);
+    setFieldErrors({});
 
     try {
       const result = await publicPost<RegisterResponse, RegisterInput>(
         "/auth/register",
-        data,
+        validation.data,
       );
       reset();
       onSuccess?.(result);
     } catch (err) {
+      if (err instanceof ApiError) {
+        const backendFieldErrors = getBackendFieldErrors(err.details);
+
+        if (Object.keys(backendFieldErrors).length > 0) {
+          setFieldErrors(backendFieldErrors);
+          return;
+        }
+      }
+
       setApiError(
         err instanceof Error
           ? err.message
@@ -95,8 +158,25 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     }
   }
 
+  function registerWithErrorReset(field: RegisterFieldName) {
+    const fieldRegistration = register(field);
+
+    return {
+      ...fieldRegistration,
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+        fieldRegistration.onChange(event);
+        setFieldErrors((current) => {
+          if (!current[field]) return current;
+          const next = { ...current };
+          delete next[field];
+          return next;
+        });
+      },
+    };
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {apiError && (
         <ErrorAlert message={apiError} />
       )}
@@ -105,8 +185,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         label="Email Address"
         type="email"
         placeholder="Enter your email address"
-        {...register("email")}
-        error={errors.email?.message}
+        {...registerWithErrorReset("email")}
+        error={fieldErrors.email}
         required
       />
 
@@ -114,8 +194,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         label="Full Name"
         type="text"
         placeholder="Enter your full name"
-        {...register("fullName")}
-        error={errors.fullName?.message}
+        {...registerWithErrorReset("fullName")}
+        error={fieldErrors.fullName}
         required
       />
 
@@ -123,8 +203,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         label="Phone Number"
         type="tel"
         placeholder="Enter your phone number"
-        {...register("phoneNumber")}
-        error={errors.phoneNumber?.message}
+        {...registerWithErrorReset("phoneNumber")}
+        error={fieldErrors.phoneNumber}
         helpText="Required. Must be exactly 11 digits."
         required
       />
@@ -133,8 +213,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         label="Password"
         type={showPassword ? "text" : "password"}
         placeholder="Create a password"
-        {...register("password")}
-        error={errors.password?.message}
+        {...registerWithErrorReset("password")}
+        error={fieldErrors.password}
         helpText="Minimum 8 characters."
         endElement={
           <button
@@ -155,8 +235,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         label="Confirm Password"
         type={showConfirmPassword ? "text" : "password"}
         placeholder="Confirm your password"
-        {...register("rePassword")}
-        error={errors.rePassword?.message}
+        {...registerWithErrorReset("rePassword")}
+        error={fieldErrors.rePassword}
         endElement={
           <button
             type="button"

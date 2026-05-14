@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -99,7 +99,6 @@ function formatApiError(error: unknown, fallback: string) {
 
 export default function CreateEmergencyIncidentPage() {
   const router = useRouter();
-  const defaultReportedAtRef = useRef(getCurrentBangladeshDatetimeLocal());
 
   const [mode, setMode] = useState<Mode>("standalone");
   const [categoryCode, setCategoryCode] = useState("medical");
@@ -107,7 +106,7 @@ export default function CreateEmergencyIncidentPage() {
   const [intakeReportPublicUuid, setIntakeReportPublicUuid] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [reportedAt, setReportedAt] = useState(defaultReportedAtRef.current);
+  const [reportedAt, setReportedAt] = useState(getCurrentBangladeshDatetimeLocal());
   const [locationAddress, setLocationAddress] = useState("");
   const [locationPlaceName, setLocationPlaceName] = useState("");
   const [selectedLocation, setSelectedLocation] =
@@ -201,11 +200,6 @@ export default function CreateEmergencyIncidentPage() {
         return;
       }
 
-      if (reportedAt && !isValidBangladeshLocalDatetime(reportedAt)) {
-        setError("Reported time must be a valid Bangladesh date and time.");
-        return;
-      }
-
       const titleText = title.trim();
       const descriptionText = description.trim();
       const intakeUuid = intakeReportPublicUuid.trim();
@@ -216,6 +210,12 @@ export default function CreateEmergencyIncidentPage() {
         titleText ||
         "Dispatcher selected incident location";
       const placeName = locationPlaceName.trim();
+
+      if (reportedAt && !isValidBangladeshLocalDatetime(reportedAt)) {
+        setError("Reported time must be a valid Bangladesh date and time.");
+        return;
+      }
+
       const reportedAtPayload = toBangladeshIsoDatetime(reportedAt);
 
       if (mode === "intake") {
@@ -494,6 +494,8 @@ export default function CreateEmergencyIncidentPage() {
                     onChange={handleLocationChange}
                     selectedAddress={locationAddress}
                     selectedPlaceName={locationPlaceName}
+                    syncSearchQueryToSelectedLabel={false}
+                    showCurrentLocation={false}
                   />
 
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">

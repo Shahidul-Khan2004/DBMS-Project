@@ -418,6 +418,7 @@ export default function CitizenReportDetailPage() {
                   onChange={handleLocationChange}
                   selectedAddress={locationForm.addressText}
                   selectedPlaceName={locationForm.placeName}
+                  syncSearchQueryToSelectedLabel={false}
                 />
                 <div>
                   <label className="block text-sm font-medium text-gray-700">

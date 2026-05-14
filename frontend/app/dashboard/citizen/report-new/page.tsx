@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ import { clearAuthSession } from "@/lib/auth-store";
 import {
   getCurrentBangladeshDatetimeLocal,
   isValidBangladeshLocalDatetime,
+  toBangladeshIsoDatetime,
 } from "@/lib/datetime";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type {
@@ -104,7 +105,6 @@ function getSelectedCoordinates(form: ReportFormState) {
 export default function CitizenNewReportPage() {
   const router = useRouter();
   const isChecking = useAuthGuard(["citizen"]);
-  const defaultReportedAtRef = useRef(getCurrentBangladeshDatetimeLocal());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [message, setMessage] = useState<{
@@ -120,7 +120,7 @@ export default function CitizenNewReportPage() {
     summary: "",
     description: "",
     urgencyType: "unknown",
-    reportedAt: defaultReportedAtRef.current,
+    reportedAt: getCurrentBangladeshDatetimeLocal(),
     latitude: null,
     longitude: null,
     locationAddress: "",
@@ -264,11 +264,6 @@ export default function CitizenNewReportPage() {
       return;
     }
 
-    const reportedAt =
-      form.reportedAt && form.reportedAt !== defaultReportedAtRef.current
-        ? form.reportedAt
-        : undefined;
-
     if (form.reportedAt && !isValidBangladeshLocalDatetime(form.reportedAt)) {
       setMessage({
         type: "error",
@@ -293,7 +288,7 @@ export default function CitizenNewReportPage() {
         summary,
         description: description || undefined,
         urgencyType: form.urgencyType,
-        reportedAt,
+        reportedAt: toBangladeshIsoDatetime(form.reportedAt),
         location: {
           latitude: selectedCoordinates.latitude,
           longitude: selectedCoordinates.longitude,
@@ -317,15 +312,12 @@ export default function CitizenNewReportPage() {
         reportCode: data.intake.report_code,
       });
 
-      const nextDefaultReportedAt = getCurrentBangladeshDatetimeLocal();
-      defaultReportedAtRef.current = nextDefaultReportedAt;
-
       setForm({
         categoryCode: "",
         summary: "",
         description: "",
         urgencyType: "unknown",
-        reportedAt: nextDefaultReportedAt,
+        reportedAt: getCurrentBangladeshDatetimeLocal(),
         latitude: null,
         longitude: null,
         locationAddress: "",
@@ -511,7 +503,7 @@ export default function CitizenNewReportPage() {
                   value={form.reportedAt}
                   onChange={handleChange}
                   icon={<CalendarClock className="h-4 w-4" aria-hidden />}
-                  helpText="Defaults to the current time; adjust if this happened earlier."
+                  helpText="Defaults to the current time; adjust if needed."
                 />
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -595,6 +587,7 @@ export default function CitizenNewReportPage() {
                       onChange={handleLocationPickerChange}
                       selectedAddress={form.locationAddress}
                       selectedPlaceName={form.locationPlaceName}
+                      syncSearchQueryToSelectedLabel={false}
                     />
 
                     <div className="grid gap-4 sm:grid-cols-2">
