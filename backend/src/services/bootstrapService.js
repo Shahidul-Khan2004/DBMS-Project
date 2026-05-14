@@ -48,6 +48,26 @@ const DEFAULT_PERMISSIONS = [
     moduleName: "dispatch",
     description: "Update dispatch progress",
   },
+  {
+    permissionCode: "case.create",
+    moduleName: "case",
+    description: "Create service cases",
+  },
+  {
+    permissionCode: "case.respond",
+    moduleName: "case",
+    description: "Respond to service cases",
+  },
+  {
+    permissionCode: "case.assign",
+    moduleName: "case",
+    description: "Assign service cases",
+  },
+  {
+    permissionCode: "case.escalate",
+    moduleName: "case",
+    description: "Escalate service case to emergency incident",
+  },
 ];
 
 const ROLE_DEFINITIONS = [
@@ -95,6 +115,10 @@ async function ensureRolesAndPermissions() {
     "incident.update_status",
     "dispatch.create",
     "dispatch.update_status",
+    "case.create",
+    "case.respond",
+    "case.assign",
+    "case.escalate",
   ];
 
   for (const permissionCode of dispatcherPermissionCodes) {
