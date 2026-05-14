@@ -32,6 +32,22 @@ import {
   validateOperationsReportUuidParam,
 } from "../validators/operations.js";
 import { getOperationsDispatcherOverview } from "../controllers/operationsDispatcherOverview.js";
+import {
+  getOperationsServiceCase,
+  listOperationsServiceCases,
+  patchOperationsServiceCaseStatus,
+  postOperationsServiceCaseAssignment,
+  postOperationsServiceCaseMessage,
+  postOperationsServiceCaseResolve,
+} from "../controllers/operationsServiceCases.js";
+import {
+  validateOperationsListServiceCasesQuery,
+  validateOperationsPatchServiceCaseStatus,
+  validateOperationsPostServiceCaseAssignment,
+  validateOperationsPostServiceCaseMessage,
+  validateOperationsPostServiceCaseResolve,
+  validateOperationsServiceCasePublicUuidParam,
+} from "../validators/serviceCases.js";
 
 const router = express.Router();
 
@@ -123,6 +139,52 @@ router.post(
   validateOperationsIncidentUuidParam,
   validateOperationsLinkIntakeToIncident,
   postLinkIntakeReportToIncident,
+);
+
+router.get(
+  "/service-cases",
+  requirePermission("case.respond"),
+  validateOperationsListServiceCasesQuery,
+  listOperationsServiceCases,
+);
+
+router.get(
+  "/service-cases/:publicUuid",
+  requirePermission("case.respond"),
+  validateOperationsServiceCasePublicUuidParam,
+  getOperationsServiceCase,
+);
+
+router.patch(
+  "/service-cases/:publicUuid/status",
+  requirePermission("case.respond"),
+  validateOperationsServiceCasePublicUuidParam,
+  validateOperationsPatchServiceCaseStatus,
+  patchOperationsServiceCaseStatus,
+);
+
+router.post(
+  "/service-cases/:publicUuid/messages",
+  requirePermission("case.respond"),
+  validateOperationsServiceCasePublicUuidParam,
+  validateOperationsPostServiceCaseMessage,
+  postOperationsServiceCaseMessage,
+);
+
+router.post(
+  "/service-cases/:publicUuid/assignments",
+  requirePermission("case.assign"),
+  validateOperationsServiceCasePublicUuidParam,
+  validateOperationsPostServiceCaseAssignment,
+  postOperationsServiceCaseAssignment,
+);
+
+router.post(
+  "/service-cases/:publicUuid/resolve",
+  requirePermission("case.respond"),
+  validateOperationsServiceCasePublicUuidParam,
+  validateOperationsPostServiceCaseResolve,
+  postOperationsServiceCaseResolve,
 );
 
 export default router;

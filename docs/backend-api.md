@@ -73,6 +73,8 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Intake | GET | `/intake/reports/:reportPublicUuid/reported-location-history` | Same access as patch |
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/service-case` | Roles `dispatcher` / `system_admin` |
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/emergency` | Same roles |
+| Intake | GET | `/intake/reports/my/service-cases` | Reporter: list linked service cases |
+| Intake | POST | `/intake/reports/:reportPublicUuid/escalate` | Roles `dispatcher` / `system_admin`; permissions `case.escalate` + `incident.create` |
 | Operations | GET | `/operations/dispatcher/overview` | Permission `incident.classify` |
 | Operations | GET | `/operations/intake-reports` | `incident.classify` |
 | Operations | GET | `/operations/intake-reports/:reportPublicUuid` | `incident.classify` |
@@ -85,6 +87,12 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Operations | PATCH | `/operations/incidents/:incidentPublicUuid/status` | `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/notes` | `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/intake-reports` | `incident.create` or `incident.update_status` |
+| Operations | GET | `/operations/service-cases` | Permission `case.respond` |
+| Operations | GET | `/operations/service-cases/:publicUuid` | `case.respond` |
+| Operations | PATCH | `/operations/service-cases/:publicUuid/status` | `case.respond` |
+| Operations | POST | `/operations/service-cases/:publicUuid/messages` | `case.respond` |
+| Operations | POST | `/operations/service-cases/:publicUuid/assignments` | `case.assign` |
+| Operations | POST | `/operations/service-cases/:publicUuid/resolve` | `case.respond` |
 
 ---
 
@@ -667,9 +675,158 @@ Intake must have a location and must not already be linked (`422` / `409` as app
 
 ---
 
+## Intake — citizen service cases
+
+### GET `/intake/reports/my/service-cases`
+
+Lists **service cases** where the authenticated user is the reporter (`service_cases.reporter_user_id`). Newest by `updated_at` first.
+
+**Response (200):**
+
+```json
+{
+  "service_cases": [
+    {
+      "public_uuid": "…",
+      "case_code": "SC-…",
+      "title": "…",
+      "description": null,
+      "priority_level": "medium",
+      "status_code": "under_review",
+      "category_code": "medical",
+      "intake_public_uuid": "…",
+      "intake_report_code": "IR-…",
+      "last_updated": "2026-05-06T12:00:00.000Z",
+      "created_at": "2026-05-06T10:00:00.000Z",
+      "location": {
+        "public_uuid": "…",
+        "latitude": 23.81,
+        "longitude": 90.41,
+        "address_text": "…",
+        "place_name": null,
+        "admin_area_id": 1,
+        "source": "user_shared"
+      },
+      "location_text": "…"
+    }
+  ]
+}
+```
+
+`location` is taken from `COALESCE(service_cases.current_location_id, intake_reports.reported_location_id)` when present.
+
+### POST `/intake/reports/:reportPublicUuid/escalate`
+
+Promotes an intake that is already on the **service case** path (`intake_status` must be `linked_to_case`) to an **emergency incident**, with a linked `case_escalations` row and case status `escalated_to_emergency`. **Roles:** `dispatcher` or `system_admin`. **Permissions:** `case.escalate` **and** `incident.create`.
+
+**Body:** (`severityCode`, optional `incidentTitle`, `incidentDescription`, `reportedAt`) **plus** required `escalationReason` (1–1000 chars).
+
+**Location rule:** the incident’s primary `locations.id` is the **latest** row in `intake_report_location_history` for this intake (by `changed_at`), else `intake_reports.reported_location_id`, else `service_cases.current_location_id`. The same `locations` row is referenced in `incident_location_history` with `is_current = TRUE` (no geometry copy).
+
+**Response (201):** `{ "message": "Service case escalated to emergency incident", "incident": { … }, "service_case": { … }, "intake_public_uuid": "…" }` — `incident` includes `public_uuid`, `incident_code`, `title`, `origin_type` (`service_case_escalation`).
+
+**Errors:** `404` `INTAKE_REPORT_NOT_FOUND`, `409` `INTAKE_NOT_ESCALATABLE`, `INTAKE_NOT_LINKED_TO_SERVICE_CASE`, `CASE_ALREADY_ESCALATED`, `INTAKE_ALREADY_LINKED`, `422` `EMERGENCY_INCIDENT_REQUIRES_LOCATION`, `403` for role/permission.
+
+---
+
+## Operations — service cases
+
+**Note:** Database tables `work_queues` and `queue_items` exist for future workload features; **these HTTP endpoints do not read or write them**. The operator queue is the paginated **`GET /operations/service-cases`** list.
+
+**Dispatcher messages:** `case_messages.message_body` stores `Subject: <title>\n\n<description>` (there is no separate `title` column). The API accepts JSON `title` + optional `description`; clients read back `message_body` or parse the subject line.
+
+### GET `/operations/service-cases`
+
+**Permission:** `case.respond`.
+
+**Query:** `status` (case `status_code` filter), `categoryCode`, `assignedTo` (operator user **public UUID** — matches active `case_assignments`), `limit` (1–100, default 50), `offset` (default 0).
+
+**Order:** `service_cases.updated_at` descending (exposed per row as `last_updated`).
+
+**Response (200):** `{ "service_cases": [ … ], "pagination": { "limit", "offset", "total" } }`.
+
+### GET `/operations/service-cases/:publicUuid`
+
+**Permission:** `case.respond`.
+
+**Response (200):** `{ "service_case": { … }, "status_history": [ … ], "messages": [ … ], "assignments": [ … ], "resolution": { … } \| null }` — `resolution` is absent or a single object when `case_resolutions` exists.
+
+**Response (404):** `SERVICE_CASE_NOT_FOUND`.
+
+### PATCH `/operations/service-cases/:publicUuid/status`
+
+**Permission:** `case.respond`.
+
+**Body:**
+
+```json
+{
+  "statusCode": "under_review",
+  "note": "Optional note, max 500 chars"
+}
+```
+
+**Transitions (non-terminal →):**
+
+- `submitted` → `under_review` \| `cancelled`
+- `under_review` → `awaiting_user_response` \| `closed` \| `cancelled`
+- `awaiting_user_response` → `under_review` \| `closed` \| `cancelled`
+
+`resolved` is **not** set here; use **POST `/resolve`**. `escalated_to_emergency` is set only via **POST `/intake/reports/:reportPublicUuid/escalate`**.
+
+Terminal cases cannot change status (`409` `INVALID_STATUS_TRANSITION`).
+
+**Response (200):** `{ "message": "Service case status updated", "service_case": { … }, "status_history": [ … ], "messages": [ … ], "assignments": [ … ], "resolution": … }`.
+
+### POST `/operations/service-cases/:publicUuid/messages`
+
+**Permission:** `case.respond`.
+
+**Body:** `{ "title": "…", "description": "optional" }` — `title` required, max 255.
+
+**Response (201):** `{ "message": "Dispatcher response recorded", "case_message": { "id", "message_type", "message_body", "created_at" } }`.
+
+**Errors:** `409` `SERVICE_CASE_NOT_UPDATABLE` on terminal cases.
+
+### POST `/operations/service-cases/:publicUuid/assignments`
+
+**Permission:** `case.assign`.
+
+**Body:** `{ "assignedToUserPublicUuid": "<user public uuid>", "note": "optional max 500" }`.
+
+Ends any active assignment on the case, then inserts a new **active** row (`assigned_admin_id` references `users.id` per schema).
+
+**Response (201):** `{ "message": "Service case assigned", "assignment": { "id", "assigned_to_user_public_uuid", "assignment_status" } }`.
+
+**Errors:** `404` `ASSIGNEE_USER_NOT_FOUND`.
+
+### POST `/operations/service-cases/:publicUuid/resolve`
+
+**Permission:** `case.respond`.
+
+**Body:**
+
+```json
+{
+  "resolutionType": "advice_given",
+  "resolutionText": "Required narrative",
+  "recommendedFacilityId": 1 //has to be a valid facility id
+}
+```
+
+`resolutionType`: `advice_given` \| `referred_to_facility` \| `escalated` \| `no_action_needed` \| `duplicate`. `recommendedFacilityId` optional; must reference an existing `facilities.id` when provided.
+
+Inserts `case_resolutions` then status history to **`resolved`** (trigger syncs `current_status_id`).
+
+**Response (201):** `{ "message": "Service case resolved", …full detail payload same as GET… }`.
+
+**Errors:** `409` `CASE_ALREADY_RESOLVED` (terminal or duplicate resolution), `422` `FACILITY_NOT_FOUND`.
+
+---
+
 ## Development RBAC bootstrap
 
-On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**.
+On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and **`case.create`**, **`case.respond`**, **`case.assign`**, **`case.escalate`** when `ensureRolesAndPermissions()`
 
 **Env vars:**
 
