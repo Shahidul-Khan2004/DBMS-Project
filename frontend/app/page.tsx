@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { motion } from "framer-motion";
@@ -49,7 +48,6 @@ function Container({ children }: { children: React.ReactNode }) {
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  /** Set when a section nav link is clicked; scroll position does not change it. */
   const [selectedSection, setSelectedSection] = useState<SectionId | null>(
     null,
   );
@@ -89,7 +87,6 @@ export default function Home() {
 
   return (
     <div className="bg-gradient-to-b from-emerald-50/40 via-zinc-200 to-zinc-200 overflow-x-clip">
-      {/* ==================== NAVBAR ==================== */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-zinc-200/95 backdrop-blur-md border-b border-gray-200 w-full">
         <div className="w-full px-4 sm:px-6 md:px-5 lg:px-8 xl:px-10 2xl:px-12">
           <div className="min-h-24 md:min-h-28 lg:min-h-32 py-4 md:py-5 flex items-center justify-between gap-3 md:gap-4 lg:gap-6">
@@ -271,17 +268,13 @@ export default function Home() {
           </motion.div>
         )}
       </nav>
-
-      {/* ==================== HERO SECTION ==================== */}
       <header className="relative min-h-screen w-full flex items-center overflow-hidden">
-        {/* Background photo - CORRECTED */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
           style={{
             backgroundImage: "url('/images/niers-bg.webp')",
           }}
-        />
-        {/* Blue shadow overlay — full hero: base tint + edge vignette */}
+        />  
         <div
           className="absolute inset-0 pointer-events-none"
           aria-hidden
@@ -290,12 +283,10 @@ export default function Home() {
               "radial-gradient(ellipse 125% 115% at 50% 42%, rgba(0,45,98,0) 48%, rgba(0,45,98,0.72) 100%), rgba(0,45,98,0.44)",
           }}
         />
-
-        {/* Same width + padding pattern as Container so hero aligns with navbar / sections */}
         <div className="relative z-10 w-full">
           <div className="w-full max-w-screen-2xl mx-auto px-6 md:px-8">
             <div className="pt-36 md:pt-40 lg:pt-44 flex flex-col lg:flex-row items-start lg:items-center gap-12">
-              {/* Focus card */}
+
               <RevealOnScroll className="bg-[#002D62] text-white rounded-3xl shadow-2xl border-l-4 w-full lg:w-auto shrink-0 p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl min-h-72 md:min-h-[20rem] lg:min-h-[23rem] xl:min-h-[26rem] 2xl:min-h-[30rem]">
                 <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] mb-6">
                   NATIONAL INTEGRATED EMERGENCY RESPONSE SYSTEM
@@ -309,9 +300,7 @@ export default function Home() {
           </div>
         </div>
       </header>
-
-      {/* ==================== 999 EMERGENCY SQUARE CARD ==================== */}
-      {/* ==================== 999 EMERGENCY SQUARE CARD ==================== */}
+      
       <section className="w-full py-10 bg-gradient-to-r from-emerald-50/50 via-[#EFF6FF] to-[#EFF6FF]">
         <Container>
           <RevealOnScroll className="bg-zinc-200 rounded-3xl shadow-lg flex justify-center px-6 py-12 md:px-8 md:py-14">
@@ -346,7 +335,6 @@ export default function Home() {
         </Container>
       </section>
 
-      {/* ==================== QUICK STATS BAR ==================== */}
       <section className="w-full py-10 bg-gradient-to-r from-emerald-50/50 via-[#EFF6FF] to-[#EFF6FF]">
         <Container>
           <RevealOnScroll className="bg-zinc-200 rounded-3xl shadow-lg grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
@@ -384,7 +372,6 @@ export default function Home() {
         </Container>
       </section>
 
-      {/* ==================== WHY CHOOSE NIERS ==================== */}
       <section
         id="why-choose"
         className="scroll-mt-36 md:scroll-mt-40 lg:scroll-mt-44 w-full py-16 bg-[#F0F7F4]"
@@ -445,9 +432,7 @@ export default function Home() {
           </div>
         </Container>
       </section>
-
-      {/* ==================== HOW NIERS WORKS ==================== */}
-      {/* ==================== HOW NIERS WORKS - WITH ARROWS ==================== */}
+      
       <section
         id="how-it-works"
         className="scroll-mt-36 md:scroll-mt-40 lg:scroll-mt-44 w-full py-16 bg-gradient-to-r from-emerald-50/50 via-[#EFF6FF] to-[#EFF6FF]"
@@ -466,9 +451,8 @@ export default function Home() {
             </p>
           </RevealOnScroll>
 
-          {/* Desktop: Horizontal layout with arrows */}
           <div className="hidden md:flex items-stretch justify-between gap-4 max-w-5xl mx-auto">
-            {/* Step 1 */}
+            
             <RevealOnScroll className="flex-1 flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-8 text-center ring-1 ring-[#006747]/15">
               <Phone className="w-12 h-12 shrink-0 text-[#DA291C] mb-4" />
               <h3 className="font-semibold text-xl text-[#002D62]">Call 999</h3>
@@ -479,8 +463,7 @@ export default function Home() {
             <div className="flex items-center self-center">
               <ArrowRight className="w-9 h-9 text-[#006747]" />
             </div>
-
-            {/* Step 2 */}
+            
             <RevealOnScroll
               delay={0.08}
               className="flex-1 flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-8 text-center ring-1 ring-[#006747]/15"
@@ -496,7 +479,6 @@ export default function Home() {
               <ArrowRight className="w-9 h-9 text-[#006747]" />
             </div>
 
-            {/* Step 3 */}
             <RevealOnScroll
               delay={0.16}
               className="flex-1 flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-8 text-center ring-1 ring-[#006747]/15"
@@ -511,7 +493,6 @@ export default function Home() {
             </RevealOnScroll>
           </div>
 
-          {/* Mobile: Vertical layout with down arrows */}
           <div className="md:hidden space-y-8 max-w-md mx-auto">
             <RevealOnScroll className="flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-8 text-center ring-1 ring-[#006747]/15">
               <Phone className="w-12 h-12 shrink-0 text-[#DA291C] mb-4" />
@@ -550,7 +531,6 @@ export default function Home() {
         </Container>
       </section>
 
-      {/* ==================== DISASTERS & NATIONAL EMERGENCIES CARD ==================== */}
       <section
         id="national-disaster"
         className="scroll-mt-36 md:scroll-mt-40 lg:scroll-mt-44 w-full py-16 bg-[#EFF6FF]"
@@ -588,11 +568,10 @@ export default function Home() {
         </Container>
       </section>
 
-      {/* ==================== FOOTER ==================== */}
       <footer className="w-full border-t-4 border-[#006747] bg-[#0F172A] text-white py-16">
         <Container>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
-            {/* Column 1 - Branding + About Bangladesh */}
+            
             <div className="md:col-span-5">
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-2xl font-bold">NIERS</span>
@@ -608,7 +587,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Column 2 - Quick Links */}
             <div className="md:col-span-3">
               <h3 className="font-semibold mb-4">Quick Links</h3>
               <div className="space-y-3 text-sm text-gray-400">
@@ -622,7 +600,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Column 3 - Contact */}
             <div className="md:col-span-4">
               <h3 className="font-semibold mb-4">Contact</h3>
               <div className="space-y-6">

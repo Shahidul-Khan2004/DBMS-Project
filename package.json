@@ -10,7 +10,7 @@
     "test:barikoi-live": "cd backend && RUN_BARIKOI_LIVE=1 node --import dotenv/config --test test/barikoiLiveApiKey.test.js"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.3.4",
+    "@hookform/resolvers": "^5.2.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -26,6 +26,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.51.4",
     "react-leaflet": "^5.0.0",
+    "sonner": "^2.0.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {

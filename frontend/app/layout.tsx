@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SonnerToaster } from "@/components/SonnerToaster";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body
         className={`${inter.className} h-full bg-zinc-200 antialiased overflow-x-hidden`}
       >
+        <SonnerToaster />
         <main className="min-h-screen bg-zinc-200">{children}</main>
       </body>
     </html>
