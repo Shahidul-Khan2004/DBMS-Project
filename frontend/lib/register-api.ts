@@ -55,7 +55,7 @@ export function mapZodRegisterIssues(
   return next;
 }
 
-/** Wizard step index for API field errors (7-step citizen registration UI). */
+/** Wizard step index for API field errors (5-step citizen registration UI). */
 export function registerStepIndex(field: RegisterFieldName): number {
   switch (field) {
     case "fullName":
@@ -67,7 +67,7 @@ export function registerStepIndex(field: RegisterFieldName): number {
     case "password":
       return 3;
     case "rePassword":
-      return 4;
+      return 3;
     default:
       return 0;
   }
