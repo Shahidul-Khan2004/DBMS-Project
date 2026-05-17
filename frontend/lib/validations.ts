@@ -1,16 +1,9 @@
 import { z } from "zod";
 
-const strongPasswordSchema = z
+const passwordSchema = z
   .string()
   .min(1, "Password is required")
-  .min(8, "Password must be at least 8 characters long")
-  .regex(/[a-z]/, "Password must include a lowercase letter")
-  .regex(/[A-Z]/, "Password must include an uppercase letter")
-  .regex(/\d/, "Password must include a number")
-  .regex(
-    /[^A-Za-z0-9]/,
-    "Password must include a special character",
-  );
+  .min(8, "Password must be at least 8 characters long");
 
 const registerObjectSchema = z.object({
   email: z
@@ -27,7 +20,7 @@ const registerObjectSchema = z.object({
       /^01\d{9}$/,
       "Use a valid Bangladesh mobile number (01XXXXXXXXX, 11 digits)",
     ),
-  password: strongPasswordSchema,
+  password: passwordSchema,
   rePassword: z.string().min(1, "Confirm password is required"),
 });
 
@@ -38,17 +31,6 @@ export const registerSchema = registerObjectSchema.refine(
     path: ["rePassword"],
   },
 );
-
-/** 0–5 score aligned with strongPasswordSchema checks (length, lower, upper, digit, special). */
-export function getPasswordStrengthScore(password: string): 0 | 1 | 2 | 3 | 4 | 5 {
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return score as 0 | 1 | 2 | 3 | 4 | 5;
-}
 
 /** Step 0 — full name only. */
 export const registerStepFullNameSchema = registerObjectSchema.pick({
@@ -65,12 +47,12 @@ export const registerStepEmailFieldSchema = registerObjectSchema.pick({
   email: true,
 });
 
-/** Step 3 — create password (password field only). */
+/** Password field only (not used by the stepper; combined step uses registerStepConfirmPasswordStepSchema). */
 export const registerStepCreatePasswordSchema = registerObjectSchema.pick({
   password: true,
 });
 
-/** Step 4 — confirm password must match create password (uses both fields). */
+/** Step 3 — create + confirm password (strength rules and match). */
 export const registerStepConfirmPasswordStepSchema = registerObjectSchema
   .pick({ password: true, rePassword: true })
   .refine((data) => data.password === data.rePassword, {
@@ -101,8 +83,8 @@ export const registerStepPasswordSchema = registerObjectSchema
   });
 
 /**
- * RHF resolver: no password-match refine (avoid rePassword errors on step 3).
- * Match is enforced on step 4 and on submit via registerWizardSubmitSchema.
+ * RHF resolver: no password-match refine (avoid rePassword errors while typing password).
+ * Match is enforced on the password step and on submit via registerWizardSubmitSchema.
  */
 export const registerWizardFormValuesSchema = registerObjectSchema.extend({
   acceptTerms: z.boolean(),

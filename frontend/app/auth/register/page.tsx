@@ -32,23 +32,23 @@ export default function RegisterPage() {
 
   if (registeredUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200 px-4">
-        <div className="w-full max-w-lg rounded-3xl border border-[#006747]/20 bg-zinc-200 p-8 shadow-lg shadow-[#002D62]/5">
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(0,103,71,0.10),transparent_30%),linear-gradient(135deg,#EEF6FB_0%,#F3FAF7_48%,#EAF3FB_100%)] px-4">
+        <div className="w-full max-w-lg rounded-[2rem] border border-[#C9D6E3] bg-[#F7F9FC] p-8 shadow-2xl shadow-[#002D62]/10">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#006747] text-white">
             <CheckCircle2 className="h-7 w-7" aria-hidden />
           </div>
           <h1 className="text-2xl font-bold text-[#002D62]">
             Registration complete
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-[#64748B]">
             Welcome,{" "}
-            <span className="font-medium text-slate-900">
+            <span className="font-medium text-[#0F172A]">
               {registeredUser.user.full_name}
             </span>
             . Redirecting to your dashboard.
           </p>
 
-          <div className="mt-6 rounded-2xl border border-[#002D62]/10 bg-white p-4 text-sm text-slate-700">
+          <div className="mt-6 rounded-2xl border border-[#C9D6E3] bg-[#E8EDF3]/70 p-4 text-sm text-[#0F172A]">
             <p>
               <span className="font-medium">Email:</span>{" "}
               {registeredUser.user.email}
