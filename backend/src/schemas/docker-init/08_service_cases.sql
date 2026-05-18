@@ -14,6 +14,19 @@ CREATE TABLE case_statuses (
     UNIQUE KEY uq_case_statuses_status_code (status_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE case_status_transitions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    from_status_id BIGINT UNSIGNED NOT NULL,
+    to_status_id BIGINT UNSIGNED NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    requires_note BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_case_status_transitions_from_to (from_status_id, to_status_id),
+    KEY idx_case_status_transitions_to (to_status_id),
+    CONSTRAINT fk_case_status_transitions_from FOREIGN KEY (from_status_id) REFERENCES case_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_case_status_transitions_to FOREIGN KEY (to_status_id) REFERENCES case_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE service_cases (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     public_uuid CHAR(36) NOT NULL,
@@ -40,6 +53,7 @@ CREATE TABLE service_cases (
     KEY idx_service_cases_status (current_status_id),
     KEY idx_service_cases_location (current_location_id),
     KEY idx_service_cases_priority (priority_level),
+    KEY idx_service_cases_created_at (created_at),
     CONSTRAINT fk_service_cases_intake_report FOREIGN KEY (intake_report_id) REFERENCES intake_reports(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_service_cases_reporter FOREIGN KEY (reporter_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_service_cases_parent FOREIGN KEY (parent_case_id) REFERENCES service_cases(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
@@ -92,7 +106,8 @@ CREATE TABLE case_messages (
     case_id BIGINT UNSIGNED NOT NULL,
     sender_user_id BIGINT UNSIGNED NULL,
     message_type ENUM('user_message','admin_reply','system_note') NOT NULL,
-    message_body TEXT NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body TEXT NULL,
     is_internal BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -100,7 +115,7 @@ CREATE TABLE case_messages (
     KEY idx_case_messages_sender (sender_user_id),
     CONSTRAINT fk_case_messages_case FOREIGN KEY (case_id) REFERENCES service_cases(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_case_messages_sender FOREIGN KEY (sender_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_case_messages_body_not_blank CHECK (CHAR_LENGTH(TRIM(message_body)) > 0)
+    CONSTRAINT chk_case_messages_subject_not_blank CHECK (CHAR_LENGTH(TRIM(subject)) > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE case_attachments (
