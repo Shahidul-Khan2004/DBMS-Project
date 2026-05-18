@@ -26,6 +26,20 @@ CREATE TABLE incident_statuses (
     UNIQUE KEY uq_incident_statuses_code (status_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE incident_status_transitions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    from_status_id BIGINT UNSIGNED NOT NULL,
+    to_status_id BIGINT UNSIGNED NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    requires_note BOOLEAN NOT NULL DEFAULT FALSE,
+    requires_outcome BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_status_transitions_from_to (from_status_id, to_status_id),
+    KEY idx_incident_status_transitions_to (to_status_id),
+    CONSTRAINT fk_incident_status_transitions_from FOREIGN KEY (from_status_id) REFERENCES incident_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_incident_status_transitions_to FOREIGN KEY (to_status_id) REFERENCES incident_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE incident_outcomes (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     outcome_code VARCHAR(100) NOT NULL,
@@ -81,15 +95,18 @@ CREATE TABLE incident_status_history (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     incident_id BIGINT UNSIGNED NOT NULL,
     status_id BIGINT UNSIGNED NOT NULL,
+    outcome_id BIGINT UNSIGNED NULL,
     changed_by_user_id BIGINT UNSIGNED NULL,
     changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     note VARCHAR(500) NULL,
     PRIMARY KEY (id),
     KEY idx_incident_status_history_incident_changed (incident_id, changed_at),
     KEY idx_incident_status_history_status (status_id),
+    KEY idx_incident_status_history_outcome (outcome_id),
     KEY idx_incident_status_history_user (changed_by_user_id),
     CONSTRAINT fk_incident_status_history_incident FOREIGN KEY (incident_id) REFERENCES emergency_incidents(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_incident_status_history_status FOREIGN KEY (status_id) REFERENCES incident_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_incident_status_history_outcome FOREIGN KEY (outcome_id) REFERENCES incident_outcomes(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_incident_status_history_user FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

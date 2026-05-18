@@ -1,9 +1,13 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
+import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
 import { query } from "../config/db.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
-import { updateIntakeReportStatusInTransaction } from "./intakeGatewayRepo.js";
+import {
+  ensureIntakeUnderReviewIfReceived,
+  updateIntakeReportStatusInTransaction,
+} from "./intakeGatewayRepo.js";
 import {
   requireAdministrativeAreaInTransaction,
   requireLocationIdByPublicUuid,
@@ -108,18 +112,19 @@ async function loadIntakeRowByPublicUuid(conn, publicUuid) {
   const [rows] = await conn.execute(
     `
       SELECT
-        id,
-        public_uuid,
-        report_code,
-        category_id,
-        reported_location_id,
-        urgency_type,
-        summary,
-        description,
-        intake_status,
-        reported_at
-      FROM intake_reports
-      WHERE public_uuid = ?
+        ir.id AS id,
+        ir.public_uuid AS public_uuid,
+        ir.report_code AS report_code,
+        ir.category_id AS category_id,
+        ir.reported_location_id AS reported_location_id,
+        ir.urgency_type AS urgency_type,
+        ir.summary AS summary,
+        ir.description AS description,
+        ist.status_code AS intake_status,
+        ir.reported_at AS reported_at
+      FROM intake_reports ir
+      INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
+      WHERE ir.public_uuid = ?
       LIMIT 1
     `,
     [publicUuid],
@@ -325,6 +330,14 @@ export async function createIncidentAdminStandalone(params) {
         ],
       );
 
+      await ensureIntakeUnderReviewIfReceived(
+        conn,
+        intakeRow.id,
+        intakeRow.intake_status,
+        params.actorUserId,
+        "Under review before incident linkage",
+      );
+
       await updateIntakeReportStatusInTransaction(
         conn,
         intakeRow.id,
@@ -460,6 +473,14 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
       ],
     );
 
+    await ensureIntakeUnderReviewIfReceived(
+      conn,
+      intakeRow.id,
+      intakeRow.intake_status,
+      params.actorUserId,
+      "Under review before incident promotion",
+    );
+
     await updateIntakeReportStatusInTransaction(
       conn,
       intakeRow.id,
@@ -541,6 +562,14 @@ export async function linkIntakeReportToIncident(params) {
         params.actorUserId ?? null,
         params.note ?? null,
       ],
+    );
+
+    await ensureIntakeUnderReviewIfReceived(
+      conn,
+      intakeRow.id,
+      intakeRow.intake_status,
+      params.actorUserId,
+      "Under review before incident linkage",
     );
 
     await updateIntakeReportStatusInTransaction(
@@ -776,7 +805,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
           ir.public_uuid AS intake_public_uuid,
           ir.report_code AS intake_report_code,
           ir.summary AS intake_summary,
-          ir.intake_status AS intake_status,
+          ints.status_code AS intake_status,
           l.public_uuid AS location_public_uuid,
           l.latitude AS location_latitude,
           l.longitude AS location_longitude,
@@ -786,6 +815,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
           l.source AS location_source
         FROM incident_report_links irl
         INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+        INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
         LEFT JOIN locations l ON l.id = ir.reported_location_id
         WHERE irl.incident_id = ?
         ORDER BY irl.linked_at ASC
@@ -918,48 +948,32 @@ export async function applyIncidentStatusChange(params) {
     const fromCode = rows[0].current_status_code;
     const toCode = params.statusCode;
 
-    const newStatusId = await findIncidentStatusId(conn, toCode);
+    let outcomeId = null;
+    if (params.outcomeCode) {
+      outcomeId = await findOutcomeId(conn, params.outcomeCode);
+    }
+
+    const { toStatusId: newStatusId } = await assertStatusTransitionAllowed(
+      conn,
+      "incident",
+      fromCode,
+      toCode,
+      { note: params.note ?? null, outcomeId },
+    );
 
     await conn.execute(
       `
         INSERT INTO incident_status_history (
           incident_id,
           status_id,
+          outcome_id,
           changed_by_user_id,
           note
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
       `,
-      [incidentId, newStatusId, params.actorUserId ?? null, params.note ?? null],
+      [incidentId, newStatusId, outcomeId, params.actorUserId ?? null, params.note ?? null],
     );
-
-    const updates = [];
-    const values = [];
-
-    if (toCode === "resolved") {
-      updates.push("resolved_at = COALESCE(resolved_at, CURRENT_TIMESTAMP)");
-    }
-    if (toCode === "closed") {
-      updates.push("closed_at = COALESCE(closed_at, CURRENT_TIMESTAMP)");
-      updates.push("resolved_at = COALESCE(resolved_at, CURRENT_TIMESTAMP)");
-    }
-
-    if (params.outcomeCode) {
-      const outcomeId = await findOutcomeId(conn, params.outcomeCode);
-      updates.push("final_outcome_id = ?");
-      values.push(outcomeId);
-    }
-
-    if (updates.length) {
-      await conn.execute(
-        `
-          UPDATE emergency_incidents
-          SET ${updates.join(", ")}
-          WHERE id = ?
-        `,
-        [...values, incidentId],
-      );
-    }
 
     await conn.commit();
 

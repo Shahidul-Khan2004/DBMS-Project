@@ -42,6 +42,31 @@ CREATE TABLE report_categories (
     CONSTRAINT chk_report_categories_name_not_blank CHECK (CHAR_LENGTH(TRIM(name)) > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE intake_statuses (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    status_code VARCHAR(100) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(500) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_terminal BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_intake_statuses_status_code (status_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE intake_status_transitions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    from_status_id BIGINT UNSIGNED NOT NULL,
+    to_status_id BIGINT UNSIGNED NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    requires_note BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_intake_status_transitions_from_to (from_status_id, to_status_id),
+    KEY idx_intake_status_transitions_to (to_status_id),
+    CONSTRAINT fk_intake_status_transitions_from FOREIGN KEY (from_status_id) REFERENCES intake_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_intake_status_transitions_to FOREIGN KEY (to_status_id) REFERENCES intake_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE intake_reports (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     public_uuid CHAR(36) NOT NULL,
@@ -54,7 +79,7 @@ CREATE TABLE intake_reports (
     urgency_type ENUM('non_emergency','emergency','unknown') NOT NULL DEFAULT 'unknown',
     summary VARCHAR(255) NOT NULL,
     description TEXT NULL,
-    intake_status ENUM('received','under_review','linked_to_case','linked_to_incident','duplicate','false_report','closed') NOT NULL DEFAULT 'received',
+    current_status_id BIGINT UNSIGNED NOT NULL,
     final_disposition ENUM('valid','duplicate','false_report','prank','insufficient_info','closed_without_action') NULL,
     received_by_user_id BIGINT UNSIGNED NULL,
     reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -68,7 +93,7 @@ CREATE TABLE intake_reports (
     KEY idx_intake_reports_channel (channel_id),
     KEY idx_intake_reports_category (category_id),
     KEY idx_intake_reports_location (reported_location_id),
-    KEY idx_intake_reports_status (intake_status),
+    KEY idx_intake_reports_current_status (current_status_id),
     KEY idx_intake_reports_reported_at (reported_at),
     CONSTRAINT fk_intake_reports_reporter_user FOREIGN KEY (reporter_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_intake_reports_reporter_contact FOREIGN KEY (reporter_contact_id) REFERENCES reporter_contacts(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
@@ -76,6 +101,7 @@ CREATE TABLE intake_reports (
     CONSTRAINT fk_intake_reports_category FOREIGN KEY (category_id) REFERENCES report_categories(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_intake_reports_location FOREIGN KEY (reported_location_id) REFERENCES locations(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_intake_reports_received_by FOREIGN KEY (received_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_intake_reports_current_status FOREIGN KEY (current_status_id) REFERENCES intake_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_intake_reports_summary_not_blank CHECK (CHAR_LENGTH(TRIM(summary)) > 0),
     CONSTRAINT chk_intake_reports_reported_before_created CHECK (reported_at <= created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -83,14 +109,16 @@ CREATE TABLE intake_reports (
 CREATE TABLE intake_report_status_history (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     intake_report_id BIGINT UNSIGNED NOT NULL,
-    status ENUM('received','under_review','linked_to_case','linked_to_incident','duplicate','false_report','closed') NOT NULL,
+    status_id BIGINT UNSIGNED NOT NULL,
     changed_by_user_id BIGINT UNSIGNED NULL,
     changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     note VARCHAR(500) NULL,
     PRIMARY KEY (id),
     KEY idx_irsh_report_changed (intake_report_id, changed_at),
+    KEY idx_irsh_status (status_id),
     KEY idx_irsh_changed_by (changed_by_user_id),
     CONSTRAINT fk_irsh_report FOREIGN KEY (intake_report_id) REFERENCES intake_reports(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_irsh_status FOREIGN KEY (status_id) REFERENCES intake_statuses(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_irsh_changed_by FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

@@ -47,6 +47,65 @@ INSERT INTO case_statuses (status_code, name, sort_order, is_terminal) VALUES
 ('closed','Closed',6,TRUE),
 ('cancelled','Cancelled',7,TRUE);
 
+INSERT INTO case_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE, FALSE
+FROM case_statuses f
+INNER JOIN case_statuses t ON (
+    (f.status_code = 'submitted' AND t.status_code IN ('under_review', 'cancelled', 'resolved', 'escalated_to_emergency'))
+    OR (f.status_code = 'under_review' AND t.status_code IN ('awaiting_user_response', 'closed', 'cancelled', 'resolved', 'escalated_to_emergency'))
+    OR (f.status_code = 'awaiting_user_response' AND t.status_code IN ('under_review', 'closed', 'cancelled', 'resolved', 'escalated_to_emergency'))
+);
+
+INSERT INTO intake_statuses (status_code, name, sort_order, is_terminal) VALUES
+('received','Received',1,FALSE),
+('under_review','Under Review',2,FALSE),
+('linked_to_case','Linked to Case',3,FALSE),
+('linked_to_incident','Linked to Incident',4,TRUE),
+('duplicate','Duplicate',5,TRUE),
+('false_report','False Report',6,TRUE),
+('closed','Closed',7,TRUE);
+
+INSERT INTO intake_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE, FALSE
+FROM intake_statuses f
+INNER JOIN intake_statuses t ON (
+    (f.status_code = 'received' AND t.status_code IN ('under_review', 'duplicate', 'false_report', 'closed'))
+    OR (f.status_code = 'under_review' AND t.status_code IN ('linked_to_case', 'linked_to_incident', 'duplicate', 'false_report', 'closed'))
+    OR (f.status_code = 'linked_to_case' AND t.status_code = 'linked_to_incident')
+);
+
+INSERT INTO dispatch_statuses (status_code, name, sort_order, is_terminal) VALUES
+('assigned','Assigned',1,FALSE),
+('dispatched','Dispatched',2,FALSE),
+('arrived','Arrived',3,FALSE),
+('completed','Completed',4,TRUE),
+('cancelled','Cancelled',5,TRUE);
+
+INSERT INTO dispatch_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE, FALSE
+FROM dispatch_statuses f
+INNER JOIN dispatch_statuses t ON (
+    (f.status_code = 'assigned' AND t.status_code IN ('dispatched', 'cancelled'))
+    OR (f.status_code = 'dispatched' AND t.status_code IN ('arrived', 'cancelled'))
+    OR (f.status_code = 'arrived' AND t.status_code IN ('completed', 'cancelled'))
+);
+
+INSERT INTO unit_statuses (status_code, name, sort_order, is_terminal) VALUES
+('available','Available',1,FALSE),
+('busy','Busy',2,FALSE),
+('maintenance','Maintenance',3,FALSE),
+('offline','Offline',4,FALSE);
+
+INSERT INTO unit_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE, FALSE
+FROM unit_statuses f
+INNER JOIN unit_statuses t ON (
+    (f.status_code = 'available' AND t.status_code IN ('busy', 'maintenance', 'offline'))
+    OR (f.status_code = 'busy' AND t.status_code IN ('available', 'maintenance', 'offline'))
+    OR (f.status_code = 'maintenance' AND t.status_code = 'available')
+    OR (f.status_code = 'offline' AND t.status_code = 'available')
+);
+
 INSERT INTO incident_severity_levels (severity_code, name, priority_rank) VALUES
 ('low','Low',1),
 ('medium','Medium',2),
@@ -63,6 +122,16 @@ INSERT INTO incident_statuses (status_code, name, sort_order, is_terminal) VALUE
 ('resolved','Resolved',7,TRUE),
 ('closed','Closed',8,TRUE),
 ('cancelled','Cancelled',9,TRUE);
+
+INSERT INTO incident_status_transitions (from_status_id, to_status_id, is_active, requires_note, requires_outcome)
+SELECT f.id, t.id, TRUE, FALSE,
+       CASE WHEN t.status_code IN ('resolved', 'closed', 'cancelled') THEN TRUE ELSE FALSE END
+FROM incident_statuses f
+INNER JOIN incident_statuses t ON (
+    (f.status_code = 'reported' AND t.status_code IN ('classified', 'cancelled'))
+    OR (f.status_code = 'classified' AND t.status_code IN ('in_progress', 'resolved', 'closed', 'cancelled'))
+    OR (f.status_code = 'in_progress' AND t.status_code IN ('resolved', 'closed', 'cancelled'))
+);
 
 INSERT INTO incident_outcomes (outcome_code, name, is_successful_resolution) VALUES
 ('resolved','Resolved',TRUE),

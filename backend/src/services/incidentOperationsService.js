@@ -18,14 +18,6 @@ import { listIntakeReportLocationHistory } from "../repositories/intakeRepo.js";
 import { findIntakeReportByPublicUuid } from "../repositories/intakeRepo.js";
 import { createNotification } from "./notificationService.js";
 
-const TERMINAL_STATUSES = new Set(["resolved", "closed", "cancelled"]);
-
-const ALLOWED_TRANSITIONS = {
-  reported:    new Set(["classified", "cancelled"]),
-  classified:  new Set(["in_progress", "resolved", "closed", "cancelled"]),
-  in_progress: new Set(["resolved", "closed", "cancelled"]),
-};
-
 async function getCurrentIncidentStatus(publicUuid) {
   const result = await query(
     `
@@ -38,30 +30,6 @@ async function getCurrentIncidentStatus(publicUuid) {
     [publicUuid],
   );
   return result.rows[0]?.status_code ?? null;
-}
-
-function assertStatusTransition(fromCode, toCode) {
-  if (!fromCode || !toCode) {
-    throw new BackendError(422, "INVALID_STATUS_CODE", "Invalid status transition");
-  }
-  if (fromCode === toCode) {
-    throw new BackendError(409, "INVALID_STATUS_TRANSITION", "Incident already has this status");
-  }
-  if (TERMINAL_STATUSES.has(fromCode)) {
-    throw new BackendError(
-      409,
-      "INVALID_STATUS_TRANSITION",
-      "Cannot change status of a terminal incident",
-    );
-  }
-  const allowed = ALLOWED_TRANSITIONS[fromCode];
-  if (!allowed || !allowed.has(toCode)) {
-    throw new BackendError(
-      409,
-      "INVALID_STATUS_TRANSITION",
-      `Cannot transition incident from '${fromCode}' to '${toCode}'`,
-    );
-  }
 }
 
 function assertOutcomeForTerminal(statusCode, outcomeCode) {
@@ -190,7 +158,6 @@ export async function operationsPatchIncidentStatus(actorUserId, incidentPublicU
     throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
   }
 
-  assertStatusTransition(fromCode, body.statusCode);
   assertOutcomeForTerminal(body.statusCode, body.outcomeCode ?? null);
 
   const incident = await applyIncidentStatusChange({

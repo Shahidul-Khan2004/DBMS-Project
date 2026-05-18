@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import pool, { query } from "../config/db.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
+import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import { updateIntakeReportStatusInTransaction } from "./intakeGatewayRepo.js";
 
 const DEFAULT_LIST_LIMIT = 50;
@@ -306,7 +307,8 @@ export async function getServiceCaseDetailForOperations(casePublicUuid) {
         SELECT
           cm.id AS id,
           cm.message_type AS message_type,
-          cm.message_body AS message_body,
+          cm.subject AS subject,
+          cm.body AS body,
           cm.is_internal AS is_internal,
           cm.created_at AS created_at,
           u.public_uuid AS sender_public_uuid,
@@ -377,7 +379,8 @@ export async function getServiceCaseDetailForOperations(casePublicUuid) {
       messages: messages.map((m) => ({
         id: String(m.id),
         message_type: m.message_type,
-        message_body: m.message_body,
+        subject: m.subject,
+        body: m.body,
         is_internal: Boolean(m.is_internal),
         created_at: m.created_at,
         sender: m.sender_public_uuid
@@ -501,29 +504,6 @@ async function lockServiceCaseForStatusChange(conn, casePublicUuid) {
   };
 }
 
-const CASE_STATUS_TRANSITIONS = {
-  submitted: new Set(["under_review", "cancelled"]),
-  under_review: new Set(["awaiting_user_response", "closed", "cancelled"]),
-  awaiting_user_response: new Set(["under_review", "closed", "cancelled"]),
-};
-
-function assertCaseStatusTransition(fromCode, toCode) {
-  if (!fromCode || !toCode) {
-    throw new BackendError(422, "INVALID_STATUS_CODE", "Invalid status transition");
-  }
-  if (fromCode === toCode) {
-    throw new BackendError(409, "INVALID_STATUS_TRANSITION", "Service case already has this status");
-  }
-  const allowed = CASE_STATUS_TRANSITIONS[fromCode];
-  if (!allowed || !allowed.has(toCode)) {
-    throw new BackendError(
-      409,
-      "INVALID_STATUS_TRANSITION",
-      `Cannot transition service case from '${fromCode}' to '${toCode}'`,
-    );
-  }
-}
-
 export async function patchServiceCaseStatusInTransaction(params) {
   const conn = await pool.getConnection();
   try {
@@ -538,9 +518,13 @@ export async function patchServiceCaseStatusInTransaction(params) {
       );
     }
 
-    assertCaseStatusTransition(meta.fromStatusCode, params.statusCode);
-
-    const newStatusId = await findCaseStatusId(conn, params.statusCode);
+    const { toStatusId: newStatusId } = await assertStatusTransitionAllowed(
+      conn,
+      "case",
+      meta.fromStatusCode,
+      params.statusCode,
+      { note: params.note ?? null },
+    );
 
     await conn.execute(
       `
@@ -588,9 +572,10 @@ export async function patchServiceCaseStatusInTransaction(params) {
   }
 }
 
-function encodeDispatcherMessageBody(title, description) {
-  const desc = description?.trim() ? description.trim() : "";
-  return `Subject: ${title}\n\n${desc}`;
+function normalizeMessageFields(title, description) {
+  const subject = String(title ?? "").trim();
+  const body = description?.trim() ? description.trim() : null;
+  return { subject, body };
 }
 
 export async function postServiceCaseMessageInTransaction(params) {
@@ -613,7 +598,7 @@ export async function postServiceCaseMessageInTransaction(params) {
     );
     const caseCode = hdr[0]?.case_code ?? null;
 
-    const messageBody = encodeDispatcherMessageBody(params.title, params.description ?? "");
+    const { subject, body } = normalizeMessageFields(params.title, params.description ?? "");
 
     const [msgResult] = await conn.execute(
       `
@@ -621,17 +606,22 @@ export async function postServiceCaseMessageInTransaction(params) {
           case_id,
           sender_user_id,
           message_type,
-          message_body,
+          subject,
+          body,
           is_internal
         )
-        VALUES (?, ?, 'admin_reply', ?, FALSE)
+        VALUES (?, ?, 'admin_reply', ?, ?, FALSE)
       `,
-      [meta.caseId, params.actorUserId, messageBody],
+      [meta.caseId, params.actorUserId, subject, body],
     );
 
     if (meta.fromStatusCode === "under_review") {
-      assertCaseStatusTransition(meta.fromStatusCode, "awaiting_user_response");
-      const awaitingStatusId = await findCaseStatusId(conn, "awaiting_user_response");
+      const { toStatusId: awaitingStatusId } = await assertStatusTransitionAllowed(
+        conn,
+        "case",
+        meta.fromStatusCode,
+        "awaiting_user_response",
+      );
       await conn.execute(
         `
           INSERT INTO case_status_history (
@@ -682,7 +672,8 @@ export async function postServiceCaseMessageInTransaction(params) {
       message: {
         id: String(msgResult.insertId),
         message_type: "admin_reply",
-        message_body: messageBody,
+        subject,
+        body,
         created_at: createdRow[0]?.created_at ?? null,
       },
       reporterUserId: meta.reporterUserId,
@@ -736,7 +727,7 @@ export async function postCitizenServiceCaseMessageInTransaction(params) {
     );
     const caseCode = hdr[0]?.case_code ?? null;
 
-    const messageBody = encodeDispatcherMessageBody(params.title, params.description ?? "");
+    const { subject, body } = normalizeMessageFields(params.title, params.description ?? "");
 
     const [msgResult] = await conn.execute(
       `
@@ -744,17 +735,22 @@ export async function postCitizenServiceCaseMessageInTransaction(params) {
           case_id,
           sender_user_id,
           message_type,
-          message_body,
+          subject,
+          body,
           is_internal
         )
-        VALUES (?, ?, 'user_message', ?, FALSE)
+        VALUES (?, ?, 'user_message', ?, ?, FALSE)
       `,
-      [meta.caseId, params.actorUserId, messageBody],
+      [meta.caseId, params.actorUserId, subject, body],
     );
 
     if (meta.fromStatusCode === "awaiting_user_response") {
-      assertCaseStatusTransition(meta.fromStatusCode, "under_review");
-      const underReviewStatusId = await findCaseStatusId(conn, "under_review");
+      const { toStatusId: underReviewStatusId } = await assertStatusTransitionAllowed(
+        conn,
+        "case",
+        meta.fromStatusCode,
+        "under_review",
+      );
       await conn.execute(
         `
           INSERT INTO case_status_history (
@@ -807,7 +803,8 @@ export async function postCitizenServiceCaseMessageInTransaction(params) {
       message: {
         id: String(msgResult.insertId),
         message_type: "user_message",
-        message_body: messageBody,
+        subject,
+        body,
         created_at: createdRow[0]?.created_at ?? null,
       },
       caseId: meta.caseId,
@@ -950,7 +947,14 @@ export async function resolveServiceCaseInTransaction(params) {
       ],
     );
 
-    const resolvedStatusId = await findCaseStatusId(conn, "resolved");
+    const statusNote = params.statusNote ?? "Resolved via operations API";
+    const { toStatusId: resolvedStatusId } = await assertStatusTransitionAllowed(
+      conn,
+      "case",
+      meta.fromStatusCode,
+      "resolved",
+      { note: statusNote },
+    );
     await conn.execute(
       `
         INSERT INTO case_status_history (
@@ -961,12 +965,7 @@ export async function resolveServiceCaseInTransaction(params) {
         )
         VALUES (?, ?, ?, ?)
       `,
-      [
-        meta.caseId,
-        resolvedStatusId,
-        params.actorUserId ?? null,
-        params.statusNote ?? "Resolved via operations API",
-      ],
+      [meta.caseId, resolvedStatusId, params.actorUserId ?? null, statusNote],
     );
 
     await insertAuditLog(conn, {
@@ -1011,9 +1010,10 @@ async function loadIntakeRowForEscalation(conn, reportPublicUuid) {
         ir.reported_location_id AS reported_location_id,
         ir.summary AS summary,
         ir.description AS description,
-        ir.intake_status AS intake_status,
+        ist.status_code AS intake_status,
         ir.reported_at AS reported_at
       FROM intake_reports ir
+      INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
       WHERE ir.public_uuid = ?
       LIMIT 1
     `,
@@ -1228,7 +1228,15 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
       [serviceCaseRow.id, incidentDbId, params.actorUserId, params.escalationReason],
     );
 
-    const escalatedStatusId = await findCaseStatusId(conn, "escalated_to_emergency");
+    const caseMeta = await lockServiceCaseForStatusChange(conn, serviceCaseRow.public_uuid);
+    const escalationNote = `Escalated to emergency incident ${incidentCode}`;
+    const { toStatusId: escalatedStatusId } = await assertStatusTransitionAllowed(
+      conn,
+      "case",
+      caseMeta.fromStatusCode,
+      "escalated_to_emergency",
+      { note: escalationNote },
+    );
     await conn.execute(
       `
         INSERT INTO case_status_history (
@@ -1239,12 +1247,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
         )
         VALUES (?, ?, ?, ?)
       `,
-      [
-        serviceCaseRow.id,
-        escalatedStatusId,
-        params.actorUserId ?? null,
-        `Escalated to emergency incident ${incidentCode}`,
-      ],
+      [serviceCaseRow.id, escalatedStatusId, params.actorUserId ?? null, escalationNote],
     );
 
     await updateIntakeReportStatusInTransaction(
