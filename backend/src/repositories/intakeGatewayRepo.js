@@ -1,5 +1,9 @@
 import BackendError from "../lib/BackendError.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
+import {
+  assertStatusTransitionAllowed,
+  findStatusIdByCode,
+} from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
 
 async function findCaseStatusId(conn, statusCode) {
@@ -53,31 +57,63 @@ async function findSeverityLevelId(conn, severityCode) {
 export async function updateIntakeReportStatusInTransaction(
   conn,
   intakeReportId,
-  status,
+  statusCode,
   actorUserId,
   note,
 ) {
-  await conn.execute(
+  const [currentRows] = await conn.execute(
     `
-      UPDATE intake_reports
-      SET intake_status = ?
-      WHERE id = ?
+      SELECT ist.status_code AS status_code
+      FROM intake_reports ir
+      INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
+      WHERE ir.id = ?
+      LIMIT 1
     `,
-    [status, intakeReportId],
+    [intakeReportId],
+  );
+  if (!currentRows[0]) {
+    throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+  }
+
+  const { toStatusId: statusId } = await assertStatusTransitionAllowed(
+    conn,
+    "intake",
+    currentRows[0].status_code,
+    statusCode,
+    { note },
   );
 
   await conn.execute(
     `
       INSERT INTO intake_report_status_history (
         intake_report_id,
-        status,
+        status_id,
         changed_by_user_id,
         note
       )
       VALUES (?, ?, ?, ?)
     `,
-    [intakeReportId, status, actorUserId ?? null, note ?? null],
+    [intakeReportId, statusId, actorUserId ?? null, note ?? null],
   );
+}
+
+/** DB transitions require under_review before linked_to_case / linked_to_incident. */
+export async function ensureIntakeUnderReviewIfReceived(
+  conn,
+  intakeReportId,
+  intakeStatus,
+  actorUserId,
+  note = "Placed under review before linkage",
+) {
+  if (intakeStatus === "received") {
+    await updateIntakeReportStatusInTransaction(
+      conn,
+      intakeReportId,
+      "under_review",
+      actorUserId,
+      note,
+    );
+  }
 }
 
 /**
@@ -144,6 +180,14 @@ export async function createServiceCaseFromIntake(params) {
       ],
     );
 
+    await ensureIntakeUnderReviewIfReceived(
+      conn,
+      params.intake.id,
+      params.intake.intake_status,
+      params.actorUserId,
+      "Under review before service case linkage",
+    );
+
     await updateIntakeReportStatusInTransaction(
       conn,
       params.intake.id,
@@ -179,24 +223,25 @@ export async function createServiceCaseFromIntake(params) {
     const [intakeRows] = await conn.execute(
       `
         SELECT
-          id,
-          public_uuid,
-          report_code,
-          reporter_user_id,
-          channel_id,
-          category_id,
-          reported_location_id,
-          urgency_type,
-          summary,
-          description,
-          intake_status,
-          final_disposition,
-          received_by_user_id,
-          reported_at,
-          created_at,
-          updated_at
-        FROM intake_reports
-        WHERE id = ?
+          ir.id,
+          ir.public_uuid,
+          ir.report_code,
+          ir.reporter_user_id,
+          ir.channel_id,
+          ir.category_id,
+          ir.reported_location_id,
+          ir.urgency_type,
+          ir.summary,
+          ir.description,
+          ist.status_code AS intake_status,
+          ir.final_disposition,
+          ir.received_by_user_id,
+          ir.reported_at,
+          ir.created_at,
+          ir.updated_at
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
+        WHERE ir.id = ?
         LIMIT 1
       `,
       [params.intake.id],
@@ -338,6 +383,14 @@ export async function createEmergency999PathFromIntake(params) {
       ],
     );
 
+    await ensureIntakeUnderReviewIfReceived(
+      conn,
+      params.intake.id,
+      params.intake.intake_status,
+      params.actorUserId,
+      "Under review before emergency incident linkage",
+    );
+
     await updateIntakeReportStatusInTransaction(
       conn,
       params.intake.id,
@@ -420,24 +473,25 @@ export async function createEmergency999PathFromIntake(params) {
     const [intakeRows] = await conn.execute(
       `
         SELECT
-          id,
-          public_uuid,
-          report_code,
-          reporter_user_id,
-          channel_id,
-          category_id,
-          reported_location_id,
-          urgency_type,
-          summary,
-          description,
-          intake_status,
-          final_disposition,
-          received_by_user_id,
-          reported_at,
-          created_at,
-          updated_at
-        FROM intake_reports
-        WHERE id = ?
+          ir.id,
+          ir.public_uuid,
+          ir.report_code,
+          ir.reporter_user_id,
+          ir.channel_id,
+          ir.category_id,
+          ir.reported_location_id,
+          ir.urgency_type,
+          ir.summary,
+          ir.description,
+          ist.status_code AS intake_status,
+          ir.final_disposition,
+          ir.received_by_user_id,
+          ir.reported_at,
+          ir.created_at,
+          ir.updated_at
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
+        WHERE ir.id = ?
         LIMIT 1
       `,
       [params.intake.id],

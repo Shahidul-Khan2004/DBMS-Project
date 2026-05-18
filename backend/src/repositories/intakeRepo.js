@@ -10,6 +10,7 @@ import { ROLE_CODES } from "../services/rbacService.js";
 import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
 import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
+import { findStatusIdByCode } from "../lib/statusWorkflow.js";
 
 function isDuplicateIntakeIdentityError(error) {
   return (
@@ -173,6 +174,8 @@ export async function createIntakeReport(params) {
       reportedLocationId = Number(inserted.id);
     }
 
+    const { id: receivedStatusId } = await findStatusIdByCode(conn, "intake", "received");
+
     const [intakeResult] = await conn.execute(
       `
         INSERT INTO intake_reports (
@@ -186,11 +189,11 @@ export async function createIntakeReport(params) {
           urgency_type,
           summary,
           description,
-          intake_status,
+          current_status_id,
           received_by_user_id,
           reported_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, COALESCE(?, CURRENT_TIMESTAMP))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
       `,
       [
         params.publicUuid,
@@ -203,6 +206,7 @@ export async function createIntakeReport(params) {
         params.urgencyType ?? "unknown",
         params.summary,
         params.description ?? null,
+        receivedStatusId,
         params.receivedByUserId ?? null,
         toMySqlDateTimeOrNull(params.reportedAt),
       ],
@@ -212,14 +216,15 @@ export async function createIntakeReport(params) {
       `
         INSERT INTO intake_report_status_history (
           intake_report_id,
-          status,
+          status_id,
           changed_by_user_id,
           note
         )
-        VALUES (?, 'received', ?, ?)
+        VALUES (?, ?, ?, ?)
       `,
       [
         intakeResult.insertId,
+        receivedStatusId,
         params.receivedByUserId ?? params.reporterUserId ?? null,
         "Initial intake creation",
       ],
@@ -239,25 +244,26 @@ export async function createIntakeReport(params) {
     const [rows] = await conn.execute(
       `
         SELECT
-          id,
-          public_uuid,
-          report_code,
-          reporter_user_id,
-          reporter_contact_id,
-          channel_id,
-          category_id,
-          reported_location_id,
-          urgency_type,
-          summary,
-          description,
-          intake_status,
-          final_disposition,
-          received_by_user_id,
-          reported_at,
-          created_at,
-          updated_at
-        FROM intake_reports
-        WHERE id = ?
+          ir.id,
+          ir.public_uuid,
+          ir.report_code,
+          ir.reporter_user_id,
+          ir.reporter_contact_id,
+          ir.channel_id,
+          ir.category_id,
+          ir.reported_location_id,
+          ir.urgency_type,
+          ir.summary,
+          ir.description,
+          ints.status_code AS intake_status,
+          ir.final_disposition,
+          ir.received_by_user_id,
+          ir.reported_at,
+          ir.created_at,
+          ir.updated_at
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
+        WHERE ir.id = ?
         LIMIT 1
       `,
       [intakeResult.insertId],
@@ -285,25 +291,26 @@ export async function findIntakeReportByPublicUuid(publicUuid) {
   const result = await query(
     `
       SELECT
-        id,
-        public_uuid,
-        report_code,
-        reporter_user_id,
-        reporter_contact_id,
-        channel_id,
-        category_id,
-        reported_location_id,
-        urgency_type,
-        summary,
-        description,
-        intake_status,
-        final_disposition,
-        received_by_user_id,
-        reported_at,
-        created_at,
-        updated_at
-      FROM intake_reports
-      WHERE public_uuid = ?
+        ir.id,
+        ir.public_uuid,
+        ir.report_code,
+        ir.reporter_user_id,
+        ir.reporter_contact_id,
+        ir.channel_id,
+        ir.category_id,
+        ir.reported_location_id,
+        ir.urgency_type,
+        ir.summary,
+        ir.description,
+        ints.status_code AS intake_status,
+        ir.final_disposition,
+        ir.received_by_user_id,
+        ir.reported_at,
+        ir.created_at,
+        ir.updated_at
+      FROM intake_reports ir
+      INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
+      WHERE ir.public_uuid = ?
       LIMIT 1
     `,
     [publicUuid],
@@ -321,7 +328,7 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
         ir.summary,
         ir.description,
         ir.urgency_type,
-        ir.intake_status,
+        ints.status_code AS intake_status,
         ir.final_disposition,
         ir.reported_at,
         ir.created_at,
@@ -335,6 +342,7 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
         l.admin_area_id AS location_admin_area_id,
         l.source AS location_source
       FROM intake_reports ir
+      INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
       INNER JOIN report_channels rc ON rc.id = ir.channel_id
       INNER JOIN report_categories rcat ON rcat.id = ir.category_id
       LEFT JOIN locations l ON l.id = ir.reported_location_id
@@ -360,7 +368,7 @@ export async function findIntakeReportByPublicUuidForReporter(reportPublicUuid, 
         ir.summary,
         ir.description,
         ir.urgency_type,
-        ir.intake_status,
+        ints.status_code AS intake_status,
         ir.final_disposition,
         ir.reported_at,
         ir.created_at,
@@ -375,6 +383,7 @@ export async function findIntakeReportByPublicUuidForReporter(reportPublicUuid, 
         l.admin_area_id AS location_admin_area_id,
         l.source AS location_source
       FROM intake_reports ir
+      INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
       INNER JOIN report_channels rc ON rc.id = ir.channel_id
       INNER JOIN report_categories rcat ON rcat.id = ir.category_id
       LEFT JOIN locations l ON l.id = ir.reported_location_id
@@ -394,7 +403,7 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         SUM(
           CASE
             WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = FALSE, 1, 0)
-            WHEN ir.intake_status IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
+            WHEN ints.status_code IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
             THEN 1
             ELSE 0
           END
@@ -402,12 +411,13 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         SUM(
           CASE
             WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = TRUE, 1, 0)
-            WHEN ir.intake_status IN ('duplicate', 'false_report', 'closed')
+            WHEN ints.status_code IN ('duplicate', 'false_report', 'closed')
             THEN 1
             ELSE 0
           END
         ) AS resolved_reports
       FROM intake_reports ir
+      INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
       LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
       LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
       LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
@@ -540,7 +550,7 @@ export async function updateIntakeReportLocation(params) {
           ir.summary,
           ir.description,
           ir.urgency_type,
-          ir.intake_status,
+          ints.status_code AS intake_status,
           ir.final_disposition,
           ir.reported_at,
           ir.created_at,
@@ -554,6 +564,7 @@ export async function updateIntakeReportLocation(params) {
           l.admin_area_id AS location_admin_area_id,
           l.source AS location_source
         FROM intake_reports ir
+        INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
         INNER JOIN report_channels rc ON rc.id = ir.channel_id
         INNER JOIN report_categories rcat ON rcat.id = ir.category_id
         LEFT JOIN locations l ON l.id = ir.reported_location_id

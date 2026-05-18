@@ -8,7 +8,7 @@ function buildListWhere(filters, params) {
   const clauses = [];
 
   if (filters.intake_status) {
-    clauses.push("ir.intake_status = ?");
+    clauses.push("ist.status_code = ?");
     params.push(filters.intake_status);
   }
   if (filters.urgency_type) {
@@ -32,7 +32,7 @@ const INTAKE_SELECT = `
     ir.urgency_type AS urgency_type,
     ir.summary AS summary,
     ir.description AS description,
-    ir.intake_status AS intake_status,
+    ist.status_code AS intake_status,
     ir.final_disposition AS final_disposition,
     ir.reported_at AS reported_at,
     ir.created_at AS created_at,
@@ -56,6 +56,7 @@ const INTAKE_SELECT = `
 
 const INTAKE_FROM = `
   FROM intake_reports ir
+  INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
   INNER JOIN report_channels rc ON rc.id = ir.channel_id AND rc.is_active = TRUE
   INNER JOIN report_categories rcat ON rcat.id = ir.category_id AND rcat.is_active = TRUE
   LEFT JOIN locations l ON l.id = ir.reported_location_id
@@ -140,7 +141,7 @@ function formatIntakeRow(row) {
   };
 }
 
-const PENDING_CLASSIFICATION_CLAUSE = "ir.intake_status IN ('received', 'under_review')";
+const PENDING_CLASSIFICATION_CLAUSE = "ist.status_code IN ('received', 'under_review')";
 
 /** Intake reports awaiting classification/triage for dispatcher dashboard counts. */
 export async function countIntakeReportsPendingClassification() {
