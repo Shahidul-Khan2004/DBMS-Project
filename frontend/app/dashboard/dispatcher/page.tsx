@@ -204,11 +204,18 @@ export default function DispatcherDashboard() {
               <Button
                 type="button"
                 variant="primary"
+                onClick={() => router.push("/dashboard/dispatcher/service-cases")}
+              >
+                View Service Cases
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
                 onClick={() => router.push("/dashboard/dispatcher/incidents")}
               >
                 View Incidents
               </Button>
-              </>
+            </>
             }
           />
         </div>
