@@ -129,6 +129,14 @@ export default function CitizenDashboard() {
               <Button
                 type="button"
                 variant="secondary"
+                onClick={() => router.push("/dashboard/citizen/service-cases")}
+              >
+                <FileText className="h-4 w-4" aria-hidden />
+                My Service Cases
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
                 onClick={() => router.push("/dashboard/citizen/locations")}
               >
                 <MapPin className="h-4 w-4" aria-hidden />

@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { loginSchema, LoginInput } from "@/lib/validations";
@@ -37,41 +38,12 @@ function getBackendFieldErrors(details: unknown): LoginFieldErrors {
   }, {});
 }
 
-function PasswordToggleIcon({ visible }: { visible: boolean }) {
-  if (visible) {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-      >
-        <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-        <circle cx="12" cy="12" r="3" />
-        <path d="M4 4l16 16" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-    >
-      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
+function loginInputClass(hasError: boolean) {
+  const base =
+    "rounded-2xl border border-[#B8C7D6] bg-[#FDFEFF] px-4 py-3 text-[#0F172A] placeholder:text-[#7A8CA3] shadow-sm focus:border-[#002D62] focus:outline-none focus:ring-4 focus:ring-[#002D62]/10";
+  const err =
+    "border-[#DA291C] bg-[#FDECEC] focus:border-[#DA291C] focus:ring-4 focus:ring-[#DA291C]/10";
+  return [base, hasError && err].filter(Boolean).join(" ");
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
@@ -167,6 +139,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         placeholder="Enter your email address"
         {...registerWithErrorReset("email")}
         error={fieldErrors.email}
+        className={loginInputClass(!!fieldErrors.email)}
         required
       />
 
@@ -176,6 +149,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         placeholder="Enter your password"
         {...registerWithErrorReset("password")}
         error={fieldErrors.password}
+        className={loginInputClass(!!fieldErrors.password)}
         endElement={
           <button
             type="button"
@@ -185,7 +159,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             title={showPassword ? "Hide password" : "Show password"}
             className="inline-flex items-center justify-center text-[#002D62] transition-colors hover:text-[#006747]"
           >
-            <PasswordToggleIcon visible={showPassword} />
+            {showPassword ? (
+              <EyeOff className="h-5 w-5" aria-hidden />
+            ) : (
+              <Eye className="h-5 w-5" aria-hidden />
+            )}
           </button>
         }
         required
@@ -197,7 +175,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         fullWidth
         size="lg"
         isLoading={isLoading}
-        className="mt-2"
+        className="mt-2 bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] disabled:cursor-not-allowed disabled:bg-[#7F96B3] disabled:opacity-100 disabled:shadow-none"
       >
         Sign In
       </Button>

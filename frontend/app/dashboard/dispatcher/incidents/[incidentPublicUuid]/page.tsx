@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -94,6 +95,7 @@ interface LinkIntakeResponse {
 
 type IntakeLinkType = "supporting_report" | "follow_up_report";
 
+const DEFAULT_RECENT_INTAKE_LINK_TYPE: IntakeLinkType = "supporting_report";
 const TERMINAL_STATUSES = ["resolved", "closed", "cancelled"];
 const OUTCOME_OPTIONS = [
   "resolved",
@@ -175,6 +177,15 @@ function formatLocation(report: LinkedIntakeReport) {
   );
 }
 
+function formatRecentReportLocation(report: OperationsIntakeReport) {
+  return (
+    report.location_text ||
+    report.location?.address_text ||
+    report.location?.place_name ||
+    "Location unavailable"
+  );
+}
+
 export default function IncidentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -206,8 +217,9 @@ export default function IncidentDetailPage() {
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkIntakeUuid, setLinkIntakeUuid] = useState("");
   const [linkType, setLinkType] =
-    useState<IntakeLinkType>("supporting_report");
+    useState<IntakeLinkType>(DEFAULT_RECENT_INTAKE_LINK_TYPE);
   const [linkNote, setLinkNote] = useState("");
+  const [recentReportsExpanded, setRecentReportsExpanded] = useState(false);
   const [isLinkingIntake, setIsLinkingIntake] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
@@ -261,6 +273,10 @@ export default function IncidentDetailPage() {
       setLoadingRecentReports(false);
     }
   }, []);
+
+  const refreshIncidentPage = useCallback(async () => {
+    await Promise.all([loadIncident(), loadRecentIntakeReports()]);
+  }, [loadIncident, loadRecentIntakeReports]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,6 +413,35 @@ export default function IncidentDetailPage() {
     }
   };
 
+  const linkedReportUuidSet = useMemo(
+    () => new Set(linkedReports.map((report) => report.intake_public_uuid)),
+    [linkedReports],
+  );
+  const visibleRecentIntakeReports = useMemo(
+    () => {
+      return [...recentIntakeReports]
+        .filter(
+          (report) =>
+            !report.has_incident && !linkedReportUuidSet.has(report.public_uuid),
+        )
+        .sort((leftReport, rightReport) => {
+          const leftTime = Date.parse(
+            leftReport.reported_at ??
+              leftReport.created_at ??
+              leftReport.updated_at,
+          );
+          const rightTime = Date.parse(
+            rightReport.reported_at ??
+              rightReport.created_at ??
+              rightReport.updated_at,
+          );
+
+          return (Number.isNaN(rightTime) ? 0 : rightTime) -
+            (Number.isNaN(leftTime) ? 0 : leftTime);
+        });
+    },
+    [linkedReportUuidSet, recentIntakeReports],
+  );
   const openLinkModal = () => {
     setLinkError(null);
     setLinkSuccess(null);
@@ -440,7 +485,7 @@ export default function IncidentDetailPage() {
       );
 
       setLinkIntakeUuid("");
-      setLinkType("supporting_report");
+      setLinkType(DEFAULT_RECENT_INTAKE_LINK_TYPE);
       setLinkNote("");
       setLinkModalOpen(false);
       setLinkSuccess(data.message ?? "Intake report linked to incident.");
@@ -585,10 +630,10 @@ export default function IncidentDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => void loadIncident()}
-            disabled={loading}
+            onClick={() => void refreshIncidentPage()}
+            disabled={loading || loadingRecentReports}
           >
-            {loading ? "Loading..." : "Refresh"}
+            {loading || loadingRecentReports ? "Loading..." : "Refresh"}
           </Button>
         </div>
 
@@ -603,8 +648,9 @@ export default function IncidentDetailPage() {
         ) : null}
 
         {incident ? (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_480px]">
             <div className="space-y-6">
+              <div className="max-w-4xl">
               <Card className="shadow-md">
                 <CardHeader>
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -664,200 +710,115 @@ export default function IncidentDetailPage() {
                   </dl>
                 </CardContent>
               </Card>
+              </div>
 
-              <Card className="shadow-md">
-                <CardHeader>
-                  <h2 className="text-lg font-semibold text-[#002D62]">
-                    Full Incident Detail
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <DetailItem label="Incident Code" value={incident.incident_code} />
-                    <DetailItem label="Status" value={incident.status_code} />
-                    <DetailItem label="Severity" value={incident.severity_code} />
-                    <DetailItem label="Category" value={incident.category_code} />
-                    <DetailItem label="Origin Type" value={incident.origin_type} />
-                    <DetailItem label="Outcome Code" value={incident.outcome_code} />
-                    <DetailItem
-                      label="Reported At"
-                      value={formatBangladeshTime(incident.reported_at)}
-                    />
-                    <DetailItem
-                      label="Resolved At"
-                      value={formatBangladeshTime(incident.resolved_at)}
-                    />
-                    <DetailItem
-                      label="Closed At"
-                      value={formatBangladeshTime(incident.closed_at)}
-                    />
-                    <DetailItem
-                      label="Created At"
-                      value={formatBangladeshTime(incident.created_at)}
-                    />
-                    <DetailItem
-                      label="Updated At"
-                      value={formatBangladeshTime(incident.updated_at)}
-                    />
-                  </dl>
-                </CardContent>
-              </Card>
+                <Card className="shadow-md">
+                  <CardHeader>
+                    <h2 className="text-lg font-semibold text-[#002D62]">
+                      Full Incident Detail
+                    </h2>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      <DetailItem label="Incident Code" value={incident.incident_code} />
+                      <DetailItem label="Status" value={incident.status_code} />
+                      <DetailItem label="Severity" value={incident.severity_code} />
+                      <DetailItem label="Category" value={incident.category_code} />
+                      <DetailItem label="Origin Type" value={incident.origin_type} />
+                      <DetailItem label="Outcome Code" value={incident.outcome_code} />
+                      <DetailItem
+                        label="Reported At"
+                        value={formatBangladeshTime(incident.reported_at)}
+                      />
+                      <DetailItem
+                        label="Resolved At"
+                        value={formatBangladeshTime(incident.resolved_at)}
+                      />
+                      <DetailItem
+                        label="Closed At"
+                        value={formatBangladeshTime(incident.closed_at)}
+                      />
+                      <DetailItem
+                        label="Created At"
+                        value={formatBangladeshTime(incident.created_at)}
+                      />
+                      <DetailItem
+                        label="Updated At"
+                        value={formatBangladeshTime(incident.updated_at)}
+                      />
+                    </dl>
+                  </CardContent>
+                </Card>
 
-              <Card className="shadow-md">
-                <CardHeader>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-[#002D62]">
-                        Recent Intake Reports
-                      </h2>
+                <Card className="shadow-md">
+                  <CardHeader>
+                    <h2 className="text-lg font-semibold text-[#002D62]">
+                      Linked Intake Reports
+                    </h2>
+                    {currentStatusIsTerminal ? (
                       <p className="mt-1 text-sm text-gray-600">
-                        Recently reported intake reports that can be linked to this incident.
+                        Terminal incidents cannot accept new intake links.
                       </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void loadRecentIntakeReports()}
-                      disabled={loadingRecentReports}
-                    >
-                      {loadingRecentReports ? "Loading..." : "Refresh"}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {loadingRecentReports ? (
-                    <LoadingSkeleton lines={3} />
-                  ) : recentIntakeReports.length === 0 ? (
-                    <EmptyState
-                      title="No recent intake reports"
-                      description="No recent intake reports were found."
-                    />
-                  ) : (
-                    <div className="space-y-4">
-                      {recentIntakeReports.map((report) => (
-                        <div
-                          key={report.public_uuid}
-                          className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
-                        >
-                          <div className="flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#002D62]">
-                                {report.report_code}
-                              </span>
-                              <Badge tone={report.urgency_type}>
-                                {formatBadgeLabel(report.urgency_type)}
-                              </Badge>
-                              <Badge tone={report.category_code}>
-                                {formatBadgeLabel(report.category_code)}
-                              </Badge>
-                            </div>
-                            <p className="mt-1 text-sm text-gray-600">
-                              Reported {formatBangladeshTime(report.reported_at)}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">
-                              {report.summary || report.description || "No summary available."}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => {
-                              setLinkIntakeUuid(report.public_uuid);
-                              setLinkModalOpen(true);
-                            }}
-                            disabled={currentStatusIsTerminal || report.has_incident}
-                          >
-                            {report.has_incident ? "Already linked" : "Link"}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-md">
-                <CardHeader>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-[#002D62]">
-                        Linked Intake Reports
-                      </h2>
-                      {currentStatusIsTerminal ? (
-                        <p className="mt-1 text-sm text-gray-600">
-                          Terminal incidents cannot accept new intake links.
-                        </p>
-                      ) : null}
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={openLinkModal}
-                      disabled={currentStatusIsTerminal}
-                    >
-                      Link Intake Report
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {linkSuccess ? (
-                    <div className="mb-4 rounded-2xl bg-green-50 p-3 text-sm text-green-700">
-                      {linkSuccess}
-                    </div>
-                  ) : null}
-                  {linkedReports.length === 0 ? (
-                    <p className="text-sm text-gray-600">
-                      No intake reports linked to this incident.
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-[#002D62]/10">
-                      {linkedReports.map((report) => (
-                        <li key={report.intake_public_uuid} className="py-4">
-                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#002D62]">
-                                  {report.intake_report_code}
-                                </span>
-                                <Badge tone={report.intake_status}>
-                                  {formatBadgeLabel(report.intake_status)}
-                                </Badge>
-                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-                                  {formatBadgeLabel(report.link_type)}
-                                </span>
+                    ) : null}
+                  </CardHeader>
+                  <CardContent>
+                    {linkSuccess ? (
+                      <div className="mb-4 rounded-2xl bg-green-50 p-3 text-sm text-green-700">
+                        {linkSuccess}
+                      </div>
+                    ) : null}
+                    {linkedReports.length === 0 ? (
+                      <p className="text-sm text-gray-600">
+                        No intake reports linked yet.
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-[#002D62]/10">
+                        {linkedReports.map((report) => (
+                          <li key={report.intake_public_uuid} className="py-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#002D62]">
+                                    {report.intake_report_code}
+                                  </span>
+                                  <Badge tone={report.intake_status}>
+                                    {formatBadgeLabel(report.intake_status)}
+                                  </Badge>
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    {formatBadgeLabel(report.link_type)}
+                                  </span>
+                                </div>
+                                <p className="mt-3 break-words text-sm font-medium text-gray-900">
+                                  {report.intake_summary}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Linked {formatBangladeshTime(report.linked_at)}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Location: {formatLocation(report)}
+                                </p>
                               </div>
-                              <p className="mt-3 text-sm font-medium text-gray-900">
-                                {report.intake_summary}
-                              </p>
-                              <p className="mt-1 text-xs text-gray-500">
-                                Linked {formatBangladeshTime(report.linked_at)}
-                              </p>
-                              <p className="mt-1 text-xs text-gray-500">
-                                Location: {formatLocation(report)}
-                              </p>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/dispatcher/intake-reports/${report.intake_public_uuid}`,
+                                  )
+                                }
+                              >
+                                Open Intake
+                              </Button>
                             </div>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() =>
-                                router.push(
-                                  `/dashboard/dispatcher/intake-reports/${report.intake_public_uuid}`,
-                                )
-                              }
-                            >
-                              Open Intake
-                            </Button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
 
-              <Card className="shadow-md">
+                <Card className="shadow-md">
                 <CardHeader>
                   <h2 className="text-lg font-semibold text-[#002D62]">
                     Timeline Preview
@@ -895,7 +856,118 @@ export default function IncidentDetailPage() {
               </Card>
             </div>
 
-            <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <aside className="space-y-6 lg:self-start">
+              <Card className="shadow-md">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-[#002D62]">
+                        Recent Intake Reports
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Expand to review recently reported intake reports.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        setRecentReportsExpanded((expanded) => !expanded)
+                      }
+                      aria-expanded={recentReportsExpanded}
+                      aria-label={
+                        recentReportsExpanded
+                          ? "Collapse recent intake reports"
+                          : "Expand recent intake reports"
+                      }
+                    >
+                      {recentReportsExpanded ? (
+                        <ChevronUp className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" aria-hidden />
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                {recentReportsExpanded ? (
+                  <CardContent className="space-y-4">
+                    {loadingRecentReports ? (
+                      <LoadingSkeleton lines={2} />
+                    ) : visibleRecentIntakeReports.length === 0 ? (
+                      <EmptyState
+                        title="No recent intake reports"
+                        description="No unlinked recent intake reports were found."
+                      />
+                    ) : (
+                      <div className="space-y-4 transition-all duration-200 ease-out">
+                        {visibleRecentIntakeReports.map((report) => {
+                          const isAlreadyLinked =
+                            report.has_incident ||
+                            linkedReportUuidSet.has(report.public_uuid);
+
+                          return (
+                            <div
+                              key={report.public_uuid}
+                              className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge tone={report.urgency_type}>
+                                    {formatBadgeLabel(report.urgency_type)}
+                                  </Badge>
+                                  <Badge tone={report.category_code}>
+                                    {formatBadgeLabel(report.category_code)}
+                                  </Badge>
+                                  {isAlreadyLinked ? (
+                                    <Badge tone="linked_to_incident">
+                                      Already linked
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-sm text-gray-600">
+                                  Reported {formatBangladeshTime(report.reported_at)}
+                                </p>
+                                <p className="mt-1 truncate text-xs text-gray-500">
+                                  Location: {formatRecentReportLocation(report)}
+                                </p>
+                                <p className="mt-1 truncate text-sm text-gray-500">
+                                  {report.summary ||
+                                    report.description ||
+                                    "No summary available."}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  setLinkIntakeUuid(report.public_uuid);
+                                  openLinkModal();
+                                }}
+                                disabled={
+                                  currentStatusIsTerminal ||
+                                  isLinkingIntake ||
+                                  isAlreadyLinked
+                                }
+                              >
+                                {isAlreadyLinked ? "Already linked" : "Link"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {currentStatusIsTerminal ? (
+                      <p className="text-sm text-gray-600">
+                        Terminal incidents cannot accept new intake links.
+                      </p>
+                    ) : null}
+                  </CardContent>
+                ) : null}
+              </Card>
+
               <Card className="shadow-md">
                 <CardHeader>
                   <h2 className="text-lg font-semibold text-[#002D62]">

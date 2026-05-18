@@ -34,6 +34,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { href: "/dashboard/citizen", label: "Dashboard" },
           { href: "/dashboard/citizen/report-new", label: "New Report" },
           { href: "/dashboard/citizen/reports", label: "My Reports" },
+          { href: "/dashboard/citizen/service-cases", label: "Service Cases" },
           { href: "/dashboard/citizen/locations", label: "Locations" },
         ]
       : []),
@@ -42,6 +43,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { href: "/dashboard/dispatcher", label: "Overview" },
           { href: "/dashboard/dispatcher/gateway-999", label: "999 Gateway" },
           { href: "/dashboard/dispatcher/intake-reports", label: "Intake Queue" },
+          { href: "/dashboard/dispatcher/service-cases", label: "Service Cases" },
           { href: "/dashboard/dispatcher/incidents", label: "Incidents" },
         ]
       : []),
