@@ -29,6 +29,7 @@ CREATE TABLE dispatch_status_transitions (
 
 CREATE TABLE dispatches (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    public_uuid CHAR(36) NOT NULL,
     incident_id BIGINT UNSIGNED NOT NULL,
     unit_id BIGINT UNSIGNED NOT NULL,
     assigned_by_user_id BIGINT UNSIGNED NOT NULL,
@@ -43,6 +44,7 @@ CREATE TABLE dispatches (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    UNIQUE KEY uq_dispatches_public_uuid (public_uuid),
     UNIQUE KEY uq_dispatches_incident_unit (incident_id, unit_id),
     KEY idx_dispatches_unit (unit_id),
     KEY idx_dispatches_user (assigned_by_user_id),

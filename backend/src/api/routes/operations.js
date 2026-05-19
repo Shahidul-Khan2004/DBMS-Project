@@ -33,6 +33,21 @@ import {
 } from "../validators/operations.js";
 import { getOperationsDispatcherOverview } from "../controllers/operationsDispatcherOverview.js";
 import {
+  getOperationsAgencyWorkload,
+  getOperationsAvailableUnits,
+  getOperationsIncidentResponseTiming,
+  patchOperationsDispatchStatus,
+  postOperationsIncidentAgency,
+  postOperationsIncidentDispatch,
+} from "../controllers/operationsDispatch.js";
+import {
+  validateOperationsAddIncidentAgency,
+  validateOperationsAvailableUnitsQuery,
+  validateOperationsCreateDispatch,
+  validateOperationsDispatchUuidParam,
+  validateOperationsPatchDispatchStatus,
+} from "../validators/operationsDispatch.js";
+import {
   getOperationsServiceCase,
   getOperationsServiceCaseMessages,
   listOperationsServiceCases,
@@ -140,6 +155,50 @@ router.post(
   validateOperationsIncidentUuidParam,
   validateOperationsLinkIntakeToIncident,
   postLinkIntakeReportToIncident,
+);
+
+router.post(
+  "/incidents/:incidentPublicUuid/agencies",
+  requirePermission("incident.assign_agency"),
+  validateOperationsIncidentUuidParam,
+  validateOperationsAddIncidentAgency,
+  postOperationsIncidentAgency,
+);
+
+router.get(
+  "/units/available",
+  requirePermission("dispatch.create"),
+  validateOperationsAvailableUnitsQuery,
+  getOperationsAvailableUnits,
+);
+
+router.post(
+  "/incidents/:incidentPublicUuid/dispatches",
+  requirePermission("dispatch.create"),
+  validateOperationsIncidentUuidParam,
+  validateOperationsCreateDispatch,
+  postOperationsIncidentDispatch,
+);
+
+router.patch(
+  "/dispatches/:dispatchPublicUuid/status",
+  requirePermission("dispatch.update_status"),
+  validateOperationsDispatchUuidParam,
+  validateOperationsPatchDispatchStatus,
+  patchOperationsDispatchStatus,
+);
+
+router.get(
+  "/agencies/workload",
+  requireAnyPermission("dispatch.create", "incident.assign_agency"),
+  getOperationsAgencyWorkload,
+);
+
+router.get(
+  "/incidents/:incidentPublicUuid/response-timing",
+  requireAnyPermission("dispatch.create", "incident.assign_agency"),
+  validateOperationsIncidentUuidParam,
+  getOperationsIncidentResponseTiming,
 );
 
 router.get(

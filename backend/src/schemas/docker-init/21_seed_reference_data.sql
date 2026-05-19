@@ -128,8 +128,11 @@ SELECT f.id, t.id, TRUE, FALSE,
        CASE WHEN t.status_code IN ('resolved', 'closed', 'cancelled') THEN TRUE ELSE FALSE END
 FROM incident_statuses f
 INNER JOIN incident_statuses t ON (
-    (f.status_code = 'reported' AND t.status_code IN ('classified', 'cancelled'))
-    OR (f.status_code = 'classified' AND t.status_code IN ('in_progress', 'resolved', 'closed', 'cancelled'))
+    (f.status_code = 'reported' AND t.status_code IN ('classified', 'cancelled', 'agency_assigned', 'unit_assigned', 'dispatched', 'in_progress'))
+    OR (f.status_code = 'classified' AND t.status_code IN ('agency_assigned', 'unit_assigned', 'dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
+    OR (f.status_code = 'agency_assigned' AND t.status_code IN ('unit_assigned', 'dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
+    OR (f.status_code = 'unit_assigned' AND t.status_code IN ('dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
+    OR (f.status_code = 'dispatched' AND t.status_code IN ('in_progress', 'resolved', 'closed', 'cancelled'))
     OR (f.status_code = 'in_progress' AND t.status_code IN ('resolved', 'closed', 'cancelled'))
 );
 

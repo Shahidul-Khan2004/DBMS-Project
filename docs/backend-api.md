@@ -89,6 +89,12 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Operations | PATCH | `/operations/incidents/:incidentPublicUuid/status` | `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/notes` | `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/intake-reports` | `incident.create` or `incident.update_status` |
+| Operations | POST | `/operations/incidents/:incidentPublicUuid/agencies` | `incident.assign_agency` |
+| Operations | GET | `/operations/units/available` | `dispatch.create`; query `incidentPublicUuid` required |
+| Operations | POST | `/operations/incidents/:incidentPublicUuid/dispatches` | `dispatch.create` |
+| Operations | PATCH | `/operations/dispatches/:dispatchPublicUuid/status` | `dispatch.update_status` |
+| Operations | GET | `/operations/agencies/workload` | `dispatch.create` or `incident.assign_agency` |
+| Operations | GET | `/operations/incidents/:incidentPublicUuid/response-timing` | `dispatch.create` or `incident.assign_agency` |
 | Operations | GET | `/operations/service-cases` | Permission `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid` | `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid/messages` | `case.respond`; message thread only |
@@ -675,6 +681,207 @@ Links another intake to an existing incident. **Does not** move the incident’s
 Intake must have a location and must not already be linked (`422` / `409` as applicable).
 
 **Response (201):** `{ "message": "Intake report linked to incident", "link": { … } }` (link row + incident/intake identifiers per repository).
+
+---
+
+## Operations — dispatch workflow
+
+Dispatcher flow: add participating agency → list available units for the incident → create dispatch → advance dispatch status. Status values are **strings** (`status_code`). External identifiers use `public_uuid`.
+
+Incident status may auto-advance on milestones (same transaction): agency add → `agency_assigned`; dispatch create → `unit_assigned`; dispatch `dispatched` → `dispatched`; dispatch `arrived` → `in_progress`. `completed` / `cancelled` do not change incident status.
+
+### Demo seed UUIDs (`24_seed_agencies_units_demo.sql`)
+
+| Entity | `public_uuid` | Notes |
+|--------|---------------|--------|
+| Dhaka Fire Service | `b2000001-0000-4000-8000-000000000001` | Agency |
+| Dhaka Metropolitan Police | `b2000001-0000-4000-8000-000000000002` | Agency |
+| Dhaka Emergency Medical Services | `b2000001-0000-4000-8000-000000000003` | Agency |
+| Fire Engine Alpha | `c3000001-0000-4000-8000-000000000001` | Unit, `available` |
+| Fire Engine Bravo | `c3000001-0000-4000-8000-000000000002` | Unit, `available` |
+| Patrol Unit One | `c3000001-0000-4000-8000-000000000003` | Unit, `available` |
+| Patrol Unit Two | `c3000001-0000-4000-8000-000000000004` | Unit, `busy` |
+| Ambulance One | `c3000001-0000-4000-8000-000000000005` | Unit, `available` |
+| Ambulance Two | `c3000001-0000-4000-8000-000000000006` | Unit, `available` |
+| Medical Response Van | `c3000001-0000-4000-8000-000000000007` | Unit, `busy` |
+| Fire Command Vehicle | `c3000001-0000-4000-8000-000000000008` | Unit, `available` |
+
+### POST `/operations/incidents/:incidentPublicUuid/agencies`
+
+**Permission:** `incident.assign_agency`.
+
+**Body:**
+
+```json
+{
+  "agencyPublicUuid": "b2000001-0000-4000-8000-000000000001",
+  "isLeadAgency": false
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "message": "Agency added to incident",
+  "participation": {
+    "agency_public_uuid": "…",
+    "agency_name": "Dhaka Fire Service",
+    "is_lead_agency": false,
+    "participation_status": "active",
+    "joined_at": "2026-05-19T10:00:00.000Z"
+  }
+}
+```
+
+**Errors:** `404 INCIDENT_NOT_FOUND`, `404 AGENCY_NOT_FOUND`, `409 AGENCY_ALREADY_PARTICIPATING`
+
+### GET `/operations/units/available`
+
+**Permission:** `dispatch.create`.
+
+**Query:** `incidentPublicUuid` (required UUID) — only units whose agency participates on the incident (`participation_status` `requested` or `active`) and `status_code` = `available`.
+
+**Response (200):**
+
+```json
+{
+  "incident_public_uuid": "…",
+  "units": [
+    {
+      "public_uuid": "c3000001-0000-4000-8000-000000000001",
+      "unit_code": "FIRE-01",
+      "unit_name": "Fire Engine Alpha",
+      "status_code": "available",
+      "agency_public_uuid": "b2000001-0000-4000-8000-000000000001",
+      "agency_name": "Dhaka Fire Service",
+      "unit_type_code": "fire_truck"
+    }
+  ]
+}
+```
+
+**Errors:** `404 INCIDENT_NOT_FOUND`, `422 VALIDATION_ERROR` (missing/invalid query)
+
+### POST `/operations/incidents/:incidentPublicUuid/dispatches`
+
+**Permission:** `dispatch.create`.
+
+Creates dispatch in `assigned`, sets unit to `busy`, and may advance incident to `unit_assigned`.
+
+**Body:**
+
+```json
+{
+  "unitPublicUuid": "c3000001-0000-4000-8000-000000000001",
+  "priorityLevel": "medium",
+  "note": "Optional"
+}
+```
+
+`priorityLevel`: `low` \| `medium` \| `high` \| `critical` (default `medium`).
+
+**Response (201):**
+
+```json
+{
+  "message": "Dispatch created",
+  "dispatch": {
+    "public_uuid": "…",
+    "incident_public_uuid": "…",
+    "unit_public_uuid": "…",
+    "status_code": "assigned",
+    "priority_level": "medium",
+    "assigned_at": "2026-05-19T10:05:00.000Z",
+    "dispatched_at": null,
+    "arrived_at": null,
+    "completed_at": null,
+    "cancelled_at": null
+  }
+}
+```
+
+**Errors:** `404 INCIDENT_NOT_FOUND`, `404 UNIT_NOT_FOUND`, `409 UNIT_NOT_AVAILABLE`, `409 AGENCY_NOT_PARTICIPATING`, `409 DISPATCH_ALREADY_EXISTS`
+
+### PATCH `/operations/dispatches/:dispatchPublicUuid/status`
+
+**Permission:** `dispatch.update_status`.
+
+**Body:**
+
+```json
+{
+  "statusCode": "dispatched",
+  "note": "Optional"
+}
+```
+
+`statusCode`: `dispatched` \| `arrived` \| `completed` \| `cancelled`.
+
+**Dispatch transitions:**
+
+- `assigned` → `dispatched`, `cancelled`
+- `dispatched` → `arrived`, `cancelled`
+- `arrived` → `completed`, `cancelled`
+
+On `completed` or `cancelled`, unit returns to `available`.
+
+**Response (200):** `{ "message": "Dispatch status updated", "dispatch": { … } }`
+
+**Errors:** `404 DISPATCH_NOT_FOUND`, `409 INVALID_STATUS_TRANSITION`, `422 INVALID_STATUS_CODE`
+
+### GET `/operations/agencies/workload`
+
+**Permission:** `dispatch.create` or `incident.assign_agency`.
+
+Reads `vw_agency_workload` joined with agency `public_uuid`.
+
+**Response (200):**
+
+```json
+{
+  "agencies": [
+    {
+      "agency_public_uuid": "…",
+      "agency_name": "Dhaka Fire Service",
+      "active_incidents": 0,
+      "total_units": 3,
+      "available_units": 2,
+      "busy_units": 1,
+      "total_dispatches": 0
+    }
+  ]
+}
+```
+
+### GET `/operations/incidents/:incidentPublicUuid/response-timing`
+
+**Permission:** `dispatch.create` or `incident.assign_agency`.
+
+Reads `vw_response_pipeline_timing` for pipeline SLA minutes.
+
+**Response (200):**
+
+```json
+{
+  "timing": {
+    "incident_public_uuid": "…",
+    "incident_code": "EI-…",
+    "first_call_started_at": null,
+    "incident_created_at": "2026-05-19T10:00:00.000Z",
+    "first_agency_joined_at": null,
+    "first_unit_assigned_at": null,
+    "first_unit_dispatched_at": null,
+    "first_unit_arrived_at": null,
+    "call_to_incident_minutes": null,
+    "incident_to_agency_minutes": null,
+    "agency_to_dispatch_minutes": null,
+    "dispatch_to_arrival_minutes": null
+  }
+}
+```
+
+**Errors:** `404 INCIDENT_NOT_FOUND`
 
 ---
 
