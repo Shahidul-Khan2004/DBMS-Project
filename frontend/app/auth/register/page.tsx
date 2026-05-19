@@ -32,7 +32,7 @@ export default function RegisterPage() {
 
   if (registeredUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(0,103,71,0.10),transparent_30%),linear-gradient(135deg,#EEF6FB_0%,#F3FAF7_48%,#EAF3FB_100%)] px-4">
+      <div className="niers-auth-bg flex min-h-[100svh] items-center justify-center px-[var(--page-x)]">
         <div className="w-full max-w-lg rounded-[2rem] border border-[#C9D6E3] bg-[#F7F9FC] p-8 shadow-2xl shadow-[#002D62]/10">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#006747] text-white">
             <CheckCircle2 className="h-7 w-7" aria-hidden />
