@@ -20,6 +20,20 @@ import {
   toBangladeshIsoDatetime,
 } from "@/lib/datetime";
 import {
+  addIncidentAgency,
+  createIncidentDispatch,
+  getAvailableUnits,
+  getIncidentResponseTiming,
+  updateDispatchStatus,
+} from "@/lib/dispatch-api";
+import type {
+  AgencyParticipation,
+  AvailableUnit,
+  Dispatch,
+  DispatchPriorityLevel,
+  ResponseTiming,
+} from "@/types/dispatch";
+import {
   type OperationsIntakeReport,
   type OperationsIntakeReportsResponse,
 } from "@/types/operations-intake";
@@ -72,6 +86,7 @@ interface IncidentResponse {
   incident: IncidentDetail;
   linked_intake_reports: LinkedIntakeReport[];
   timeline_preview: TimelineEvent[];
+  dispatches?: Dispatch[];
 }
 
 interface StatusUpdateResponse {
@@ -105,6 +120,31 @@ const OUTCOME_OPTIONS = [
   "transferred",
   "unresolved",
 ];
+const DEMO_AGENCIES = [
+  {
+    publicUuid: "b2000001-0000-4000-8000-000000000001",
+    name: "Dhaka Fire Service",
+  },
+  {
+    publicUuid: "b2000001-0000-4000-8000-000000000002",
+    name: "Dhaka Metropolitan Police",
+  },
+  {
+    publicUuid: "b2000001-0000-4000-8000-000000000003",
+    name: "Dhaka Emergency Medical Services",
+  },
+];
+const DISPATCH_PRIORITY_OPTIONS: DispatchPriorityLevel[] = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+];
+const DISPATCH_STATUS_TRANSITIONS: Record<string, string[]> = {
+  assigned: ["dispatched", "cancelled"],
+  dispatched: ["arrived", "cancelled"],
+  arrived: ["completed", "cancelled"],
+};
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   reported: ["classified", "cancelled"],
@@ -133,14 +173,28 @@ function getDefaultOutcome(statusCode: string) {
 function formatApiError(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
     const hints: Record<string, string> = {
+      AGENCY_ALREADY_PARTICIPATING:
+        "This agency is already participating in the incident.",
+      AGENCY_NOT_FOUND: "The selected agency could not be found.",
+      AGENCY_NOT_PARTICIPATING:
+        "Add the unit's agency to this incident before dispatching the unit.",
+      DISPATCH_ALREADY_EXISTS:
+        "This unit already has a dispatch for the incident.",
       EMERGENCY_INCIDENT_REQUIRES_LOCATION:
         "Add a reported location to the intake report before linking it.",
+      INCIDENT_NOT_FOUND: "The incident could not be found.",
       INTAKE_ALREADY_LINKED:
         "This intake report is already linked to an emergency incident.",
       INTAKE_NOT_PROMOTABLE:
         "This intake report cannot be linked in its current status.",
       INCIDENT_NOT_LINKABLE:
         "This incident cannot accept new intake links.",
+      INVALID_STATUS_CODE: "Choose a valid dispatch status.",
+      INVALID_STATUS_TRANSITION:
+        "That dispatch status transition is not allowed.",
+      UNIT_NOT_AVAILABLE:
+        "The selected unit is no longer available. Refresh units and try again.",
+      UNIT_NOT_FOUND: "The selected unit could not be found.",
     };
     const hint = error.code ? hints[error.code] : undefined;
     const codePrefix = error.code ? `${error.code}: ` : "";
@@ -186,6 +240,31 @@ function formatRecentReportLocation(report: OperationsIntakeReport) {
   );
 }
 
+function formatMinuteValue(value: number | null | undefined) {
+  if (value === null || value === undefined) return "N/A";
+  return `${value} min`;
+}
+
+function formatMilestoneValue(value: string | null | undefined) {
+  return value ? formatBangladeshTime(value) : "Not yet reached";
+}
+
+function getDispatchTransitions(statusCode: string) {
+  return DISPATCH_STATUS_TRANSITIONS[statusCode] ?? [];
+}
+
+function mergeDispatches(current: Dispatch[], nextDispatch: Dispatch) {
+  const existingIndex = current.findIndex(
+    (dispatch) => dispatch.public_uuid === nextDispatch.public_uuid,
+  );
+
+  if (existingIndex === -1) return [nextDispatch, ...current];
+
+  return current.map((dispatch, index) =>
+    index === existingIndex ? nextDispatch : dispatch,
+  );
+}
+
 export default function IncidentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -225,6 +304,35 @@ export default function IncidentDetailPage() {
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
   const [recentIntakeReports, setRecentIntakeReports] = useState<OperationsIntakeReport[]>([]);
   const [loadingRecentReports, setLoadingRecentReports] = useState(false);
+  const [agencyPublicUuid, setAgencyPublicUuid] = useState(
+    DEMO_AGENCIES[0]?.publicUuid ?? "",
+  );
+  const [isLeadAgency, setIsLeadAgency] = useState(false);
+  const [agencyParticipations, setAgencyParticipations] = useState<AgencyParticipation[]>([]);
+  const [agencyLoading, setAgencyLoading] = useState(false);
+  const [dispatchMessage, setDispatchMessage] = useState<string | null>(null);
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const [availableUnits, setAvailableUnits] = useState<AvailableUnit[]>([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [unitsError, setUnitsError] = useState<string | null>(null);
+  const [selectedUnitUuid, setSelectedUnitUuid] = useState("");
+  const [priorityLevel, setPriorityLevel] =
+    useState<DispatchPriorityLevel>("medium");
+  const [dispatchNote, setDispatchNote] = useState("");
+  const [dispatches, setDispatches] = useState<Dispatch[]>([]);
+  const [isCreatingDispatch, setIsCreatingDispatch] = useState(false);
+  const [dispatchStatusSelections, setDispatchStatusSelections] = useState<
+    Record<string, string>
+  >({});
+  const [dispatchStatusNotes, setDispatchStatusNotes] = useState<
+    Record<string, string>
+  >({});
+  const [updatingDispatchUuid, setUpdatingDispatchUuid] = useState<string | null>(
+    null,
+  );
+  const [responseTiming, setResponseTiming] = useState<ResponseTiming | null>(null);
+  const [responseTimingLoading, setResponseTimingLoading] = useState(false);
+  const [responseTimingError, setResponseTimingError] = useState<string | null>(null);
 
   const redirectToLogin = useCallback(() => {
     sessionStorage.removeItem("loggedInUser");
@@ -249,6 +357,9 @@ export default function IncidentDetailPage() {
       setIncident(data.incident);
       setLinkedReports(data.linked_intake_reports ?? []);
       setTimeline(data.timeline_preview ?? []);
+      if (Array.isArray(data.dispatches)) {
+        setDispatches(data.dispatches);
+      }
     } catch (err) {
       setError(formatApiError(err, "Unexpected error while loading incident."));
       setIncident(null);
@@ -274,9 +385,58 @@ export default function IncidentDetailPage() {
     }
   }, []);
 
+  const loadAvailableUnits = useCallback(async () => {
+    setUnitsLoading(true);
+    setUnitsError(null);
+
+    try {
+      const data = await getAvailableUnits(incidentPublicUuid);
+      setAvailableUnits(data.units ?? []);
+      setSelectedUnitUuid((current) => {
+        if (current && data.units?.some((unit) => unit.public_uuid === current)) {
+          return current;
+        }
+        return data.units?.[0]?.public_uuid ?? "";
+      });
+    } catch (err) {
+      setUnitsError(formatApiError(err, "Could not load available units."));
+      setAvailableUnits([]);
+      setSelectedUnitUuid("");
+    } finally {
+      setUnitsLoading(false);
+    }
+  }, [incidentPublicUuid]);
+
+  const loadResponseTiming = useCallback(async () => {
+    setResponseTimingLoading(true);
+    setResponseTimingError(null);
+
+    try {
+      const data = await getIncidentResponseTiming(incidentPublicUuid);
+      setResponseTiming(data.timing ?? null);
+    } catch (err) {
+      setResponseTimingError(
+        formatApiError(err, "Could not load response timing."),
+      );
+      setResponseTiming(null);
+    } finally {
+      setResponseTimingLoading(false);
+    }
+  }, [incidentPublicUuid]);
+
   const refreshIncidentPage = useCallback(async () => {
-    await Promise.all([loadIncident(), loadRecentIntakeReports()]);
-  }, [loadIncident, loadRecentIntakeReports]);
+    await Promise.all([
+      loadIncident(),
+      loadRecentIntakeReports(),
+      loadAvailableUnits(),
+      loadResponseTiming(),
+    ]);
+  }, [
+    loadAvailableUnits,
+    loadIncident,
+    loadRecentIntakeReports,
+    loadResponseTiming,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,6 +473,17 @@ export default function IncidentDetailPage() {
   }, [isLoadingSession, loadRecentIntakeReports]);
 
   useEffect(() => {
+    if (isLoadingSession || !incidentPublicUuid) return;
+    void loadAvailableUnits();
+    void loadResponseTiming();
+  }, [
+    incidentPublicUuid,
+    isLoadingSession,
+    loadAvailableUnits,
+    loadResponseTiming,
+  ]);
+
+  useEffect(() => {
     if (!incident) return;
 
     const allowed = getAllowedTransitions(incident.status_code);
@@ -333,6 +504,7 @@ export default function IncidentDetailPage() {
   const currentStatusIsTerminal = incident
     ? isTerminalStatus(incident.status_code)
     : false;
+  const canManageDispatchActions = Boolean(incident) && !currentStatusIsTerminal;
   const canUpdateStatus =
     Boolean(incident) && !currentStatusIsTerminal && allowedTransitions.length > 0;
   const shouldSendOutcome = isTerminalStatus(statusCode);
@@ -446,6 +618,122 @@ export default function IncidentDetailPage() {
     setLinkError(null);
     setLinkSuccess(null);
     setLinkModalOpen(true);
+  };
+
+  const handleAgencySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!agencyPublicUuid) return;
+    if (currentStatusIsTerminal) {
+      setDispatchError(
+        "This incident is final. Agency and dispatch actions are disabled.",
+      );
+      return;
+    }
+
+    setAgencyLoading(true);
+    setDispatchError(null);
+    setDispatchMessage(null);
+
+    try {
+      const data = await addIncidentAgency(incidentPublicUuid, {
+        agencyPublicUuid,
+        isLeadAgency,
+      });
+      setAgencyParticipations((current) => [
+        data.participation,
+        ...current.filter(
+          (item) => item.agency_public_uuid !== data.participation.agency_public_uuid,
+        ),
+      ]);
+      setDispatchMessage(data.message ?? "Agency added to incident.");
+      setIsLeadAgency(false);
+      await Promise.all([loadIncident(), loadAvailableUnits(), loadResponseTiming()]);
+    } catch (err) {
+      setDispatchError(formatApiError(err, "Could not add agency to incident."));
+    } finally {
+      setAgencyLoading(false);
+    }
+  };
+
+  const handleCreateDispatch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (currentStatusIsTerminal) {
+      setDispatchError(
+        "This incident is final. Agency and dispatch actions are disabled.",
+      );
+      return;
+    }
+    if (!selectedUnitUuid) {
+      setDispatchError("Select an available unit to create a dispatch.");
+      return;
+    }
+
+    setIsCreatingDispatch(true);
+    setDispatchError(null);
+    setDispatchMessage(null);
+
+    try {
+      const data = await createIncidentDispatch(incidentPublicUuid, {
+        unitPublicUuid: selectedUnitUuid,
+        priorityLevel,
+        note: dispatchNote.trim() || undefined,
+      });
+      setDispatches((current) => mergeDispatches(current, data.dispatch));
+      setDispatchStatusSelections((current) => ({
+        ...current,
+        [data.dispatch.public_uuid]:
+          getDispatchTransitions(data.dispatch.status_code)[0] ?? "",
+      }));
+      setDispatchNote("");
+      setDispatchMessage(data.message ?? "Dispatch created.");
+      await Promise.all([loadIncident(), loadAvailableUnits(), loadResponseTiming()]);
+    } catch (err) {
+      setDispatchError(formatApiError(err, "Could not create dispatch."));
+    } finally {
+      setIsCreatingDispatch(false);
+    }
+  };
+
+  const handleDispatchStatusUpdate = async (dispatch: Dispatch) => {
+    if (currentStatusIsTerminal) {
+      setDispatchError(
+        "This incident is final. Agency and dispatch actions are disabled.",
+      );
+      return;
+    }
+    const nextStatus =
+      dispatchStatusSelections[dispatch.public_uuid] ??
+      getDispatchTransitions(dispatch.status_code)[0] ??
+      "";
+
+    if (!nextStatus) return;
+
+    setUpdatingDispatchUuid(dispatch.public_uuid);
+    setDispatchError(null);
+    setDispatchMessage(null);
+
+    try {
+      const data = await updateDispatchStatus(dispatch.public_uuid, {
+        statusCode: nextStatus,
+        note: dispatchStatusNotes[dispatch.public_uuid]?.trim() || undefined,
+      });
+      setDispatches((current) => mergeDispatches(current, data.dispatch));
+      setDispatchStatusNotes((current) => ({
+        ...current,
+        [dispatch.public_uuid]: "",
+      }));
+      setDispatchStatusSelections((current) => ({
+        ...current,
+        [dispatch.public_uuid]:
+          getDispatchTransitions(data.dispatch.status_code)[0] ?? "",
+      }));
+      setDispatchMessage(data.message ?? "Dispatch status updated.");
+      await Promise.all([loadIncident(), loadAvailableUnits(), loadResponseTiming()]);
+    } catch (err) {
+      setDispatchError(formatApiError(err, "Could not update dispatch status."));
+    } finally {
+      setUpdatingDispatchUuid(null);
+    }
   };
 
   const closeLinkModal = () => {
@@ -747,6 +1035,414 @@ export default function IncidentDetailPage() {
                         value={formatBangladeshTime(incident.updated_at)}
                       />
                     </dl>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-md">
+                  <CardHeader>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold text-[#002D62]">
+                          Dispatch & Response
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Assign agencies, dispatch available units, and monitor response timing.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          void Promise.all([
+                            loadAvailableUnits(),
+                            loadResponseTiming(),
+                            loadIncident(),
+                          ])
+                        }
+                        disabled={unitsLoading || responseTimingLoading || loading}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-8">
+                    {dispatchError ? (
+                      <div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+                        {dispatchError}
+                      </div>
+                    ) : null}
+                    {dispatchMessage ? (
+                      <div className="rounded-2xl bg-green-50 p-3 text-sm text-green-700">
+                        {dispatchMessage}
+                      </div>
+                    ) : null}
+                    {currentStatusIsTerminal ? (
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                        This incident is final. Agency assignment and dispatch actions are disabled.
+                      </div>
+                    ) : null}
+
+                    <section>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Agency Assignment
+                      </h3>
+                      <form
+                        onSubmit={handleAgencySubmit}
+                        className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]"
+                      >
+                        <div>
+                          <label className={labelClassName}>Participating Agency</label>
+                          <select
+                            value={agencyPublicUuid}
+                            onChange={(event) => setAgencyPublicUuid(event.target.value)}
+                            className={fieldClassName}
+                            disabled={agencyLoading || currentStatusIsTerminal}
+                          >
+                            {DEMO_AGENCIES.map((agency) => (
+                              <option key={agency.publicUuid} value={agency.publicUuid}>
+                                {agency.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <label className="flex min-h-[42px] items-center gap-2 rounded-2xl border border-[#002D62]/20 px-3 py-2 text-sm font-medium text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={isLeadAgency}
+                              onChange={(event) => setIsLeadAgency(event.target.checked)}
+                              disabled={agencyLoading || currentStatusIsTerminal}
+                              className="h-4 w-4 rounded border-gray-300 text-[#006747] focus:ring-[#006747]"
+                            />
+                            Lead agency
+                          </label>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Button
+                            type="submit"
+                            isLoading={agencyLoading}
+                            disabled={
+                              agencyLoading || !agencyPublicUuid || currentStatusIsTerminal
+                            }
+                          >
+                            Add Agency
+                          </Button>
+                        </div>
+                      </form>
+
+                      {agencyParticipations.length > 0 ? (
+                        <ul className="mt-4 space-y-2">
+                          {agencyParticipations.map((participation) => (
+                            <li
+                              key={participation.agency_public_uuid}
+                              className="rounded-lg border border-[#002D62]/10 p-3 text-sm text-gray-700"
+                            >
+                              <span className="font-semibold text-gray-900">
+                                {participation.agency_name}
+                              </span>{" "}
+                              joined {formatBangladeshTime(participation.joined_at)}
+                              {participation.is_lead_agency ? " as lead agency" : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+
+                    <section className="border-t border-[#002D62]/10 pt-6">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Available Units
+                      </h3>
+                      {unitsLoading ? (
+                        <div className="mt-4">
+                          <LoadingSkeleton lines={3} />
+                        </div>
+                      ) : unitsError ? (
+                        <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+                          {unitsError}
+                        </div>
+                      ) : availableUnits.length === 0 ? (
+                        <p className="mt-4 text-sm text-gray-600">
+                          No available units. Add an agency first or wait for units to become available.
+                        </p>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-100 text-sm">
+                            <thead>
+                              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                <th className="py-2 pr-4">Unit</th>
+                                <th className="py-2 pr-4">Type</th>
+                                <th className="py-2 pr-4">Agency</th>
+                                <th className="py-2 pr-4">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {availableUnits.map((unit) => (
+                                <tr key={unit.public_uuid}>
+                                  <td className="py-3 pr-4">
+                                    <p className="font-medium text-gray-900">
+                                      {unit.unit_name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {unit.unit_code}
+                                    </p>
+                                  </td>
+                                  <td className="py-3 pr-4 text-gray-700">
+                                    {formatBadgeLabel(unit.unit_type_code)}
+                                  </td>
+                                  <td className="py-3 pr-4 text-gray-700">
+                                    {unit.agency_name}
+                                  </td>
+                                  <td className="py-3 pr-4">
+                                    <Badge tone={unit.status_code}>
+                                      {formatBadgeLabel(unit.status_code)}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="border-t border-[#002D62]/10 pt-6">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Create Dispatch
+                      </h3>
+                      <form onSubmit={handleCreateDispatch} className="mt-4 space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className={labelClassName}>Unit</label>
+                            <select
+                              value={selectedUnitUuid}
+                              onChange={(event) => setSelectedUnitUuid(event.target.value)}
+                              className={fieldClassName}
+                              disabled={
+                                isCreatingDispatch ||
+                                availableUnits.length === 0 ||
+                                currentStatusIsTerminal
+                              }
+                              required
+                            >
+                              {availableUnits.length === 0 ? (
+                                <option value="">No available units</option>
+                              ) : (
+                                availableUnits.map((unit) => (
+                                  <option key={unit.public_uuid} value={unit.public_uuid}>
+                                    {unit.unit_name} ({unit.unit_code})
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClassName}>Priority</label>
+                            <select
+                              value={priorityLevel}
+                              onChange={(event) =>
+                                setPriorityLevel(event.target.value as DispatchPriorityLevel)
+                              }
+                              className={fieldClassName}
+                              disabled={isCreatingDispatch || currentStatusIsTerminal}
+                            >
+                              {DISPATCH_PRIORITY_OPTIONS.map((priority) => (
+                                <option key={priority} value={priority}>
+                                  {formatBadgeLabel(priority)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className={labelClassName}>Note</label>
+                          <textarea
+                            value={dispatchNote}
+                            onChange={(event) => setDispatchNote(event.target.value)}
+                            className={fieldClassName}
+                            rows={3}
+                            placeholder="Optional dispatch note"
+                            disabled={
+                              isCreatingDispatch || currentStatusIsTerminal
+                            }
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          isLoading={isCreatingDispatch}
+                          disabled={
+                            isCreatingDispatch ||
+                            availableUnits.length === 0 ||
+                            !selectedUnitUuid ||
+                            currentStatusIsTerminal
+                          }
+                        >
+                          Create Dispatch
+                        </Button>
+                      </form>
+                    </section>
+
+                    <section className="border-t border-[#002D62]/10 pt-6">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Dispatch Status Controls
+                      </h3>
+                      {dispatches.length === 0 ? (
+                        <p className="mt-4 text-sm text-gray-600">
+                          No dispatches are available from this page session. Existing dispatches can only be listed after refresh if the incident detail endpoint returns them.
+                        </p>
+                      ) : (
+                        <ul className="mt-4 space-y-4">
+                          {dispatches.map((dispatch) => {
+                            const transitions = getDispatchTransitions(dispatch.status_code);
+                            const selectedStatus =
+                              dispatchStatusSelections[dispatch.public_uuid] ??
+                              transitions[0] ??
+                              "";
+
+                            return (
+                              <li
+                                key={dispatch.public_uuid}
+                                className="rounded-lg border border-[#002D62]/10 p-4"
+                              >
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge tone={dispatch.status_code}>
+                                        {formatBadgeLabel(dispatch.status_code)}
+                                      </Badge>
+                                      <Badge tone={dispatch.priority_level}>
+                                        {formatBadgeLabel(dispatch.priority_level)}
+                                      </Badge>
+                                    </div>
+                                    <p className="mt-2 break-all text-sm font-medium text-gray-900">
+                                      Dispatch {dispatch.public_uuid}
+                                    </p>
+                                    <p className="mt-1 break-all text-xs text-gray-500">
+                                      Unit {dispatch.unit_public_uuid}
+                                    </p>
+                                  </div>
+                                  <div className="text-xs text-gray-500 md:text-right">
+                                    <p>Assigned {formatMilestoneValue(dispatch.assigned_at)}</p>
+                                    <p>Dispatched {formatMilestoneValue(dispatch.dispatched_at)}</p>
+                                    <p>Arrived {formatMilestoneValue(dispatch.arrived_at)}</p>
+                                  </div>
+                                </div>
+
+                                {transitions.length === 0 ? (
+                                  <p className="mt-4 text-sm text-gray-600">
+                                    This dispatch is terminal.
+                                  </p>
+                                ) : (
+                                  <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto]">
+                                    <select
+                                      value={selectedStatus}
+                                      onChange={(event) =>
+                                        setDispatchStatusSelections((current) => ({
+                                          ...current,
+                                          [dispatch.public_uuid]: event.target.value,
+                                        }))
+                                      }
+                                      className={fieldClassName}
+                                      disabled={
+                                        updatingDispatchUuid === dispatch.public_uuid ||
+                                        currentStatusIsTerminal
+                                      }
+                                    >
+                                      {transitions.map((status) => (
+                                        <option key={status} value={status}>
+                                          {formatBadgeLabel(status)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      value={dispatchStatusNotes[dispatch.public_uuid] ?? ""}
+                                      onChange={(event) =>
+                                        setDispatchStatusNotes((current) => ({
+                                          ...current,
+                                          [dispatch.public_uuid]: event.target.value,
+                                        }))
+                                      }
+                                      className={fieldClassName}
+                                      placeholder="Optional status note"
+                                      disabled={
+                                        updatingDispatchUuid === dispatch.public_uuid ||
+                                        currentStatusIsTerminal
+                                      }
+                                    />
+                                    <Button
+                                      type="button"
+                                      isLoading={updatingDispatchUuid === dispatch.public_uuid}
+                                      disabled={
+                                        updatingDispatchUuid === dispatch.public_uuid ||
+                                        !selectedStatus ||
+                                        currentStatusIsTerminal
+                                      }
+                                      onClick={() => void handleDispatchStatusUpdate(dispatch)}
+                                    >
+                                      Update
+                                    </Button>
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+
+                    <section className="border-t border-[#002D62]/10 pt-6">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Response Timing
+                      </h3>
+                      {responseTimingLoading ? (
+                        <div className="mt-4">
+                          <LoadingSkeleton lines={3} />
+                        </div>
+                      ) : responseTimingError ? (
+                        <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+                          {responseTimingError}
+                        </div>
+                      ) : !responseTiming ? (
+                        <p className="mt-4 text-sm text-gray-600">
+                          Response timing is not available for this incident yet.
+                        </p>
+                      ) : (
+                        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <DetailItem
+                            label="Call to Incident"
+                            value={formatMinuteValue(responseTiming.call_to_incident_minutes)}
+                          />
+                          <DetailItem
+                            label="Incident to Agency"
+                            value={formatMinuteValue(responseTiming.incident_to_agency_minutes)}
+                          />
+                          <DetailItem
+                            label="Agency to Dispatch"
+                            value={formatMinuteValue(responseTiming.agency_to_dispatch_minutes)}
+                          />
+                          <DetailItem
+                            label="Dispatch to Arrival"
+                            value={formatMinuteValue(responseTiming.dispatch_to_arrival_minutes)}
+                          />
+                          <DetailItem
+                            label="First Agency Joined"
+                            value={formatMilestoneValue(responseTiming.first_agency_joined_at)}
+                          />
+                          <DetailItem
+                            label="First Unit Assigned"
+                            value={formatMilestoneValue(responseTiming.first_unit_assigned_at)}
+                          />
+                          <DetailItem
+                            label="First Unit Dispatched"
+                            value={formatMilestoneValue(responseTiming.first_unit_dispatched_at)}
+                          />
+                          <DetailItem
+                            label="First Unit Arrived"
+                            value={formatMilestoneValue(responseTiming.first_unit_arrived_at)}
+                          />
+                        </dl>
+                      )}
+                    </section>
                   </CardContent>
                 </Card>
 

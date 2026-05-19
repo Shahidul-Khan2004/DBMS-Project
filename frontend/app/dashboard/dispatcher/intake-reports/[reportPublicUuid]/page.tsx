@@ -19,6 +19,13 @@ import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { ApiError, apiJson, apiPost, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import {
+  canClassifyServiceCase,
+  canEscalateServiceCase,
+  canPromoteEmergency,
+  getEmergencyAction,
+  getEscalateServiceCaseHref,
+} from "@/lib/dispatcher-intake-actions";
 import type {
   LocationPickerSelectionDetails,
   LocationPickerValue,
@@ -80,17 +87,6 @@ function formatLocation(
     location.place_name ||
     "Map location selected"
   );
-}
-
-function getEmergencyAction(report: OperationsIntakeReport) {
-  const isEmergencyCall = report.channel_code === "emergency_call";
-
-  return {
-    href: isEmergencyCall
-      ? `/dashboard/dispatcher/intake-reports/${report.public_uuid}/classify/emergency`
-      : `/dashboard/dispatcher/intake-reports/${report.public_uuid}/promote/emergency`,
-    label: isEmergencyCall ? "Classify Emergency Call" : "Promote to Emergency",
-  };
 }
 
 function formatApiError(error: unknown, fallback: string) {
@@ -347,9 +343,9 @@ export default function IntakeReportDetailPage() {
             Back to Reports
           </Button>
 
-          {report && !report.has_incident ? (
+          {report ? (
             <div className="flex flex-wrap gap-3">
-              {!report.has_service_case ? (
+              {canClassifyServiceCase(report) ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -364,13 +360,27 @@ export default function IntakeReportDetailPage() {
                 </Button>
               ) : null}
 
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => router.push(getEmergencyAction(report).href)}
-              >
-                {getEmergencyAction(report).label}
-              </Button>
+              {canPromoteEmergency(report) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => router.push(getEmergencyAction(report).href)}
+                >
+                  {getEmergencyAction(report).label}
+                </Button>
+              ) : null}
+
+              {canEscalateServiceCase(report) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() =>
+                    router.push(getEscalateServiceCaseHref(report.public_uuid))
+                  }
+                >
+                  Escalate to Emergency
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </div>

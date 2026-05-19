@@ -23,18 +23,40 @@ export interface CitizenServiceCase {
   updated_at?: string;
   location?: ServiceCaseLocation | null;
   location_text?: string | null;
+  linked_incident_public_uuid?: string | null;
 }
 
 export interface CitizenServiceCaseListResponse {
   service_cases: CitizenServiceCase[];
 }
 
+export type ServiceCaseMessageType =
+  | "user_message"
+  | "admin_reply"
+  | "system_note"
+  | string;
+
 export interface ServiceCaseMessageResult {
-  id: number;
-  message_type: string;
-  message_body: string;
-  created_at: string;
+  id: string;
+  message_type: ServiceCaseMessageType;
+  subject: string;
+  body: string | null;
+  message_body?: string | null;
+  created_at: string | null;
+  sender?: {
+    public_uuid: string;
+    full_name: string;
+  } | null;
+  is_internal?: boolean;
 }
+
+export interface ServiceCaseMessagesResponse {
+  public_uuid: string;
+  case_code: string;
+  messages: ServiceCaseMessageResult[];
+}
+
+export type CitizenServiceCaseMessagesResponse = ServiceCaseMessagesResponse;
 
 export interface ServiceCaseMessageResponse {
   message?: string;
@@ -60,8 +82,8 @@ export interface ServiceCaseStatusHistoryItem {
   changed_at: string;
   changed_by?: {
     public_uuid: string;
-    full_name: string;
-    actor_kind: string;
+    full_name: string | null;
+    actor_kind?: string | null;
   } | null;
 }
 

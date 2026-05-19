@@ -411,7 +411,7 @@ export function LocationPicker({
         );
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
   };
 

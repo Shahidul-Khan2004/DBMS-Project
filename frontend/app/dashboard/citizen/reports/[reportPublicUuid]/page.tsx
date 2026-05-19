@@ -17,8 +17,12 @@ import type {
 } from "@/components/location/LocationPicker";
 import { apiJson } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { getMyIncidents } from "@/lib/citizen-incidents-api";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { formatIncidentStatus } from "@/lib/incident-status";
+import { formatReportStatus, getReportStatusTone } from "@/lib/report-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
+import type { CitizenIncident } from "@/types/citizen-incident";
 import type {
   IntakeLocation,
   IntakeLocationHistoryItem,
@@ -129,9 +133,13 @@ export default function CitizenReportDetailPage() {
   const reportPublicUuid = params.reportPublicUuid as string;
   const isChecking = useAuthGuard(["citizen"]);
   const [report, setReport] = useState<IntakeReport | null>(null);
+  const [linkedIncident, setLinkedIncident] = useState<CitizenIncident | null>(
+    null,
+  );
   const [history, setHistory] = useState<IntakeLocationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [incidentError, setIncidentError] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
   const [locationError, setLocationError] = useState("");
   const [savingLocation, setSavingLocation] = useState(false);
@@ -145,19 +153,48 @@ export default function CitizenReportDetailPage() {
   const loadReport = useCallback(async () => {
     setLoading(true);
     setError("");
+    setIncidentError("");
     try {
-      const [detailData, historyData] = await Promise.all([
+      const [detailResult, historyResult, incidentsResult] =
+        await Promise.allSettled([
         apiJson<IntakeReportDetailResponse>(
           `/intake/reports/${reportPublicUuid}`,
         ),
         apiJson<IntakeLocationHistoryResponse>(
           `/intake/reports/${reportPublicUuid}/reported-location-history`,
         ),
+        getMyIncidents(),
       ]);
 
-      const nextReport = detailData.report;
+      if (detailResult.status === "rejected") {
+        throw detailResult.reason;
+      }
+
+      const nextReport = detailResult.value.report;
       setReport(nextReport);
-      setHistory(historyData.history ?? []);
+      setHistory(
+        historyResult.status === "fulfilled"
+          ? historyResult.value.history ?? []
+          : [],
+      );
+
+      if (incidentsResult.status === "fulfilled") {
+        setLinkedIncident(
+          incidentsResult.value.incidents?.find(
+            (incident) => incident.intake_public_uuid === nextReport.public_uuid,
+          ) ?? null,
+        );
+      } else {
+        setLinkedIncident(null);
+        if (nextReport.intake_status === "linked_to_incident") {
+          setIncidentError(
+            incidentsResult.reason instanceof Error
+              ? incidentsResult.reason.message
+              : "Could not load linked emergency incident details.",
+          );
+        }
+      }
+
       setLocationForm({
         latitude: nextReport.location?.latitude?.toString() ?? "",
         longitude: nextReport.location?.longitude?.toString() ?? "",
@@ -285,7 +322,6 @@ export default function CitizenReportDetailPage() {
         </Button>
 
         {error && <ErrorAlert message={error} />}
-
         <Card className="shadow-md">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -320,8 +356,8 @@ export default function CitizenReportDetailPage() {
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge tone={report.intake_status}>
-                      {formatBadgeLabel(report.intake_status)}
+                    <Badge tone={getReportStatusTone(report.intake_status)}>
+                      {formatReportStatus(report.intake_status)}
                     </Badge>
                     <Badge tone={report.urgency_type}>
                       {formatBadgeLabel(report.urgency_type)}
@@ -333,8 +369,61 @@ export default function CitizenReportDetailPage() {
                   {report.description || "No description provided."}
                 </p>
 
+                {report.intake_status === "linked_to_incident" ? (
+                  <div className="rounded-2xl border border-[#DA291C]/15 bg-red-50 p-4 text-sm text-red-900">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="font-semibold">
+                          This report has been linked to an emergency incident.
+                        </h3>
+                        {linkedIncident ? (
+                          <p className="mt-1">
+                            {linkedIncident.incident_code} is currently{" "}
+                            {formatIncidentStatus(linkedIncident.status_code)}.
+                          </p>
+                        ) : (
+                          <p className="mt-1">
+                            Incident details will appear when the linked incident is available to your account.
+                          </p>
+                        )}
+                      </div>
+                      {linkedIncident ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Badge tone={linkedIncident.status_code}>
+                            {formatIncidentStatus(linkedIncident.status_code)}
+                          </Badge>
+                          <Badge tone={linkedIncident.severity_code}>
+                            {formatBadgeLabel(linkedIncident.severity_code)}
+                          </Badge>
+                        </div>
+                      ) : null}
+                    </div>
+                    {incidentError ? (
+                      <p className="mt-3 text-xs text-red-800">
+                        {incidentError}
+                      </p>
+                    ) : null}
+                    <div className="mt-4">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          router.push(
+                            linkedIncident
+                              ? `/dashboard/citizen/incidents#${linkedIncident.public_uuid}`
+                              : "/dashboard/citizen/incidents",
+                          )
+                        }
+                      >
+                        View Incident
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <dl className="grid gap-4 sm:grid-cols-2">
-                  <DetailRow label="Status" value={formatBadgeLabel(report.intake_status)} />
+                  <DetailRow label="Status" value={formatReportStatus(report.intake_status)} />
                   <DetailRow label="Urgency" value={formatBadgeLabel(report.urgency_type)} />
                   <DetailRow
                     label="Category"
@@ -368,17 +457,17 @@ export default function CitizenReportDetailPage() {
                   </a>
                 )}
 
-                {report.incident_code && (
+                {linkedIncident && report.intake_status !== "linked_to_incident" ? (
                   <div className="rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">
                     <h3 className="text-sm font-semibold text-gray-900">
                       Linked Incident
                     </h3>
                     <p className="mt-1 text-sm text-gray-700">
-                      {report.incident_code} -{" "}
-                      {formatBadgeLabel(report.incident_status_code)}
+                      {linkedIncident.incident_code} -{" "}
+                      {formatIncidentStatus(linkedIncident.status_code)}
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </CardContent>
