@@ -706,6 +706,100 @@ function mapIncidentListRow(row) {
   };
 }
 
+function mapLocationRow(row) {
+  if (row?.location_public_uuid == null) return null;
+  return {
+    public_uuid: row.location_public_uuid,
+    latitude: Number(row.location_latitude),
+    longitude: Number(row.location_longitude),
+    address_text: row.location_address_text,
+    place_name: row.location_place_name ?? null,
+    admin_area_id:
+      row.location_admin_area_id != null ? Number(row.location_admin_area_id) : null,
+    source: row.location_source ?? null,
+  };
+}
+
+function mapMyIncidentRow(row) {
+  return {
+    public_uuid: row.public_uuid,
+    incident_code: row.incident_code,
+    title: row.title,
+    description: row.description,
+    origin_type: row.origin_type,
+    status_code: row.status_code,
+    category_code: row.category_code,
+    severity_code: row.severity_code,
+    intake_public_uuid: row.intake_public_uuid,
+    intake_report_code: row.intake_report_code,
+    reported_at: row.reported_at,
+    resolved_at: row.resolved_at,
+    closed_at: row.closed_at,
+    created_at: row.created_at,
+    last_updated: row.updated_at,
+    location: mapLocationRow(row),
+    location_text: row.location_address_text ?? null,
+  };
+}
+
+/**
+ * Lists emergency incidents linked to intake reports owned by the reporter.
+ * Prefers primary_report link when multiple reports from the same reporter exist.
+ */
+export async function listMyIncidentsByReporterUserId(reporterUserId) {
+  const { rows } = await query(
+    `
+      SELECT
+        ei.public_uuid AS public_uuid,
+        ei.incident_code AS incident_code,
+        ei.title AS title,
+        ei.description AS description,
+        ei.origin_type AS origin_type,
+        ei.reported_at AS reported_at,
+        ei.resolved_at AS resolved_at,
+        ei.closed_at AS closed_at,
+        ei.created_at AS created_at,
+        ei.updated_at AS updated_at,
+        ist.status_code AS status_code,
+        rcat.category_code AS category_code,
+        sev.severity_code AS severity_code,
+        preferred.intake_public_uuid AS intake_public_uuid,
+        preferred.intake_report_code AS intake_report_code,
+        l.public_uuid AS location_public_uuid,
+        l.latitude AS location_latitude,
+        l.longitude AS location_longitude,
+        l.address_text AS location_address_text,
+        l.place_name AS location_place_name,
+        l.admin_area_id AS location_admin_area_id,
+        l.source AS location_source
+      FROM emergency_incidents ei
+      INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+      INNER JOIN report_categories rcat ON rcat.id = ei.category_id
+      INNER JOIN incident_severity_levels sev ON sev.id = ei.severity_level_id
+      INNER JOIN (
+        SELECT
+          irl.incident_id,
+          ir.public_uuid AS intake_public_uuid,
+          ir.report_code AS intake_report_code,
+          ir.reported_location_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY irl.incident_id
+            ORDER BY (irl.link_type = 'primary_report') DESC, irl.linked_at ASC
+          ) AS rn
+        FROM incident_report_links irl
+        INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+        WHERE ir.reporter_user_id = ?
+      ) preferred ON preferred.incident_id = ei.id AND preferred.rn = 1
+      LEFT JOIN locations l
+        ON l.id = COALESCE(ei.current_location_id, preferred.reported_location_id)
+      ORDER BY ei.updated_at DESC
+    `,
+    [reporterUserId],
+  );
+
+  return rows.map(mapMyIncidentRow);
+}
+
 const ACTIVE_INCIDENT_BASE = `
   FROM emergency_incidents ei
   INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id

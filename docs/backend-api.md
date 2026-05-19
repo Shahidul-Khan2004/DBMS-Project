@@ -74,6 +74,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/service-case` | Roles `dispatcher` / `system_admin` |
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/emergency` | Same roles |
 | Intake | GET | `/intake/reports/my/service-cases` | Reporter: list linked service cases |
+| Intake | GET | `/intake/reports/my/incidents` | Reporter: list linked emergency incidents |
 | Intake | GET | `/intake/service-cases/:publicUuid/messages` | Reporter JWT only; non-internal messages |
 | Intake | POST | `/intake/service-cases/:publicUuid/messages` | Reporter JWT only (`service_cases.reporter_user_id`) |
 | Intake | POST | `/intake/reports/:reportPublicUuid/escalate` | Roles `dispatcher` / `system_admin`; permissions `case.escalate` + `incident.create` |
@@ -929,6 +930,54 @@ Lists **service cases** where the authenticated user is the reporter (`service_c
 ```
 
 `location` is taken from `COALESCE(service_cases.current_location_id, intake_reports.reported_location_id)` when present.
+
+---
+
+## Intake — citizen incidents
+
+### GET `/intake/reports/my/incidents`
+
+Lists **emergency incidents** linked to intake reports where the authenticated user is the reporter (`intake_reports.reporter_user_id` via `incident_report_links`). Newest by `updated_at` first.
+
+When multiple intake reports from the same reporter link to one incident, the list uses the `primary_report` link when present; otherwise the earliest `linked_at`.
+
+**Response (200):**
+
+```json
+{
+  "incidents": [
+    {
+      "public_uuid": "…",
+      "incident_code": "EMI-…",
+      "title": "…",
+      "description": null,
+      "status_code": "active",
+      "category_code": "medical",
+      "severity_code": "high",
+      "origin_type": "emergency_call",
+      "intake_public_uuid": "…",
+      "intake_report_code": "IR-…",
+      "reported_at": "2026-05-06T10:00:00.000Z",
+      "created_at": "2026-05-06T10:00:00.000Z",
+      "last_updated": "2026-05-06T12:00:00.000Z",
+      "resolved_at": null,
+      "closed_at": null,
+      "location": {
+        "public_uuid": "…",
+        "latitude": 23.81,
+        "longitude": 90.41,
+        "address_text": "…",
+        "place_name": null,
+        "admin_area_id": 1,
+        "source": "user_shared"
+      },
+      "location_text": "…"
+    }
+  ]
+}
+```
+
+`location` is taken from `COALESCE(emergency_incidents.current_location_id, intake_reports.reported_location_id)` when present.
 
 ### GET `/intake/service-cases/:publicUuid/messages`
 

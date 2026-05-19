@@ -21,6 +21,7 @@ import {
   postIntakeReportEscalateToEmergency,
   postIntakeServiceCaseMessage,
 } from "../controllers/intakeServiceCases.js";
+import { getMyIncidents } from "../controllers/intakeIncidents.js";
 import {
   validateIntakeEscalateServiceCaseBody,
   validateIntakePostServiceCaseMessage,
@@ -43,6 +44,7 @@ router.use(requireAuth);
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
 router.get("/reports/my/service-cases", getMyServiceCases);
+router.get("/reports/my/incidents", getMyIncidents);
 router.get(
   "/service-cases/:publicUuid/messages",
   validateIntakeServiceCasePublicUuidParam,

@@ -8,8 +8,10 @@ import {
   createIncidentAdminStandalone,
   getIncidentDetailForOperations,
   listIncidentsForOperations,
+  listMyIncidentsByReporterUserId,
   getIncidentReporterUserIds,
 } from "../repositories/incidentOperationsRepo.js";
+import { findUserByPublicUuid } from "../repositories/userRepo.js";
 import {
   findIntakeReportDetailForOperations,
   listIntakeReportsForOperations,
@@ -146,6 +148,15 @@ export async function operationsPromoteIntakeEmergency(
 
 export async function operationsListIncidents(filters) {
   return listIncidentsForOperations(filters);
+}
+
+export async function listMyIncidents(actorPublicUuid) {
+  const userRow = await findUserByPublicUuid(actorPublicUuid);
+  if (!userRow) {
+    throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
+  }
+  const incidents = await listMyIncidentsByReporterUserId(userRow.id);
+  return { incidents };
 }
 
 export async function operationsGetIncident(publicUuid) {
