@@ -51,6 +51,7 @@ CREATE TABLE agency_contacts (
 
 CREATE TABLE agency_memberships (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    public_uuid CHAR(36) NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL,
     agency_id BIGINT UNSIGNED NOT NULL,
     membership_role ENUM('representative','coordinator','operator','viewer') NOT NULL,
@@ -59,6 +60,7 @@ CREATE TABLE agency_memberships (
     left_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    UNIQUE KEY uq_agency_memberships_public_uuid (public_uuid),
     UNIQUE KEY uq_agency_memberships_user_agency (user_id, agency_id),
     KEY idx_agency_memberships_agency (agency_id),
     KEY idx_agency_memberships_role (membership_role),
