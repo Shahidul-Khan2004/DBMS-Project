@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
@@ -11,6 +11,11 @@ import { EmptyState, PageHeader, PageLoading } from "@/components/ui/StatusState
 import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { sortNewestFirst } from "@/lib/sort";
+import {
+  getServiceCaseStatusLabel,
+  isServiceCaseOpen,
+} from "@/lib/service-case-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type {
   OperationsServiceCase,
@@ -19,6 +24,7 @@ import type {
 
 const fieldClassName =
   "h-10.5 rounded-2xl border border-[#002D62]/20 bg-white px-3 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35";
+const OPEN_STATUS_FILTER = "__open__";
 
 export default function DispatcherServiceCasesPage() {
   const router = useRouter();
@@ -27,7 +33,11 @@ export default function DispatcherServiceCasesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ limit: 50, offset: 0, total: 0 });
-  const [filters, setFilters] = useState({ status: "", categoryCode: "", limit: 50 });
+  const [filters, setFilters] = useState({
+    status: OPEN_STATUS_FILTER,
+    categoryCode: "",
+    limit: 50,
+  });
 
   const loadServiceCases = useCallback(
     async (offset = 0) => {
@@ -45,7 +55,9 @@ export default function DispatcherServiceCasesPage() {
         const query = new URLSearchParams({
           limit: String(filters.limit),
           offset: String(offset),
-          ...(filters.status ? { status: filters.status } : {}),
+          ...(filters.status && filters.status !== OPEN_STATUS_FILTER
+            ? { status: filters.status }
+            : {}),
           ...(filters.categoryCode ? { categoryCode: filters.categoryCode } : {}),
         });
 
@@ -53,7 +65,12 @@ export default function DispatcherServiceCasesPage() {
           `/operations/service-cases?${query.toString()}`,
         );
 
-        setServiceCases(data.service_cases ?? []);
+        setServiceCases(
+          sortNewestFirst(data.service_cases ?? [], (serviceCase) => [
+            serviceCase.last_updated,
+            serviceCase.created_at,
+          ]),
+        );
         setPagination(data.pagination);
       } catch (err) {
         setError(
@@ -80,6 +97,13 @@ export default function DispatcherServiceCasesPage() {
     router.push("/");
   };
 
+  const visibleServiceCases = useMemo(() => {
+    if (filters.status !== OPEN_STATUS_FILTER) return serviceCases;
+    return serviceCases.filter((serviceCase) =>
+      isServiceCaseOpen(serviceCase.status_code),
+    );
+  }, [filters.status, serviceCases]);
+
   if (isChecking) {
     return <PageLoading label="Loading service case queue" />;
   }
@@ -97,7 +121,7 @@ export default function DispatcherServiceCasesPage() {
           description="Review and manage active service cases assigned to operations."
           meta={
             <p className="text-sm text-gray-600">
-              Total: {pagination.total} | Showing: {serviceCases.length}
+              Total: {filters.status === OPEN_STATUS_FILTER ? visibleServiceCases.length : pagination.total} | Showing: {visibleServiceCases.length}
             </p>
           }
           actions={
@@ -141,6 +165,7 @@ export default function DispatcherServiceCasesPage() {
                 className={fieldClassName}
               >
                 <option value="">All statuses</option>
+                <option value={OPEN_STATUS_FILTER}>Open cases</option>
                 <option value="submitted">Submitted</option>
                 <option value="under_review">Under review</option>
                 <option value="awaiting_user_response">Awaiting user response</option>
@@ -214,7 +239,7 @@ export default function DispatcherServiceCasesPage() {
               <div className="px-6 py-10 text-center text-sm text-gray-500">
                 Loading service cases...
               </div>
-            ) : serviceCases.length === 0 ? (
+            ) : visibleServiceCases.length === 0 ? (
               <div className="p-6">
                 <EmptyState
                   title="No service cases found"
@@ -223,7 +248,7 @@ export default function DispatcherServiceCasesPage() {
               </div>
             ) : (
               <ul className="divide-y divide-gray-100">
-                {serviceCases.map((serviceCase) => (
+                {visibleServiceCases.map((serviceCase) => (
                   <li
                     key={serviceCase.public_uuid}
                     className="space-y-4 border-b border-gray-100 px-4 py-5 sm:px-6"
@@ -235,7 +260,7 @@ export default function DispatcherServiceCasesPage() {
                             {serviceCase.case_code}
                           </span>
                           <Badge tone={serviceCase.status_code}>
-                            {formatBadgeLabel(serviceCase.status_code)}
+                            {getServiceCaseStatusLabel(serviceCase.status_code)}
                           </Badge>
                           <Badge tone={serviceCase.priority_level}>
                             {formatBadgeLabel(serviceCase.priority_level)}

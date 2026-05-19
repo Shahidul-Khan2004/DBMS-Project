@@ -15,7 +15,9 @@ import {
 import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { getAgencyWorkload } from "@/lib/dispatch-api";
 import type { LoginResponse } from "@/types/auth";
+import type { AgencyWorkload } from "@/types/dispatch";
 import type {
   DispatcherOverviewRecentKind,
   DispatcherOverviewResponse,
@@ -81,6 +83,9 @@ export default function DispatcherDashboard() {
   );
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [agencyWorkload, setAgencyWorkload] = useState<AgencyWorkload[]>([]);
+  const [workloadLoading, setWorkloadLoading] = useState(false);
+  const [workloadError, setWorkloadError] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
     const accessToken = await ensureAuthSession();
@@ -106,6 +111,31 @@ export default function DispatcherDashboard() {
       setOverview(null);
     } finally {
       setOverviewLoading(false);
+    }
+  }, [router]);
+
+  const loadAgencyWorkload = useCallback(async () => {
+    const accessToken = await ensureAuthSession();
+    if (!accessToken) {
+      router.push("/auth/login");
+      return;
+    }
+
+    setWorkloadLoading(true);
+    setWorkloadError(null);
+
+    try {
+      const data = await getAgencyWorkload();
+      setAgencyWorkload(data.agencies ?? []);
+    } catch (err) {
+      setWorkloadError(
+        err instanceof Error
+          ? err.message
+          : "Unexpected error while loading agency workload.",
+      );
+      setAgencyWorkload([]);
+    } finally {
+      setWorkloadLoading(false);
     }
   }, [router]);
 
@@ -144,7 +174,8 @@ export default function DispatcherDashboard() {
   useEffect(() => {
     if (isLoadingSession) return;
     void loadOverview();
-  }, [isLoadingSession, loadOverview]);
+    void loadAgencyWorkload();
+  }, [isLoadingSession, loadAgencyWorkload, loadOverview]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -307,7 +338,10 @@ export default function DispatcherDashboard() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => void loadOverview()}
+                  onClick={() => {
+                    void loadOverview();
+                    void loadAgencyWorkload();
+                  }}
                 >
                   Refresh
                 </Button>
@@ -397,6 +431,104 @@ export default function DispatcherDashboard() {
             {overviewLoading && overview !== null ? (
               <div className="border-t border-gray-100 px-6 py-2 text-center text-xs text-gray-400">
                 Refreshing…
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md md:col-span-3">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[#002D62]">
+                  Agency workload
+                </h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Current agency capacity and dispatch load.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void loadAgencyWorkload()}
+                disabled={workloadLoading}
+              >
+                {workloadLoading ? "Loading..." : "Refresh"}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-0">
+            {workloadError ? (
+              <div className="p-6">
+                <ErrorAlert message={workloadError} />
+              </div>
+            ) : null}
+
+            {workloadLoading && agencyWorkload.length === 0 && !workloadError ? (
+              <div className="p-6 text-sm text-gray-600">
+                Loading agency workload...
+              </div>
+            ) : null}
+
+            {!workloadLoading && !workloadError && agencyWorkload.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  title="No agency workload available"
+                  description="Agency workload will appear when the backend returns agency capacity rows."
+                />
+              </div>
+            ) : null}
+
+            {agencyWorkload.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-100 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="px-6 py-3">Agency</th>
+                      <th className="px-6 py-3">Active incidents</th>
+                      <th className="px-6 py-3">Total units</th>
+                      <th className="px-6 py-3">Available</th>
+                      <th className="px-6 py-3">Busy</th>
+                      <th className="px-6 py-3">Dispatches</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {agencyWorkload.map((agency) => (
+                      <tr key={agency.agency_public_uuid}>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-gray-900">
+                            {agency.agency_name}
+                          </p>
+                          <p className="break-all text-xs text-gray-500">
+                            {agency.agency_public_uuid}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {agency.active_incidents}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {agency.total_units}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {agency.available_units}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {agency.busy_units}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {agency.total_dispatches}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {workloadLoading && agencyWorkload.length > 0 ? (
+              <div className="border-t border-gray-100 px-6 py-2 text-center text-xs text-gray-400">
+                Refreshing...
               </div>
             ) : null}
           </CardContent>

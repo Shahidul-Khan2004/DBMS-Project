@@ -9,8 +9,10 @@ export interface IntakeReport {
     | "under_review"
     | "linked_to_case"
     | "linked_to_incident"
+    | "resolved"
     | "duplicate"
     | "false_report"
+    | "cancelled"
     | "closed";
   final_disposition: string | null;
   reported_at: string | null;

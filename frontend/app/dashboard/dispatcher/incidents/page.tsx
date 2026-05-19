@@ -12,6 +12,7 @@ import { EmptyState, PageHeader, PageLoading } from "@/components/ui/StatusState
 import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { sortNewestFirst } from "@/lib/sort";
 
 interface Incident {
   public_uuid: string;
@@ -115,7 +116,13 @@ export default function IncidentsPage() {
           }).toString()}`,
         );
 
-        setIncidents(data.incidents);
+        setIncidents(
+          sortNewestFirst(data.incidents ?? [], (incident) => [
+            incident.reported_at,
+            incident.updated_at,
+            incident.created_at,
+          ]),
+        );
         setPagination(data.pagination);
         setFilters((current) => ({
           ...current,

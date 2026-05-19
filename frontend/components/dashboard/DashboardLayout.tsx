@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import { getAuthSession, type UserRole } from "@/lib/auth-store";
 import { LogOut } from "lucide-react";
 import { HealthBadge } from "@/components/HealthBadge";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface DashboardLayoutProps {
   title: string;
@@ -35,6 +36,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { href: "/dashboard/citizen/report-new", label: "New Report" },
           { href: "/dashboard/citizen/reports", label: "My Reports" },
           { href: "/dashboard/citizen/service-cases", label: "Service Cases" },
+          { href: "/dashboard/citizen/incidents", label: "My Incidents" },
           { href: "/dashboard/citizen/locations", label: "Locations" },
         ]
       : []),
@@ -70,6 +72,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </div>
             <div className="flex items-center gap-3">
               <HealthBadge />
+              <NotificationBell />
               {onLogout && (
                 <button
                   onClick={onLogout}
