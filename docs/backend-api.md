@@ -640,6 +640,11 @@ Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Or
 
 Terminal statuses cannot change again.
 
+When transitioning to **`resolved`**, **`closed`**, or **`cancelled`**, the server also (same transaction):
+
+- Finalizes all non-terminal dispatches on the incident (`completed` for `resolved`/`closed`, `cancelled` for `cancelled`), advancing through valid dispatch transitions with note `Incident <statusCode>`.
+- Sets every dispatched unit that is still **`busy`** back to **`available`** via `unit_status_history`.
+
 **Response (200):** `{ "message": "Incident status updated", "incident": { … } }`
 
 **Response (409):** `INVALID_STATUS_TRANSITION`

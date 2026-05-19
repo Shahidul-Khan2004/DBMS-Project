@@ -13,6 +13,10 @@ import {
   requireLocationIdByPublicUuid,
 } from "../domain/locationAccess.js";
 import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
+import {
+  finalizeIncidentDispatches,
+  releaseIncidentUnits,
+} from "./dispatchOperationsRepo.js";
 import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
 
@@ -974,6 +978,16 @@ export async function applyIncidentStatusChange(params) {
       `,
       [incidentId, newStatusId, outcomeId, params.actorUserId ?? null, params.note ?? null],
     );
+
+    if (TERMINAL_INCIDENT_STATUSES.has(toCode)) {
+      await finalizeIncidentDispatches(conn, incidentId, toCode, params.actorUserId);
+      await releaseIncidentUnits(
+        conn,
+        incidentId,
+        params.actorUserId,
+        `Incident ${toCode}`,
+      );
+    }
 
     await conn.commit();
 

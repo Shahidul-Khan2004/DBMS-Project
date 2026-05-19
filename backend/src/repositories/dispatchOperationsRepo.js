@@ -15,6 +15,10 @@ const INCIDENT_MILESTONE_ORDER = [
   "in_progress",
 ];
 
+const DISPATCH_COMPLETE_ORDER = ["assigned", "dispatched", "arrived", "completed"];
+
+const TERMINAL_DISPATCH_STATUSES = new Set(["completed", "cancelled"]);
+
 async function loadIncidentByPublicUuid(conn, incidentPublicUuid) {
   const [rows] = await conn.execute(
     `
@@ -91,6 +95,176 @@ async function loadDispatchByPublicUuid(conn, dispatchPublicUuid) {
     [dispatchPublicUuid],
   );
   return rows[0] ?? null;
+}
+
+async function loadDispatchStatusCode(conn, dispatchId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT ds.status_code AS status_code
+      FROM dispatches d
+      INNER JOIN dispatch_statuses ds ON ds.id = d.current_status_id
+      WHERE d.id = ?
+      LIMIT 1
+    `,
+    [dispatchId],
+  );
+  return rows[0]?.status_code ?? null;
+}
+
+async function insertDispatchStatusTransition(conn, dispatchId, toStatusCode, actorUserId, note) {
+  const fromCode = await loadDispatchStatusCode(conn, dispatchId);
+  if (!fromCode) {
+    return;
+  }
+
+  const { toStatusId } = await assertStatusTransitionAllowed(
+    conn,
+    "dispatch",
+    fromCode,
+    toStatusCode,
+    { note: note ?? null },
+  );
+
+  await conn.execute(
+    `
+      INSERT INTO dispatch_status_history (
+        dispatch_id,
+        status_id,
+        changed_by_user_id,
+        note
+      )
+      VALUES (?, ?, ?, ?)
+    `,
+    [dispatchId, toStatusId, actorUserId ?? null, note ?? null],
+  );
+}
+
+export async function releaseUnitToAvailable(conn, unitId, actorUserId, note) {
+  const [unitRows] = await conn.execute(
+    `
+      SELECT us.status_code AS status_code
+      FROM emergency_units eu
+      INNER JOIN unit_statuses us ON us.id = eu.current_status_id
+      WHERE eu.id = ?
+      LIMIT 1
+    `,
+    [unitId],
+  );
+  const unitStatusCode = unitRows[0]?.status_code ?? "busy";
+  if (unitStatusCode === "available") {
+    return;
+  }
+
+  const { toStatusId: availableStatusId } = await assertStatusTransitionAllowed(
+    conn,
+    "unit",
+    unitStatusCode,
+    "available",
+    { note: null },
+  );
+  await conn.execute(
+    `
+      INSERT INTO unit_status_history (
+        unit_id,
+        status_id,
+        changed_by_user_id,
+        note
+      )
+      VALUES (?, ?, ?, ?)
+    `,
+    [unitId, availableStatusId, actorUserId ?? null, note],
+  );
+}
+
+export async function tryAdvanceDispatchToward(conn, dispatchId, targetStatusCode, actorUserId, note) {
+  let currentCode = await loadDispatchStatusCode(conn, dispatchId);
+  if (!currentCode || TERMINAL_DISPATCH_STATUSES.has(currentCode)) {
+    return;
+  }
+
+  if (targetStatusCode === "cancelled") {
+    while (currentCode && !TERMINAL_DISPATCH_STATUSES.has(currentCode)) {
+      try {
+        await insertDispatchStatusTransition(conn, dispatchId, "cancelled", actorUserId, note);
+        currentCode = "cancelled";
+      } catch (error) {
+        if (error instanceof BackendError && error.code === "INVALID_STATUS_TRANSITION") {
+          break;
+        }
+        throw error;
+      }
+    }
+    return;
+  }
+
+  if (targetStatusCode !== "completed") {
+    return;
+  }
+
+  const targetIndex = DISPATCH_COMPLETE_ORDER.indexOf("completed");
+  let currentIndex = DISPATCH_COMPLETE_ORDER.indexOf(currentCode);
+  if (currentIndex === -1 || currentIndex >= targetIndex) {
+    return;
+  }
+
+  while (currentIndex < targetIndex) {
+    const nextCode = DISPATCH_COMPLETE_ORDER[currentIndex + 1];
+    try {
+      await insertDispatchStatusTransition(conn, dispatchId, nextCode, actorUserId, note);
+      currentCode = nextCode;
+      currentIndex += 1;
+    } catch (error) {
+      if (error instanceof BackendError && error.code === "INVALID_STATUS_TRANSITION") {
+        break;
+      }
+      throw error;
+    }
+  }
+}
+
+export async function finalizeIncidentDispatches(
+  conn,
+  incidentId,
+  incidentTerminalStatus,
+  actorUserId,
+) {
+  const targetDispatchStatus =
+    incidentTerminalStatus === "cancelled" ? "cancelled" : "completed";
+  const note = `Incident ${incidentTerminalStatus}`;
+
+  const [rows] = await conn.execute(
+    `
+      SELECT d.id AS id
+      FROM dispatches d
+      INNER JOIN dispatch_statuses ds ON ds.id = d.current_status_id
+      WHERE d.incident_id = ?
+        AND ds.status_code NOT IN ('completed', 'cancelled')
+    `,
+    [incidentId],
+  );
+
+  for (const row of rows) {
+    await tryAdvanceDispatchToward(conn, row.id, targetDispatchStatus, actorUserId, note);
+  }
+}
+
+export async function releaseIncidentUnits(conn, incidentId, actorUserId, note) {
+  const [rows] = await conn.execute(
+    `
+      SELECT DISTINCT eu.id AS unit_id, us.status_code AS status_code
+      FROM dispatches d
+      INNER JOIN emergency_units eu ON eu.id = d.unit_id
+      INNER JOIN unit_statuses us ON us.id = eu.current_status_id
+      WHERE d.incident_id = ?
+    `,
+    [incidentId],
+  );
+
+  for (const row of rows) {
+    if (row.status_code === "busy") {
+      await releaseUnitToAvailable(conn, row.unit_id, actorUserId, note);
+    }
+  }
 }
 
 export async function tryAdvanceIncidentToward(conn, incidentId, targetStatusCode, actorUserId) {
@@ -487,43 +661,12 @@ export async function patchDispatchStatus(params) {
     );
 
     if (toCode === "completed" || toCode === "cancelled") {
-      const [unitRows] = await conn.execute(
-        `
-          SELECT us.status_code AS status_code
-          FROM emergency_units eu
-          INNER JOIN unit_statuses us ON us.id = eu.current_status_id
-          WHERE eu.id = ?
-          LIMIT 1
-        `,
-        [dispatch.unit_id],
+      await releaseUnitToAvailable(
+        conn,
+        dispatch.unit_id,
+        params.actorUserId ?? null,
+        `Dispatch ${toCode}`,
       );
-      const unitStatusCode = unitRows[0]?.status_code ?? "busy";
-      if (unitStatusCode !== "available") {
-        const { toStatusId: availableStatusId } = await assertStatusTransitionAllowed(
-          conn,
-          "unit",
-          unitStatusCode,
-          "available",
-          { note: null },
-        );
-        await conn.execute(
-          `
-            INSERT INTO unit_status_history (
-              unit_id,
-              status_id,
-              changed_by_user_id,
-              note
-            )
-            VALUES (?, ?, ?, ?)
-          `,
-          [
-            dispatch.unit_id,
-            availableStatusId,
-            params.actorUserId ?? null,
-            `Dispatch ${toCode}`,
-          ],
-        );
-      }
     }
 
     if (toCode === "dispatched") {
