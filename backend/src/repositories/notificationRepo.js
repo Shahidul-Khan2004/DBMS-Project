@@ -184,6 +184,8 @@ async function insertEmailOutboxRows(
     emailBody = interpolate(emailTemplate.body_template, templateVars);
   }
 
+  const outboxIds = [];
+
   for (const userId of recipientUserIds) {
     const [rows] = await conn.execute(
       `SELECT email FROM users WHERE id = ? LIMIT 1`,
@@ -191,9 +193,10 @@ async function insertEmailOutboxRows(
     );
 
     // Skip silently — avoids aborting the whole notification for one bad recipient.
+    // Do not push an ID — this user had no email address.
     if (!rows[0]) continue;
 
-    await conn.execute(
+    const [result] = await conn.execute(
       `
         INSERT INTO email_outbox (
           notification_id,
@@ -207,7 +210,11 @@ async function insertEmailOutboxRows(
       `,
       [notificationId, userId, rows[0].email, emailSubject, emailBody],
     );
+
+    outboxIds.push(result.insertId);
   }
+
+  return outboxIds;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -272,9 +279,12 @@ export async function insertNotificationWithRecipients(params) {
       await insertRecipientRows(conn, notificationId, params.recipientUserIds, channel);
     }
 
-    // Step 3 — queue email_outbox rows (email template resolved inside)
+    // Step 3 — insert email_outbox rows (email template resolved inside)
+    // Repo only does DB work — BullMQ enqueueing happens in the service layer
+    // AFTER this transaction commits, to avoid enqueue-inside-transaction problems.
+    let outboxIds = [];
     if (params.deliveryChannel === "email" || params.deliveryChannel === "both") {
-      await insertEmailOutboxRows(
+      outboxIds = await insertEmailOutboxRows(
         conn,
         notificationId,
         params.recipientUserIds,
@@ -289,6 +299,7 @@ export async function insertNotificationWithRecipients(params) {
     return {
       notificationId,
       recipientCount: params.recipientUserIds.length,
+      outboxIds,
     };
   } catch (error) {
     await conn.rollback();

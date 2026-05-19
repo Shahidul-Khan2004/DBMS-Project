@@ -13,5 +13,13 @@ services:
       - mysql_data:/var/lib/mysql
       - ./src/schemas/docker-init:/docker-entrypoint-initdb.d:ro
 
+  redis:
+    image: redis:7-alpine
+    container_name: DBMS_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
 volumes:
   mysql_data:
+  

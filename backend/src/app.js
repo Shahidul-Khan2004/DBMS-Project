@@ -10,7 +10,7 @@ import locationsRouter from "./api/routes/locations.js";
 import notificationsRouter from "./api/routes/notifications.js";
 import { errorHandler, notFound } from "./api/middlewares/error.js";
 import { bootstrapDevelopmentSystemAdmin } from "./services/bootstrapService.js";
-import { startEmailWorker } from "./workers/emailWorker.js";
+import { startEmailQueueWorker } from "./workers/emailQueueWorker.js";
 
 const app = express();
 
@@ -43,7 +43,7 @@ async function startServer() {
     console.error("Bootstrap failed:", error);
   }
 
-  startEmailWorker();
+  startEmailQueueWorker();
 
   app.listen(PORT, () => {
     console.log(`Server is running on port http://localhost:${PORT}`);
