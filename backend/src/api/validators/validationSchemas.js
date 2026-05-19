@@ -309,3 +309,27 @@ export const operationsPostServiceCaseResolveSchema = z.object({
 export const intakeEscalateServiceCaseToEmergencySchema = classifyEmergency999Schema.extend({
   escalationReason: z.string().trim().min(1, "escalationReason is required").max(1000),
 });
+
+export const operationsAddIncidentAgencySchema = z.object({
+  agencyPublicUuid: z.uuid({ message: "Invalid agency id" }),
+  isLeadAgency: z.boolean().optional().default(false),
+});
+
+export const operationsAvailableUnitsQuerySchema = z.object({
+  incidentPublicUuid: z.uuid({ message: "incidentPublicUuid is required" }),
+});
+
+export const operationsCreateDispatchSchema = z.object({
+  unitPublicUuid: z.uuid({ message: "Invalid unit id" }),
+  priorityLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const operationsDispatchUuidParamSchema = z.object({
+  dispatchPublicUuid: z.uuid({ message: "Invalid dispatch id" }),
+});
+
+export const operationsPatchDispatchStatusSchema = z.object({
+  statusCode: z.enum(["dispatched", "arrived", "completed", "cancelled"]),
+  note: z.string().trim().max(500).optional(),
+});
