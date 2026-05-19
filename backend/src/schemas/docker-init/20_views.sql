@@ -138,8 +138,8 @@ SELECT
     a.name AS agency_name,
     COUNT(DISTINCT CASE WHEN iap.participation_status IN ('requested','active') THEN iap.incident_id END) AS active_incidents,
     COUNT(DISTINCT eu.id) AS total_units,
-    SUM(CASE WHEN us.status_code = 'available' THEN 1 ELSE 0 END) AS available_units,
-    SUM(CASE WHEN us.status_code = 'busy' THEN 1 ELSE 0 END) AS busy_units,
+    COUNT(DISTINCT CASE WHEN us.status_code = 'available' THEN eu.id END) AS available_units,
+    COUNT(DISTINCT CASE WHEN us.status_code = 'busy' THEN eu.id END) AS busy_units,
     COUNT(DISTINCT d.id) AS total_dispatches
 FROM agencies a
 LEFT JOIN incident_agency_participation iap ON iap.agency_id = a.id
