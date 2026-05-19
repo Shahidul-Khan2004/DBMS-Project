@@ -2,9 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuthStepMotion } from "@/lib/auth-motion";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useMemo, useState } from "react";
+import { AuthPageShell } from "@/components/layout/AuthPageShell";
 import { useForm, type FieldErrors } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -261,6 +263,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const stepMotion = useAuthStepMotion();
 
   const {
     register,
@@ -522,7 +525,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
       <span
         className={[
           "flex shrink-0 items-center justify-center rounded-full text-sm font-bold",
-          variant === "compact" ? "h-7 w-7" : "h-9 w-9",
+          variant === "compact" ? "h-7 w-7" : "h-9 w-9 lg:h-8 lg:w-8",
           stepBadgeClass(active, done),
         ].join(" ")}
       >
@@ -574,7 +577,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
           aria-current={active ? "step" : undefined}
           aria-label={navigable ? `Go to ${step.title}` : undefined}
           className={[
-            "flex w-full gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors",
+            "flex w-full gap-3 rounded-2xl border px-4 py-2.5 text-left transition-colors lg:px-3 lg:py-2",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]",
             stepButtonClass(active, done, navigable),
           ].join(" ")}
@@ -591,7 +594,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
             </span>
             <span
               className={[
-                "mt-0.5 block text-xs sm:text-sm",
+                "mt-0.5 block text-xs leading-snug sm:text-sm",
                 stepSubtitleClass(active, done),
               ].join(" ")}
             >
@@ -603,49 +606,31 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
     );
   };
 
-  const isReviewStep = currentStep === REVIEW_STEP_INDEX;
+  const isTallDesktopStep = currentStep >= 3;
+  const desktopFormCardHeight = isTallDesktopStep
+    ? "lg:min-h-[280px] lg:max-h-[340px]"
+    : "lg:min-h-[280px] lg:max-h-[300px]";
 
   return (
-    <motion.div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(0,103,71,0.10),transparent_30%),linear-gradient(135deg,#EEF6FB_0%,#F3FAF7_48%,#EAF3FB_100%)] lg:min-h-[100svh] lg:overflow-hidden">
-      <nav className="fixed top-0 inset-x-0 z-50 w-full border-b border-gray-200 bg-zinc-200/95 backdrop-blur-md">
-        <div className="w-full px-4 sm:px-6 md:px-5 lg:px-8 xl:px-10 2xl:px-12">
-          <div className="flex min-h-24 items-center justify-between gap-3 py-4 md:min-h-28 md:gap-4 md:py-5 lg:min-h-32 lg:gap-6">
-          <Link
-            href="/"
-            className="flex shrink-0 cursor-pointer items-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]"
-          >
-            <div className="bg-[#002D62] px-7 py-3 text-2xl font-bold tracking-[-1px] text-white md:px-8 md:py-3.5 md:text-3xl lg:px-9 lg:py-4 lg:text-[2.25rem]">
-              NIERS
-            </div>
-          </Link>
-          <Link
-            href="/auth/login"
-            className="cursor-pointer rounded-2xl border-2 border-primary-600 px-7 py-3 text-base font-semibold text-primary-600 transition-colors hover:border-primary-700 hover:bg-gray-50 hover:text-primary-700 md:px-8 md:py-3.5 lg:text-lg"
-          >
-            Login
-          </Link>
-          </div>
-        </div>
-      </nav>
-
-      <div className="mx-auto max-w-[1360px] px-6 pb-6 pt-[calc(96px+3rem)] lg:pt-[calc(128px+3rem)]">
-        <div className="mb-7 max-w-xl">
-          <h1 className="text-4xl font-extrabold tracking-tight text-[#002D62] lg:text-[2.65rem] lg:leading-[1.05]">
-            Create your Citizen Account
-          </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            Join the National Integrated Emergency Response System.
-          </p>
-        </div>
-
+    <AuthPageShell
+      variant="register"
+      heading={{
+        title: "Create your Citizen Account",
+        subtitle: "Join the National Integrated Emergency Response System.",
+      }}
+      cta={{ href: "/auth/login", label: "Login" }}
+    >
         <form
-          className="grid gap-8 lg:grid-cols-[360px_minmax(680px,1fr)] lg:items-start lg:gap-12"
+          className="flex flex-col"
           onSubmit={handleSubmit(onRegister, onSubmitInvalid)}
           onKeyDown={onFormKeyDown}
           noValidate
         >
-          <aside className="min-w-0 lg:w-[360px] lg:shrink-0">
-            <div className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-4 shadow-xl shadow-[#002D62]/10">
+          <div className="grid items-start gap-6 lg:grid-cols-[clamp(360px,24vw,470px)_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-0">
+          <aside className="min-w-0 w-full lg:w-[clamp(360px,24vw,470px)] lg:shrink-0">
+            <div
+              className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-[var(--card-p-register)] shadow-xl shadow-[#002D62]/10 lg:p-4"
+            >
               <nav
                 aria-label="Registration steps"
                 className="flex max-w-full gap-2 overflow-x-auto lg:hidden"
@@ -658,28 +643,34 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                 aria-label="Registration steps"
                 className="hidden lg:block"
               >
-                <ol className="flex flex-col gap-2">
+                <ol className="flex flex-col gap-1.5 lg:gap-1">
                   {STEP_META.map((_, index) =>
                     renderStepButton(index, "vertical"),
                   )}
                 </ol>
               </nav>
             </div>
-            <p className="mt-4 text-center text-xs text-[#64748B] lg:mt-3 lg:text-left">
+            <p className="mt-2 text-center text-xs text-[#64748B] lg:mt-2 lg:text-left">
               Step {currentStep + 1} of {TOTAL_STEPS}
             </p>
           </aside>
 
           <section className="min-w-0">
-            <motion.div className="flex min-h-[330px] items-center justify-center rounded-[2rem] border border-[#C9D6E3] bg-[#E8EDF3]/70 p-10 shadow-xl shadow-[#002D62]/10 [&_label]:text-[#0F172A] [&_p]:text-[#64748B] [&_[id$='-error']]:text-[#DA291C]">
+            <motion.div
+              className={[
+                "rounded-[2rem] border border-[#C9D6E3] bg-[#E8EDF3]/70 p-[var(--card-p-register)] shadow-xl shadow-[#002D62]/10 lg:flex lg:flex-col lg:min-h-0 lg:p-4",
+                "[&_label]:text-[#0F172A] [&_p]:text-[#64748B] [&_[id$='-error']]:text-[#DA291C]",
+                desktopFormCardHeight,
+              ].join(" ")}
+            >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentStep}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
-                    className="mx-auto w-full max-w-[520px]"
+                    initial={stepMotion.initial}
+                    animate={stepMotion.animate}
+                    exit={stepMotion.exit}
+                    transition={stepMotion.transition}
+                    className="flex min-h-0 w-full flex-1 flex-col lg:min-h-full"
                   >
                     <h2 className="text-xl font-bold text-[#002D62] lg:hidden sm:text-2xl">
                       {STEP_META[currentStep].title}
@@ -687,7 +678,8 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                     <p className="mt-1 text-sm text-[#64748B] lg:hidden sm:text-base">
                       {STEP_META[currentStep].subtitle}
                     </p>
-                    <div className="mt-6 space-y-6 lg:mt-0">
+                    <div className="mt-4 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto lg:mt-0">
+                      <div className="mx-auto flex w-full max-w-[700px] flex-col justify-center">
                       <div
                         className={currentStep === 0 ? "space-y-2" : "hidden"}
                         aria-hidden={currentStep !== 0}
@@ -739,7 +731,9 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                       </div>
 
                       <div
-                        className={currentStep === 3 ? "space-y-4" : "hidden"}
+                        className={
+                          currentStep === 3 ? "space-y-4 lg:space-y-3" : "hidden"
+                        }
                         aria-hidden={currentStep !== 3}
                       >
                         <Input
@@ -800,16 +794,16 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                       <div
                         className={
                           currentStep === REVIEW_STEP_INDEX
-                            ? "space-y-4"
+                            ? "space-y-4 lg:space-y-3"
                             : "hidden"
                         }
                         aria-hidden={currentStep !== REVIEW_STEP_INDEX}
                       >
-                        <div className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-6 shadow-lg shadow-[#002D62]/10">
+                        <div className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-4 shadow-lg shadow-[#002D62]/10 lg:p-3">
                           <h3 className="text-base font-semibold text-[#002D62]">
                             Summary
                           </h3>
-                          <dl className="mt-4 space-y-2 text-sm">
+                          <dl className="mt-3 space-y-2 text-sm lg:mt-2 lg:space-y-1.5">
                             <div className="flex justify-between gap-4">
                               <dt className="text-[#64748B]">Full name</dt>
                               <dd className="max-w-[60%] text-right font-medium text-[#0F172A]">
@@ -846,7 +840,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                           </dl>
                         </div>
 
-                        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF]/50 p-4">
+                        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF]/50 p-4 lg:p-3">
                           <input
                             type="checkbox"
                             className="mt-1 h-4 w-4 shrink-0 rounded border-[#002D62]/30 text-[#002D62] focus:ring-[#006747]/35"
@@ -866,13 +860,14 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                           </p>
                         )}
                       </div>
+                      </div>
                     </div>
-                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                    <div className="mx-auto mt-8 flex w-full max-w-[700px] shrink-0 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                       <Button
                         type="button"
                         variant="outline"
                         size="lg"
-                        className="border-2 border-[#002D62] bg-[#F7F9FC] text-[#002D62] hover:bg-[#EFF6FF] sm:min-w-[8rem] disabled:opacity-100 disabled:bg-[#F7F9FC] disabled:text-[#7F96B3] disabled:border-[#C9D6E3]"
+                        className="border-2 border-[#002D62] bg-[#F7F9FC] text-[#002D62] hover:bg-[#EFF6FF] sm:min-w-[8rem] lg:px-5 lg:py-2.5 lg:text-base disabled:opacity-100 disabled:bg-[#F7F9FC] disabled:text-[#7F96B3] disabled:border-[#C9D6E3]"
                         disabled={currentStep === 0 || isSubmitting}
                         onClick={goBack}
                       >
@@ -884,7 +879,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                           type="button"
                           variant="primary"
                           size="lg"
-                          className="bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] sm:min-w-[8rem] disabled:opacity-100 disabled:bg-[#7F96B3] disabled:cursor-not-allowed disabled:shadow-none"
+                          className="bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] sm:min-w-[8rem] lg:px-5 lg:py-2.5 lg:text-base disabled:opacity-100 disabled:bg-[#7F96B3] disabled:cursor-not-allowed disabled:shadow-none"
                           disabled={nextDisabled || isSubmitting}
                           onClick={handleNext}
                         >
@@ -895,7 +890,7 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                           type="submit"
                           variant="primary"
                           size="lg"
-                          className="bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] sm:min-w-[8rem] disabled:opacity-100 disabled:bg-[#7F96B3] disabled:cursor-not-allowed disabled:shadow-none"
+                          className="bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] sm:min-w-[8rem] lg:px-5 lg:py-2.5 lg:text-base disabled:opacity-100 disabled:bg-[#7F96B3] disabled:cursor-not-allowed disabled:shadow-none"
                           isLoading={isSubmitting}
                           disabled={!reviewStepValid}
                         >
@@ -906,8 +901,11 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                   </motion.div>
                 </AnimatePresence>
             </motion.div>
+          </section>
+          </div>
 
-            <p className="mt-4 text-center text-sm text-[#64748B]">
+          <div className="mt-5 lg:mt-6">
+            <p className="text-center text-sm text-[#64748B]">
               Already have an account?{" "}
               <Link
                 href="/auth/login"
@@ -919,9 +917,8 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
             <p className="mt-2 text-center text-xs text-[#64748B]">
               Official NIERS registration portal | 2026
             </p>
-          </section>
+          </div>
         </form>
-      </div>
-    </motion.div>
+    </AuthPageShell>
   );
 };
