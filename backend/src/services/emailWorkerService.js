@@ -1,105 +1,132 @@
 /**
  * services/emailWorkerService.js
  * ================================
- * Polls email_outbox for pending rows and delivers them via the mailer.
+ * Email delivery logic for the BullMQ worker.
  *
- * Flow per outbox row:
- *   1. Mark row as 'sending'              (prevents double-processing)
- *   2. Count prior attempts               (decides retry vs give up)
- *   3. Call sendEmail()                   (SMTP via mailer.js)
- *   4a. On success → markEmailSent()      (status = 'sent', logs attempt)
- *   4b. On failure, attempts < MAX_RETRIES → resetEmailForRetry() (back to 'pending' + backoff)
- *   4c. On failure, attempts >= MAX_RETRIES → markEmailFailed()   (status = 'failed', logs attempt)
+ * processEmailOutboxJob() is called once per BullMQ job.
+ * It handles the full lifecycle of one email_outbox row:
+ *   1. Load the row
+ *   2. Guard against already-sent or non-pending rows
+ *   3. Claim it (pending → sending) with an atomic UPDATE
+ *   4. Send via SMTP
+ *   5a. Success → markEmailSent()
+ *   5b. Failure, not final attempt → resetEmailForRetry() + throw (BullMQ retries)
+ *   5c. Failure, final attempt     → markEmailFailed()    + throw
  *
- * MAX_RETRIES = 3 — an email that fails 3 times is marked 'failed' permanently.
- * The email_delivery_attempts table has a full audit trail of every attempt.
+ * Critical retry rule:
+ *   email_status is ONLY set to 'failed' on the final attempt.
+ *   On earlier failures the row is reset to 'pending' so the safe-claim
+ *   UPDATE (WHERE email_status = 'pending') can pick it up again on retry.
  *
- * This service has no HTTP surface — it is started once by emailWorker.js
- * and runs for the lifetime of the Node.js process.
+ * runEmailWorkerCycle() is kept as a no-op export for backward compatibility
+ * in case any other file still imports it.
  */
 
 import { sendEmail } from "../integrations/mailer.js";
 import {
-  fetchPendingEmails,
+  findEmailOutboxById,
   markEmailSending,
   markEmailSent,
   markEmailFailed,
   resetEmailForRetry,
-  countDeliveryAttempts,
 } from "../repositories/emailOutboxRepo.js";
 
-const MAX_RETRIES = 3;
-const BATCH_SIZE  = 10; // rows processed per poll cycle
 
 /**
- * Processes a single email_outbox row.
+ * Processes one email_outbox row identified by outboxId.
  *
- * Marked as a named function so stack traces are readable in logs.
- *
- * @param {object} outboxRow - Row from fetchPendingEmails()
+ * @param {number} outboxId
+ * @param {object} [options]
+ * @param {number} [options.attemptNumber=1]  - Current attempt (1-based)
+ * @param {number} [options.maxAttempts=1]    - Total attempts BullMQ will make
  * @returns {Promise<void>}
  */
-async function processOutboxRow(outboxRow) {
-  const { id, to_email, subject, body } = outboxRow;
+export async function processEmailOutboxJob(outboxId, options = {}) {
+  const { attemptNumber = 1, maxAttempts = 1 } = options;
 
-  // Step 1 — lock the row so no other worker cycle picks it up
-  await markEmailSending(id);
+  // Step 1 — load the row
+  const row = await findEmailOutboxById(outboxId);
 
-  // Step 2 — how many times have we already tried this email?
-  const priorAttempts = await countDeliveryAttempts(id);
-  const attemptNumber = priorAttempts + 1;
+  if (!row) {
+    console.warn(`[emailWorkerService] outboxId=${outboxId} not found — skipping`);
+    return;
+  }
 
+  // Step 2 — guard: skip rows that are already done or in a non-retryable state
+  if (row.email_status === "sent") {
+    console.log(`[emailWorkerService] outboxId=${outboxId} already sent — skipping`);
+    return;
+  }
+
+  if (row.email_status !== "pending") {
+    // Could be 'sending' (another worker claimed it) or 'failed'
+    console.warn(
+      `[emailWorkerService] outboxId=${outboxId} has status='${row.email_status}' — skipping`,
+    );
+    return;
+  }
+
+  // Step 3 — atomic claim: pending → sending
+  const claimed = await markEmailSending(outboxId);
+  if (!claimed) {
+    // Another worker beat us to it — back off silently
+    console.warn(
+      `[emailWorkerService] outboxId=${outboxId} claim failed (already taken) — skipping`,
+    );
+    return;
+  }
+
+  // Step 4 — send
   try {
-    // Step 3 — send via SMTP
-    const info = await sendEmail({ to: to_email, subject, text: body });
+    const info = await sendEmail({
+      to:      row.to_email,
+      subject: row.subject,
+      text:    row.body,
+    });
 
-    // Step 4a — success
+    // Step 5a — success
     const providerResponse = JSON.stringify({ messageId: info.messageId });
-    await markEmailSent(id, attemptNumber, providerResponse);
+    await markEmailSent(outboxId, attemptNumber, providerResponse);
 
-    console.log(`[emailWorker] Sent email #${id} to ${to_email} (attempt ${attemptNumber})`);
+    console.log(
+      `[emailWorkerService] Sent outboxId=${outboxId} to ${row.to_email} (attempt ${attemptNumber}/${maxAttempts})`,
+    );
   } catch (err) {
     const errorMessage = err?.message ?? String(err);
-    console.error(`[emailWorker] Failed to send email #${id} to ${to_email} (attempt ${attemptNumber}):`, errorMessage);
+    console.error(
+      `[emailWorkerService] Failed outboxId=${outboxId} to ${row.to_email} ` +
+      `(attempt ${attemptNumber}/${maxAttempts}): ${errorMessage}`,
+    );
 
-    if (attemptNumber >= MAX_RETRIES) {
-      // Step 4c — give up permanently
-      await markEmailFailed(id, attemptNumber, errorMessage);
-      console.error(`[emailWorker] Email #${id} permanently failed after ${MAX_RETRIES} attempts`);
+    if (attemptNumber >= maxAttempts) {
+      // Step 5c — final attempt exhausted: mark permanently failed
+      await markEmailFailed(outboxId, attemptNumber, errorMessage);
+      console.error(
+        `[emailWorkerService] outboxId=${outboxId} permanently failed after ${maxAttempts} attempt(s)`,
+      );
     } else {
-      // Step 4b — retry later with backoff
-      await resetEmailForRetry(id, attemptNumber, errorMessage);
-      console.log(`[emailWorker] Email #${id} queued for retry (attempt ${attemptNumber} of ${MAX_RETRIES})`);
+      // Step 5b — more retries remain: reset to pending so next attempt can claim it
+      await resetEmailForRetry(outboxId, attemptNumber, errorMessage);
+      console.log(
+        `[emailWorkerService] outboxId=${outboxId} reset to pending for retry ` +
+        `(attempt ${attemptNumber} of ${maxAttempts})`,
+      );
     }
+
+    // Throw so BullMQ knows the job failed and schedules the next attempt.
+    throw err;
   }
 }
 
+
 /**
- * Runs one poll cycle — fetches up to BATCH_SIZE pending emails and processes them.
- *
- * Errors on individual rows are caught inside processOutboxRow() so one bad
- * email never stops the rest of the batch from being processed.
- *
- * Unexpected errors at the fetch level are caught here and logged — the worker
- * interval keeps running regardless.
- *
- * @returns {Promise<void>}
+ * No-op kept for backward compatibility.
+ * The old polling worker called this on an interval; the BullMQ worker does not.
+ * Remove once all import sites are confirmed gone.
  */
 export async function runEmailWorkerCycle() {
-  try {
-    const pendingEmails = await fetchPendingEmails(BATCH_SIZE);
-
-    if (pendingEmails.length === 0) return; // nothing to do this cycle
-
-    console.log(`[emailWorker] Processing ${pendingEmails.length} pending email(s)`);
-
-    // Process rows sequentially — avoids hammering the SMTP server and keeps
-    // logs readable. Switch to Promise.all() later if throughput becomes an issue.
-    for (const row of pendingEmails) {
-      await processOutboxRow(row);
-    }
-  } catch (err) {
-    // Log but do not rethrow — the setInterval in emailWorker.js must keep running
-    console.error("[emailWorker] Unexpected error during poll cycle:", err);
-  }
+  console.warn(
+    "[emailWorkerService] runEmailWorkerCycle() is a no-op — " +
+    "the BullMQ worker is now handling email delivery.",
+  );
 }
