@@ -15,7 +15,7 @@ INSERT INTO notification_templates (template_code, channel, subject_template, bo
  TRUE),
 
 ('intake_received__email',   'email',
- 'We received your report – {{report_code}}',
+ 'We received your report {{report_code}}',
  'Hello,\n\nThank you for submitting your report.\n\nWe have received your report with reference code {{report_code}}. Our team will review the information you provided and take the necessary next steps.\n\nYou will be notified when there is an update on your report. Please keep this reference code for future communication.\n\nThank you,\nNIERS Support Team',
  TRUE),
 
@@ -25,7 +25,7 @@ INSERT INTO notification_templates (template_code, channel, subject_template, bo
  TRUE),
 
 ('intake_classified__email',  'email',
- 'Your report has been reviewed – {{case_code}}',
+ 'Your report has been reviewed {{case_code}}',
  'Hello,\n\nYour report has been reviewed by our team, and a service case has been opened for further follow-up.\n\nService case reference: {{case_code}}\n\nOur team will review the details and take appropriate action based on the information provided. You will be notified if further updates or actions are required.\n\nThank you for helping us improve public service response.\n\nRegards,\nNIERS Support Team',
  TRUE),
 
@@ -35,7 +35,7 @@ INSERT INTO notification_templates (template_code, channel, subject_template, bo
  TRUE),
 
 ('intake_escalated__email',  'email',
- 'Emergency escalation – {{incident_code}}',
+ 'Emergency escalation {{incident_code}}',
  'Hello,\n\nYour report has been escalated to an emergency incident.\n\nIncident reference: {{incident_code}}\n\nEmergency responders have been notified, and the incident is now being handled through the emergency response process. Please remain safe and follow any instructions provided by authorized emergency personnel.\n\nRegards,\nNIERS Emergency Response Team',
  TRUE),
 
@@ -45,7 +45,7 @@ INSERT INTO notification_templates (template_code, channel, subject_template, bo
  TRUE),
 
 ('incident_created__email',  'email',
- 'Incident created – {{incident_code}}',
+ 'Incident created {{incident_code}}',
  'Hello,\n\nA new emergency incident has been created and is now active.\n\nIncident reference: {{incident_code}}\n\nThe incident has been recorded in the system and can now be tracked by the responsible operations team. Further updates will be recorded as the incident progresses.\n\nRegards,\nNIERS Operations Team',
  TRUE),
 
