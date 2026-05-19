@@ -34,6 +34,7 @@ import {
 import { getOperationsDispatcherOverview } from "../controllers/operationsDispatcherOverview.js";
 import {
   getOperationsServiceCase,
+  getOperationsServiceCaseMessages,
   listOperationsServiceCases,
   patchOperationsServiceCaseStatus,
   postOperationsServiceCaseAssignment,
@@ -153,6 +154,13 @@ router.get(
   requirePermission("case.respond"),
   validateOperationsServiceCasePublicUuidParam,
   getOperationsServiceCase,
+);
+
+router.get(
+  "/service-cases/:publicUuid/messages",
+  requirePermission("case.respond"),
+  validateOperationsServiceCasePublicUuidParam,
+  getOperationsServiceCaseMessages,
 );
 
 router.patch(

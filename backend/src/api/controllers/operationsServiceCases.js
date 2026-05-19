@@ -12,6 +12,14 @@ export async function getOperationsServiceCase(req, res) {
   res.status(200).json(result);
 }
 
+export async function getOperationsServiceCaseMessages(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const result = await serviceCaseOperationsService.operationsGetServiceCaseMessages(
+    params.publicUuid,
+  );
+  res.status(200).json(result);
+}
+
 export async function patchOperationsServiceCaseStatus(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;

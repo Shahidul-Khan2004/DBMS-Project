@@ -74,6 +74,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/service-case` | Roles `dispatcher` / `system_admin` |
 | Intake | POST | `/intake/reports/:reportPublicUuid/classify/emergency` | Same roles |
 | Intake | GET | `/intake/reports/my/service-cases` | Reporter: list linked service cases |
+| Intake | GET | `/intake/service-cases/:publicUuid/messages` | Reporter JWT only; non-internal messages |
 | Intake | POST | `/intake/service-cases/:publicUuid/messages` | Reporter JWT only (`service_cases.reporter_user_id`) |
 | Intake | POST | `/intake/reports/:reportPublicUuid/escalate` | Roles `dispatcher` / `system_admin`; permissions `case.escalate` + `incident.create` |
 | Operations | GET | `/operations/dispatcher/overview` | Permission `incident.classify` |
@@ -90,6 +91,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/intake-reports` | `incident.create` or `incident.update_status` |
 | Operations | GET | `/operations/service-cases` | Permission `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid` | `case.respond` |
+| Operations | GET | `/operations/service-cases/:publicUuid/messages` | `case.respond`; message thread only |
 | Operations | PATCH | `/operations/service-cases/:publicUuid/status` | `case.respond` |
 | Operations | POST | `/operations/service-cases/:publicUuid/messages` | `case.respond` |
 | Operations | POST | `/operations/service-cases/:publicUuid/assignments` | `case.assign` |
@@ -716,6 +718,40 @@ Lists **service cases** where the authenticated user is the reporter (`service_c
 
 `location` is taken from `COALESCE(service_cases.current_location_id, intake_reports.reported_location_id)` when present.
 
+### GET `/intake/service-cases/:publicUuid/messages`
+
+**Access:** Bearer JWT. The authenticated user must be the case reporter (`service_cases.reporter_user_id` matches the token’s internal user id).
+
+**Behavior:** Returns the message thread for the service case, oldest first. Rows with `is_internal = TRUE` are **excluded** (citizens never see internal operator notes).
+
+**Response (200):**
+
+```json
+{
+  "public_uuid": "…",
+  "case_code": "SC-…",
+  "messages": [
+    {
+      "id": "1",
+      "message_type": "user_message",
+      "subject": "…",
+      "body": "…",
+      "created_at": "2026-05-19T14:00:00.000Z",
+      "sender": { "public_uuid": "…", "full_name": "…" }
+    }
+  ]
+}
+```
+
+`message_type` is one of `user_message`, `admin_reply`, or `system_note`. `sender` is `null` for system-generated rows without a user.
+
+**Errors:**
+
+- `401` — missing/invalid bearer token.
+- `403` `FORBIDDEN` — case exists but caller is not the reporter.
+- `404` `SERVICE_CASE_NOT_FOUND` — unknown `publicUuid`.
+- `422` `VALIDATION_ERROR` — invalid `publicUuid` param.
+
 ### POST `/intake/service-cases/:publicUuid/messages`
 
 **Access:** Bearer JWT. The authenticated user must be the case reporter (`service_cases.reporter_user_id` matches the token’s internal user id).
@@ -754,7 +790,19 @@ Promotes an intake that is already on the **service case** path (`intake_status`
 
 **Note:** Database tables `work_queues` and `queue_items` exist for future workload features; **these HTTP endpoints do not read or write them**. The operator queue is the paginated **`GET /operations/service-cases`** list.
 
-**Dispatcher / operator messages:** The API accepts JSON `title` + optional `description`; persisted as `case_messages.subject` and `case_messages.body`. Responses and case detail `messages[]` return `subject` and `body`. Persisted `message_type` for this endpoint is **`admin_reply`** (dispatcher/operator reply in the DB enum).
+**Dispatcher / operator messages:** The API accepts JSON `title` + optional `description`; persisted as `case_messages.subject` and `case_messages.body`. Responses and case detail `messages[]` return `subject` and `body`. Persisted `message_type` for dispatcher POST is **`admin_reply`** (dispatcher/operator reply in the DB enum).
+
+**Case message object** (used in GET message endpoints and in `messages[]` on case detail):
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `id` | string | `case_messages.id` |
+| `message_type` | string | `user_message` \| `admin_reply` \| `system_note` |
+| `subject` | string | |
+| `body` | string \| null | |
+| `created_at` | string (ISO) | |
+| `sender` | object \| null | `{ public_uuid, full_name }` |
+| `is_internal` | boolean | **Operations only** (GET messages + case detail); omitted on citizen GET |
 
 ### GET `/operations/service-cases`
 
@@ -771,6 +819,36 @@ Promotes an intake that is already on the **service case** path (`intake_status`
 **Permission:** `case.respond`.
 
 **Response (200):** `{ "service_case": { … }, "status_history": [ … ], "messages": [ … ], "assignments": [ … ], "resolution": { … } \| null }` — `resolution` is absent or a single object when `case_resolutions` exists.
+
+**Response (404):** `SERVICE_CASE_NOT_FOUND`.
+
+For status history, assignments, and resolution without re-fetching the full payload, use case detail above. For **messages only**, use **GET `/operations/service-cases/:publicUuid/messages`**.
+
+### GET `/operations/service-cases/:publicUuid/messages`
+
+**Permission:** `case.respond`.
+
+**Behavior:** Returns the message thread for the service case, oldest first. Includes **all** messages (including `is_internal = TRUE` when present). Each item includes `is_internal`.
+
+**Response (200):**
+
+```json
+{
+  "public_uuid": "…",
+  "case_code": "SC-…",
+  "messages": [
+    {
+      "id": "1",
+      "message_type": "admin_reply",
+      "subject": "…",
+      "body": "…",
+      "is_internal": false,
+      "created_at": "2026-05-19T14:00:00.000Z",
+      "sender": { "public_uuid": "…", "full_name": "…" }
+    }
+  ]
+}
+```
 
 **Response (404):** `SERVICE_CASE_NOT_FOUND`.
 

@@ -16,6 +16,7 @@ import {
   requireRole,
 } from "../middlewares/auth.js";
 import {
+  getIntakeServiceCaseMessages,
   getMyServiceCases,
   postIntakeReportEscalateToEmergency,
   postIntakeServiceCaseMessage,
@@ -42,6 +43,11 @@ router.use(requireAuth);
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
 router.get("/reports/my/service-cases", getMyServiceCases);
+router.get(
+  "/service-cases/:publicUuid/messages",
+  validateIntakeServiceCasePublicUuidParam,
+  getIntakeServiceCaseMessages,
+);
 router.post(
   "/service-cases/:publicUuid/messages",
   validateIntakeServiceCasePublicUuidParam,

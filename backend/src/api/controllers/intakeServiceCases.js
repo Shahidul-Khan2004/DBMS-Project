@@ -5,6 +5,15 @@ export async function getMyServiceCases(req, res) {
   res.status(200).json(result);
 }
 
+export async function getIntakeServiceCaseMessages(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const result = await serviceCaseOperationsService.intakeGetServiceCaseMessages(
+    req.actorUserId,
+    params.publicUuid,
+  );
+  res.status(200).json(result);
+}
+
 export async function postIntakeServiceCaseMessage(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
