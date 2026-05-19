@@ -273,6 +273,94 @@ function mapCaseDetailHeader(row) {
   };
 }
 
+function mapCaseMessageRow(m, { includeInternal = false } = {}) {
+  const mapped = {
+    id: String(m.id),
+    message_type: m.message_type,
+    subject: m.subject,
+    body: m.body,
+    created_at: m.created_at,
+    sender: m.sender_public_uuid
+      ? {
+          public_uuid: m.sender_public_uuid,
+          full_name: m.sender_full_name ?? null,
+        }
+      : null,
+  };
+  if (includeInternal) {
+    mapped.is_internal = Boolean(m.is_internal);
+  }
+  return mapped;
+}
+
+async function fetchCaseMessages(conn, caseId, { excludeInternal = false } = {}) {
+  const internalFilter = excludeInternal ? "AND cm.is_internal = FALSE" : "";
+  const [messages] = await conn.execute(
+    `
+      SELECT
+        cm.id AS id,
+        cm.message_type AS message_type,
+        cm.subject AS subject,
+        cm.body AS body,
+        cm.is_internal AS is_internal,
+        cm.created_at AS created_at,
+        u.public_uuid AS sender_public_uuid,
+        up.full_name AS sender_full_name
+      FROM case_messages cm
+      LEFT JOIN users u ON u.id = cm.sender_user_id
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE cm.case_id = ?
+      ${internalFilter}
+      ORDER BY cm.created_at ASC, cm.id ASC
+    `,
+    [caseId],
+  );
+  return messages;
+}
+
+export async function getServiceCaseMessagesForCitizen(casePublicUuid, actorUserId) {
+  const conn = await pool.getConnection();
+  try {
+    const header = await loadServiceCaseHeader(conn, casePublicUuid);
+    if (!header) {
+      throw new BackendError(404, "SERVICE_CASE_NOT_FOUND", "Service case not found");
+    }
+    if (Number(header.reporter_user_id) !== Number(actorUserId)) {
+      throw new BackendError(403, "FORBIDDEN", "You are not the reporter for this service case");
+    }
+
+    const messages = await fetchCaseMessages(conn, header.id, { excludeInternal: true });
+
+    return {
+      public_uuid: header.public_uuid,
+      case_code: header.case_code,
+      messages: messages.map((m) => mapCaseMessageRow(m)),
+    };
+  } finally {
+    conn.release();
+  }
+}
+
+export async function getServiceCaseMessagesForOperations(casePublicUuid) {
+  const conn = await pool.getConnection();
+  try {
+    const header = await loadServiceCaseHeader(conn, casePublicUuid);
+    if (!header) {
+      throw new BackendError(404, "SERVICE_CASE_NOT_FOUND", "Service case not found");
+    }
+
+    const messages = await fetchCaseMessages(conn, header.id);
+
+    return {
+      public_uuid: header.public_uuid,
+      case_code: header.case_code,
+      messages: messages.map((m) => mapCaseMessageRow(m, { includeInternal: true })),
+    };
+  } finally {
+    conn.release();
+  }
+}
+
 export async function getServiceCaseDetailForOperations(casePublicUuid) {
   const conn = await pool.getConnection();
   try {
@@ -302,25 +390,7 @@ export async function getServiceCaseDetailForOperations(casePublicUuid) {
       [caseId],
     );
 
-    const [messages] = await conn.execute(
-      `
-        SELECT
-          cm.id AS id,
-          cm.message_type AS message_type,
-          cm.subject AS subject,
-          cm.body AS body,
-          cm.is_internal AS is_internal,
-          cm.created_at AS created_at,
-          u.public_uuid AS sender_public_uuid,
-          up.full_name AS sender_full_name
-        FROM case_messages cm
-        LEFT JOIN users u ON u.id = cm.sender_user_id
-        LEFT JOIN user_profiles up ON up.user_id = u.id
-        WHERE cm.case_id = ?
-        ORDER BY cm.created_at ASC, cm.id ASC
-      `,
-      [caseId],
-    );
+    const messages = await fetchCaseMessages(conn, caseId);
 
     const [assignments] = await conn.execute(
       `
@@ -376,20 +446,7 @@ export async function getServiceCaseDetailForOperations(casePublicUuid) {
             }
           : null,
       })),
-      messages: messages.map((m) => ({
-        id: String(m.id),
-        message_type: m.message_type,
-        subject: m.subject,
-        body: m.body,
-        is_internal: Boolean(m.is_internal),
-        created_at: m.created_at,
-        sender: m.sender_public_uuid
-          ? {
-              public_uuid: m.sender_public_uuid,
-              full_name: m.sender_full_name ?? null,
-            }
-          : null,
-      })),
+      messages: messages.map((m) => mapCaseMessageRow(m, { includeInternal: true })),
       assignments: assignments.map((a) => ({
         id: String(a.id),
         assignment_status: a.assignment_status,

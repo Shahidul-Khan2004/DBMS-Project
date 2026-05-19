@@ -3,6 +3,8 @@ import { findUserByPublicUuid } from "../repositories/userRepo.js";
 import {
   escalateIntakeServiceCaseToEmergencyInTransaction,
   getServiceCaseDetailForOperations,
+  getServiceCaseMessagesForCitizen,
+  getServiceCaseMessagesForOperations,
   listMyServiceCasesByReporterUserId,
   listServiceCasesForOperations,
   patchServiceCaseStatusInTransaction,
@@ -32,6 +34,14 @@ export async function operationsListServiceCases(query) {
 
 export async function operationsGetServiceCase(publicUuid) {
   return getServiceCaseDetailForOperations(publicUuid);
+}
+
+export async function operationsGetServiceCaseMessages(publicUuid) {
+  return getServiceCaseMessagesForOperations(publicUuid);
+}
+
+export async function intakeGetServiceCaseMessages(actorUserId, casePublicUuid) {
+  return getServiceCaseMessagesForCitizen(casePublicUuid, actorUserId);
 }
 
 export async function operationsPatchServiceCaseStatus(actorUserId, casePublicUuid, body, req) {
