@@ -62,21 +62,6 @@ export function requirePermission(...permissionCodes) {
 }
 
 
-export function forbidEmergencyUrgencyWithoutIncidentClassify(req, res, next) {
-  if (req.body?.urgencyType !== "emergency") {
-    return next();
-  }
-
-  const userPermissions = req.authz?.permissions || [];
-  if (!userPermissions.includes("incident.classify")) {
-    return next(
-      new BackendError(403, "FORBIDDEN", "Missing required permission")
-    );
-  }
-
-  next();
-}
-
 export function requireAnyPermission(...permissionCodes) {
   assertPermissionList(permissionCodes);
 
