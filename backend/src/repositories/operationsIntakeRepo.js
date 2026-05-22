@@ -11,10 +11,6 @@ function buildListWhere(filters, params) {
     clauses.push("ist.status_code = ?");
     params.push(filters.intake_status);
   }
-  if (filters.urgency_type) {
-    clauses.push("ir.urgency_type = ?");
-    params.push(filters.urgency_type);
-  }
   if (filters.categoryCode) {
     clauses.push("rcat.category_code = ?");
     params.push(filters.categoryCode);
@@ -29,7 +25,6 @@ const INTAKE_SELECT = `
     ir.public_uuid AS public_uuid,
     ir.report_code AS report_code,
     ir.reporter_user_id AS reporter_user_id,
-    ir.urgency_type AS urgency_type,
     ir.summary AS summary,
     ir.description AS description,
     ist.status_code AS intake_status,
@@ -114,7 +109,6 @@ function formatIntakeRow(row) {
     public_uuid: row.public_uuid,
     report_code: row.report_code,
     reporter_user_id: row.reporter_user_id != null ? String(row.reporter_user_id) : null,
-    urgency_type: row.urgency_type,
     summary: row.summary,
     description: row.description,
     intake_status: row.intake_status,

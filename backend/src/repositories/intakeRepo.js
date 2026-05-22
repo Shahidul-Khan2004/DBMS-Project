@@ -72,7 +72,6 @@ function mapIntakeReportCore(row) {
     report_code: row.report_code,
     summary: row.summary,
     description: row.description,
-    urgency_type: row.urgency_type,
     intake_status: row.intake_status,
     final_disposition: row.final_disposition,
     reported_at: row.reported_at,
@@ -186,14 +185,13 @@ export async function createIntakeReport(params) {
           channel_id,
           category_id,
           reported_location_id,
-          urgency_type,
           summary,
           description,
           current_status_id,
           received_by_user_id,
           reported_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
       `,
       [
         params.publicUuid,
@@ -203,7 +201,6 @@ export async function createIntakeReport(params) {
         channelId,
         categoryId,
         reportedLocationId,
-        params.urgencyType ?? "unknown",
         params.summary,
         params.description ?? null,
         receivedStatusId,
@@ -252,7 +249,6 @@ export async function createIntakeReport(params) {
           ir.channel_id,
           ir.category_id,
           ir.reported_location_id,
-          ir.urgency_type,
           ir.summary,
           ir.description,
           ints.status_code AS intake_status,
@@ -285,7 +281,7 @@ export async function createIntakeReport(params) {
 /**
  * Load intake by public UUID for gateway checks and classification.
  *
- * @returns {Promise<object | null>} row shape includes at least: id, public_uuid, intake_status, urgency_type, reporter_user_id, summary, channel_id, category_id, reported_location_id
+ * @returns {Promise<object | null>} row shape includes at least: id, public_uuid, intake_status, reporter_user_id, summary, channel_id, category_id, reported_location_id
  */
 export async function findIntakeReportByPublicUuid(publicUuid) {
   const result = await query(
@@ -299,7 +295,6 @@ export async function findIntakeReportByPublicUuid(publicUuid) {
         ir.channel_id,
         ir.category_id,
         ir.reported_location_id,
-        ir.urgency_type,
         ir.summary,
         ir.description,
         ints.status_code AS intake_status,
@@ -327,7 +322,6 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
         ir.report_code,
         ir.summary,
         ir.description,
-        ir.urgency_type,
         ints.status_code AS intake_status,
         ir.final_disposition,
         ir.reported_at,
@@ -367,7 +361,6 @@ export async function findIntakeReportByPublicUuidForReporter(reportPublicUuid, 
         ir.report_code,
         ir.summary,
         ir.description,
-        ir.urgency_type,
         ints.status_code AS intake_status,
         ir.final_disposition,
         ir.reported_at,
@@ -549,7 +542,6 @@ export async function updateIntakeReportLocation(params) {
           ir.report_code,
           ir.summary,
           ir.description,
-          ir.urgency_type,
           ints.status_code AS intake_status,
           ir.final_disposition,
           ir.reported_at,

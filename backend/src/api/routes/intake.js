@@ -10,7 +10,6 @@ import {
   patchMyIntakeReportLocation,
 } from "../controllers/intake.js";
 import {
-  forbidEmergencyUrgencyWithoutIncidentClassify,
   requireAuth,
   requirePermission,
   requireRole,
@@ -72,7 +71,6 @@ router.patch(
 router.post(
   "/reports",
   validateCreateIntakeReport,
-  forbidEmergencyUrgencyWithoutIncidentClassify,
   createIntakeReport,
 );
 const operatorRoles = [ROLE_CODES.DISPATCHER, ROLE_CODES.SYSTEM_ADMIN];

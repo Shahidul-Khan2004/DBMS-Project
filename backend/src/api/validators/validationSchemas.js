@@ -60,7 +60,6 @@ export const createIntakeReportSchema = z
       .min(1, "summary is required")
       .max(255, "summary must be at most 255 characters"),
     description: z.string().optional(),
-    urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
     reportedAt: z.iso.datetime({ offset: true }).optional(),
     location: locationObjectSchema.optional(),
     locationId: z.uuid({ message: "Invalid location id" }).optional(),
@@ -135,7 +134,6 @@ export const operationsCreateIncidentSchema = z
 
 export const operationsListIntakeReportsQuerySchema = z.object({
   intake_status: z.string().trim().optional(),
-  urgency_type: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
   categoryCode: z.string().trim().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
@@ -216,7 +214,6 @@ export const gateway999CreateSchema = z
     categoryCode: z.string().trim().min(1, "categoryCode is required"),
     summary: z.string().trim().min(1).max(255),
     description: z.string().optional(),
-    urgencyType: z.enum(["non_emergency", "emergency", "unknown"]).optional(),
     reportedAt: z.iso.datetime({ offset: true }).optional(),
     location: locationObjectSchema.optional(),
     locationId: z.uuid({ message: "Invalid location id" }).optional(),

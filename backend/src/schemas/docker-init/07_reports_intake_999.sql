@@ -33,7 +33,7 @@ CREATE TABLE report_categories (
     category_code VARCHAR(100) NOT NULL,
     name VARCHAR(150) NOT NULL,
     description VARCHAR(500) NULL,
-    default_urgency ENUM('non_emergency','emergency','unknown') NOT NULL DEFAULT 'unknown',
+
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     PRIMARY KEY (id),
     UNIQUE KEY uq_report_categories_category_code (category_code),
@@ -76,7 +76,6 @@ CREATE TABLE intake_reports (
     channel_id BIGINT UNSIGNED NOT NULL,
     category_id BIGINT UNSIGNED NOT NULL,
     reported_location_id BIGINT UNSIGNED NULL,
-    urgency_type ENUM('non_emergency','emergency','unknown') NOT NULL DEFAULT 'unknown',
     summary VARCHAR(255) NOT NULL,
     description TEXT NULL,
     current_status_id BIGINT UNSIGNED NOT NULL,

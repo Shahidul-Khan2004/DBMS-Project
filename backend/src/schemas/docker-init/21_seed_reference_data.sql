@@ -29,14 +29,14 @@ INSERT INTO report_channels (channel_code, name, description) VALUES
 ('agency_report','Agency Report','Reported by an agency'),
 ('mobile_app','Mobile App','Mobile app report');
 
-INSERT INTO report_categories (category_code, name, description, default_urgency) VALUES
-('medical','Medical','Medical emergency or health-related issue','unknown'),
-('crime_public_safety','Crime/Public Safety','Crime, assault, missing person, public safety','emergency'),
-('fire','Fire','Fire, explosion, gas leak','emergency'),
-('natural_disaster','Natural Disaster','Flood, cyclone, earthquake, landslide','emergency'),
-('infrastructure_emergency','Infrastructure Emergency','Bridge collapse, power failure, road hazard','unknown'),
-('relief_request','Relief Request','Food, water, medicine or shelter need','non_emergency'),
-('blood_request','Blood Request','Blood donation or urgent blood request','unknown');
+INSERT INTO report_categories (category_code, name, description) VALUES
+('medical','Medical','Medical emergency or health-related issue'),
+('crime_public_safety','Crime/Public Safety','Crime, assault, missing person, public safety'),
+('fire','Fire','Fire, explosion, gas leak'),
+('natural_disaster','Natural Disaster','Flood, cyclone, earthquake, landslide'),
+('infrastructure_emergency','Infrastructure Emergency','Bridge collapse, power failure, road hazard'),
+('relief_request','Relief Request','Food, water, medicine or shelter need'),
+('blood_request','Blood Request','Blood donation or urgent blood request');
 
 INSERT INTO case_statuses (status_code, name, sort_order, is_terminal) VALUES
 ('submitted','Submitted',1,FALSE),
