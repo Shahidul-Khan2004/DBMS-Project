@@ -67,6 +67,10 @@ export const createIntakeReportSchema = z
   .refine((data) => !(data.location && data.locationId), {
     message: "Provide only one of location or locationId, not both",
     path: ["locationId"],
+  })
+  .refine((data) => Boolean(data.location || data.locationId), {
+    message: "location or locationId is required",
+    path: ["location"],
   });
 
 export const classifyServiceCaseSchema = z.object({

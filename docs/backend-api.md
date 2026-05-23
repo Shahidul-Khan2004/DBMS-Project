@@ -301,9 +301,8 @@ Or reference an existing citizen location:
 
 **Rules:**
 
-- `location` / `locationId`: optional, mutually exclusive; follow [Location payloads](#location-payloads-intake-locations-operations).
+- `location` / `locationId`: **exactly one is required**; `locationId` is the public UUID of a saved location selected by the user in the UI (the frontend submits it automatically). Follow [Location payloads](#location-payloads-intake-locations-operations).
 - Plain string `location` is **not** accepted.
-- If the report may later go down the emergency path, ensure a stored location (`reported_location_id`) via inline location or `locationId` before classify/promote.
 
 **Response (201):**
 
