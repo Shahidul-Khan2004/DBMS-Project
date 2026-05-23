@@ -14,6 +14,7 @@ import {
   createEmergency999PathFromIntake,
   createServiceCaseFromIntake,
   ensureEmergencyCallForIntake,
+  linkGateway999IntakeToExistingIncident,
 } from "../repositories/intakeGatewayRepo.js";
 import { createNotification } from "./notificationService.js";
 
@@ -338,6 +339,26 @@ export async function createGateway999IntakeAndIncident(actorPublicUuid, body) {
       emergency_call: emergencyCall,
       disposition: "service_case",
       ...serviceResult,
+    };
+  }
+
+  if (body.disposition === "existing_incident") {
+    const userRow = await findUserByPublicUuid(actorPublicUuid);
+    const linkResult = await linkGateway999IntakeToExistingIncident({
+      intakePublicUuid: intake.public_uuid,
+      actorUserId: userRow.id,
+      incidentPublicUuid: body.incidentPublicUuid,
+      callerPhoneNumber: body.callerPhoneNumber ?? null,
+      callStartedAt: body.callStartedAt ?? new Date().toISOString(),
+      recordingUrl: placeholderRecordingUrl,
+      dispatcherUserId: userRow.id,
+      linkType: body.linkType ?? "supporting_report",
+      note: body.note ?? null,
+    });
+    return {
+      intake,
+      disposition: "existing_incident",
+      ...linkResult,
     };
   }
 
