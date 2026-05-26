@@ -326,6 +326,13 @@ export const ROUTE_MANIFEST = [
     validationPersona: "systemAdmin",
   },
   {
+    method: "PATCH",
+    path: `/admin/agencies/${U}/activate`,
+    permissions: ["agency.manage"],
+    denyPersona: "citizen",
+    validationPersona: "systemAdmin",
+  },
+  {
     method: "POST",
     path: `/admin/agencies/${U}/representatives`,
     permissions: ["agency.manage"],
@@ -421,6 +428,14 @@ export const ROUTE_MANIFEST = [
     denyPersona: "citizen",
     agencyRouter: true,
     hasBodyValidator: true,
+    validationPersona: "agencyRep",
+  },
+  {
+    method: "GET",
+    path: `/agency/incidents/${U}/response-logs`,
+    permissions: ["dispatch.view_own_agency"],
+    denyPersona: "citizen",
+    agencyRouter: true,
     validationPersona: "agencyRep",
   },
   {

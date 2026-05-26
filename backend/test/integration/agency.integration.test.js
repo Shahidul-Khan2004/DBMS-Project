@@ -47,6 +47,22 @@ describe("agency integration", { skip: !dbUp }, () => {
     assert.ok(Array.isArray(res.body.incidents ?? res.body));
   });
 
+  it("GET /agency/incidents/:incidentPublicUuid/response-logs returns agency logs", async () => {
+    if (await skipIfNoDemoRep()) {
+      return;
+    }
+
+    const token = await getAgencyRepToken(app);
+    const incidentUuid = "e5000001-0000-4000-8000-000000000001";
+    const res = await request(app)
+      .get(`/agency/incidents/${incidentUuid}/response-logs`)
+      .set(jsonHeaders(token));
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.incident_public_uuid, incidentUuid);
+    assert.ok(Array.isArray(res.body.response_logs));
+  });
+
   it("GET /agency/dispatches returns list", async () => {
     if (await skipIfNoDemoRep()) {
       return;
