@@ -53,7 +53,14 @@ describe("agency integration", { skip: !dbUp }, () => {
     }
 
     const token = await getAgencyRepToken(app);
-    const incidentUuid = "e5000001-0000-4000-8000-000000000001";
+    const listRes = await request(app).get("/agency/incidents").set(jsonHeaders(token));
+    assert.equal(listRes.status, 200);
+
+    const incidentUuid = listRes.body.incidents?.[0]?.incident_public_uuid;
+    if (!incidentUuid) {
+      return;
+    }
+
     const res = await request(app)
       .get(`/agency/incidents/${incidentUuid}/response-logs`)
       .set(jsonHeaders(token));

@@ -10,7 +10,6 @@ import {
   patchMyIntakeReportLocation,
 } from "../controllers/intake.js";
 import {
-  forbidEmergencyUrgencyWithoutIncidentClassify,
   requireAuth as defaultRequireAuth,
   requirePermission,
   requireRole,
