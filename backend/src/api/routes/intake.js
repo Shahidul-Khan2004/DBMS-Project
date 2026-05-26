@@ -73,7 +73,6 @@ router.patch(
 router.post(
   "/reports",
   validateCreateIntakeReport,
-  forbidEmergencyUrgencyWithoutIncidentClassify,
   createIntakeReport,
 );
 const operatorRoles = [ROLE_CODES.DISPATCHER, ROLE_CODES.SYSTEM_ADMIN];

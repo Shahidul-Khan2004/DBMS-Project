@@ -36,20 +36,26 @@ export function HealthBadge() {
   }, []);
 
   const isRunning = status === "running";
+  const statusLabel =
+    status === "checking"
+      ? "Server status checking"
+      : isRunning
+        ? "Server reachable"
+        : "Server unreachable";
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${
         isRunning
-          ? "bg-green-50 text-green-700"
+          ? "border-green-200 bg-green-50"
           : status === "checking"
-            ? "bg-gray-100 text-gray-700"
-            : "bg-red-50 text-red-700"
+            ? "border-gray-200 bg-gray-100"
+            : "border-red-200 bg-red-50"
       }`}
-      title="API health status"
+      aria-label={statusLabel}
     >
       <span
-        className={`h-2 w-2 rounded-full ${
+        className={`h-2.5 w-2.5 rounded-full ${
           isRunning
             ? "bg-green-500"
             : status === "checking"
@@ -57,7 +63,6 @@ export function HealthBadge() {
               : "bg-red-500"
         }`}
       />
-      API {status === "checking" ? "checking" : isRunning ? "online" : "offline"}
     </span>
   );
 }

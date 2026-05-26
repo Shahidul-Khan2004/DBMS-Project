@@ -274,7 +274,6 @@ Creates an `intake_reports` row for the authenticated reporter. Initial **`intak
   "categoryCode": "medical",
   "summary": "Road blocked by fallen tree",
   "description": "Optional longer text",
-  "urgencyType": "non_emergency",
   "reportedAt": "2026-05-04T12:00:00.000Z",
   "location": {
     "latitude": 23.8103,
@@ -300,7 +299,6 @@ Or reference an existing citizen location:
 
 **Rules:**
 
-- `urgencyType`: `non_emergency` \| `emergency` \| `unknown` (optional; default `unknown`). Portal users **must not** send `emergency` unless they hold **`incident.classify`**; otherwise `403`. Use `unknown` / `non_emergency`; operators escalate via classify or promote flows.
 - `location` / `locationId`: optional, mutually exclusive; follow [Location payloads](#location-payloads-intake-locations-operations).
 - Plain string `location` is **not** accepted.
 - If the report may later go down the emergency path, ensure a stored location (`reported_location_id`) via inline location or `locationId` before classify/promote.
@@ -315,13 +313,12 @@ Or reference an existing citizen location:
     "public_uuid": "0d5fd834-a3fc-4180-b8ec-a6e664d130d0",
     "report_code": "IR-MA4SJP2K-9C2E2EAA",
     "intake_status": "received",
-    "urgency_type": "non_emergency",
     "reported_at": "2026-05-04T12:00:00.000Z"
   }
 }
 ```
 
-**Errors:** `422` `REPORT_CHANNEL_NOT_FOUND`, `REPORT_CATEGORY_NOT_FOUND`, `VALIDATION_ERROR`, `403` for disallowed `urgencyType`.
+**Errors:** `422` `REPORT_CHANNEL_NOT_FOUND`, `REPORT_CATEGORY_NOT_FOUND`, `VALIDATION_ERROR`.
 
 ### GET `/intake/reports/my`
 
@@ -337,7 +334,6 @@ Newest first. List items use snake_case fields. Each row includes **`location`**
       "report_code": "IR-MA4SJP2K-9C2E2EAA",
       "summary": "Road blocked by fallen tree",
       "description": "Optional longer text",
-      "urgency_type": "non_emergency",
       "intake_status": "received",
       "final_disposition": null,
       "reported_at": "2026-05-04T12:00:00.000Z",
@@ -506,7 +502,7 @@ Rollup for dispatcher UIs: **counts** + merged **recent** timeline (intakes pend
 
 ### GET `/operations/intake-reports`
 
-Queue of intake reports. Query: `intake_status`, `urgency_type`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc`).
+Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc`).
 
 **Response (200):** `{ "intake_reports": [ … ], "pagination": { "limit", "offset", "total" } }`
 
@@ -550,7 +546,7 @@ Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures e
 **Body (validated):**
 
 - `disposition`: `service_case` \| `emergency_incident` (**required**)
-- `categoryCode`, `summary` (**required**); `description`, `urgencyType`, `reportedAt` optional
+- `categoryCode`, `summary` (**required**); `description`, `reportedAt` optional
 - Exactly one of **`location`** or **`locationId`** (**required**)
 - `callerPhoneNumber`, `callStartedAt` optional call metadata
 - `incidentTitle`, `incidentDescription` optional overrides

@@ -121,7 +121,6 @@ async function loadIntakeRowByPublicUuid(conn, publicUuid) {
         ir.report_code AS report_code,
         ir.category_id AS category_id,
         ir.reported_location_id AS reported_location_id,
-        ir.urgency_type AS urgency_type,
         ir.summary AS summary,
         ir.description AS description,
         ist.status_code AS intake_status,

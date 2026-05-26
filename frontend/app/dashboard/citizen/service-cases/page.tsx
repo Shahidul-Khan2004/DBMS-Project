@@ -12,6 +12,11 @@ import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { apiGet } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { sortNewestFirst } from "@/lib/sort";
+import {
+  getServiceCaseStatusLabel,
+  isServiceCaseFinal,
+} from "@/lib/service-case-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type {
   CitizenServiceCase,
@@ -41,7 +46,12 @@ export default function CitizenServiceCasesPage() {
         const data = await apiGet<CitizenServiceCaseListResponse>(
           "/intake/reports/my/service-cases",
         );
-        setServiceCases(data.service_cases ?? []);
+        setServiceCases(
+          sortNewestFirst(data.service_cases ?? [], (serviceCase) => [
+            serviceCase.last_updated,
+            serviceCase.created_at,
+          ]),
+        );
       } catch (err) {
         setError(
           err instanceof Error
@@ -143,8 +153,11 @@ export default function CitizenServiceCasesPage() {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Badge tone={serviceCase.status_code}>
-                          {formatBadgeLabel(serviceCase.status_code)}
+                          {getServiceCaseStatusLabel(serviceCase.status_code)}
                         </Badge>
+                        {isServiceCaseFinal(serviceCase.status_code) ? (
+                          <Badge tone="closed">Final</Badge>
+                        ) : null}
                         <Badge tone={serviceCase.priority_level}>
                           {formatBadgeLabel(serviceCase.priority_level)}
                         </Badge>

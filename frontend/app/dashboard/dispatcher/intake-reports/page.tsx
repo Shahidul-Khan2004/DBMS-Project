@@ -11,19 +11,17 @@ import { EmptyState, PageHeader, PageLoading } from "@/components/ui/StatusState
 import { apiGet, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { sortNewestFirst } from "@/lib/sort";
+import {
+  canCreateIncident,
+  canEscalateServiceCase,
+  getCreateIncidentHref,
+  getEscalateServiceCaseHref,
+} from "@/lib/dispatcher-intake-actions";
 import type {
   OperationsIntakeReport,
   OperationsIntakeReportsResponse,
 } from "@/types/operations-intake";
-
-function getCreateIncidentHref(reportPublicUuid: string) {
-  const query = new URLSearchParams({
-    mode: "intake",
-    intakeReportPublicUuid: reportPublicUuid,
-  });
-
-  return `/dashboard/dispatcher/incidents/create-incident?${query.toString()}`;
-}
 
 const fieldClassName =
   "h-10.5 rounded-2xl border border-[#002D62]/20 bg-white px-3 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35";
@@ -73,7 +71,13 @@ export default function IntakeReportsPage() {
           }).toString()}`,
         );
 
-        setReports(data.intake_reports);
+        setReports(
+          sortNewestFirst(data.intake_reports ?? [], (report) => [
+            report.reported_at,
+            report.created_at,
+            report.updated_at,
+          ]),
+        );
         setPagination(data.pagination);
       } catch (err) {
         setError(
@@ -255,7 +259,6 @@ export default function IntakeReportsPage() {
                 className={fieldClassName}
               >
                 <option value="reported_at_desc">Newest first</option>
-                <option value="reported_at_asc">Oldest first</option>
               </select>
               <label htmlFor="filter-limit" className="sr-only">
                 Results per page
@@ -348,7 +351,7 @@ export default function IntakeReportsPage() {
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-2">
-                        {!report.has_incident ? (
+                        {canCreateIncident(report) ? (
                           <Button
                             type="button"
                             size="sm"
@@ -357,6 +360,20 @@ export default function IntakeReportsPage() {
                             }
                           >
                             Create Incident
+                          </Button>
+                        ) : null}
+
+                        {canEscalateServiceCase(report) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                getEscalateServiceCaseHref(report.public_uuid),
+                              )
+                            }
+                          >
+                            Escalate to Emergency
                           </Button>
                         ) : null}
 

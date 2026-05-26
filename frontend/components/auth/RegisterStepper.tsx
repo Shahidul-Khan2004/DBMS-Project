@@ -54,6 +54,10 @@ const STEP_META = [
 
 const TOTAL_STEPS = STEP_META.length;
 const REVIEW_STEP_INDEX = TOTAL_STEPS - 1;
+const DUPLICATE_EMAIL_MESSAGE =
+  "This email is already registered. Please use another email or log in.";
+const DUPLICATE_PHONE_MESSAGE =
+  "This phone number is already registered. Please use another phone number or log in.";
 
 interface RegisterStepperProps {
   onSuccess?: (data: RegisterResponse) => void;
@@ -256,11 +260,28 @@ function stepSubtitleClass(active: boolean, done: boolean) {
   return "text-slate-500";
 }
 
+function getDuplicateAccountFieldError(
+  code?: string,
+): { field: RegisterFieldName; message: string } | null {
+  switch (code) {
+    case "EXISTING_EMAIL":
+      return { field: "email", message: DUPLICATE_EMAIL_MESSAGE };
+    case "EXISTING_PHONE":
+    case "EXISTING_PHONE_NUMBER":
+    case "PHONE_ALREADY_EXISTS":
+    case "PHONE_NUMBER_ALREADY_EXISTS":
+      return { field: "phoneNumber", message: DUPLICATE_PHONE_MESSAGE };
+    default:
+      return null;
+  }
+}
+
 export const RegisterStepper: React.FC<RegisterStepperProps> = ({
   onSuccess,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const stepMotion = useAuthStepMotion();
@@ -438,6 +459,8 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
 
   const onRegister = useCallback(
     async (data: RegisterWizardInput) => {
+      setGeneralError(null);
+
       const parsed = registerWizardSubmitSchema.safeParse(data);
       if (!parsed.success) {
         applyZodIssuesToForm(parsed.error.issues, setError);
@@ -472,7 +495,21 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
             }
             return;
           }
+
+          const duplicateFieldError = getDuplicateAccountFieldError(err.code);
+          if (duplicateFieldError) {
+            setCurrentStep(wizardStepForField(duplicateFieldError.field));
+            setError(duplicateFieldError.field, {
+              message: duplicateFieldError.message,
+            });
+            return;
+          }
+
+          setGeneralError(err.message || "Registration failed. Please try again.");
+          return;
         }
+
+        setGeneralError("Registration failed. Please try again.");
       } finally {
         setIsSubmitting(false);
       }
@@ -862,6 +899,14 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
                       </div>
                       </div>
                     </div>
+                    {generalError && (
+                      <div
+                        role="alert"
+                        className="mx-auto mt-4 w-full max-w-[700px] rounded-2xl border border-[#DA291C]/30 bg-[#FDECEC] px-4 py-3 text-sm font-medium text-[#B71C1C]"
+                      >
+                        {generalError}
+                      </div>
+                    )}
                     <div className="mx-auto mt-8 flex w-full max-w-[700px] shrink-0 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                       <Button
                         type="button"
