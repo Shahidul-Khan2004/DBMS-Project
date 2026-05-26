@@ -11,6 +11,8 @@ import {
   hasRoleAssignment,
 } from "../repositories/rbacRepo.js";
 import { ROLE_CODES } from "./rbacService.js";
+import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js";
+import { ensureAgencyMembershipsPublicUuid } from "./schemaMigrations.js";
 
 const DEFAULT_PERMISSIONS = [
   {
@@ -68,6 +70,36 @@ const DEFAULT_PERMISSIONS = [
     moduleName: "case",
     description: "Escalate service case to emergency incident",
   },
+  {
+    permissionCode: "agency.manage",
+    moduleName: "agency",
+    description: "Manage agencies and onboard representatives",
+  },
+  {
+    permissionCode: "agency.view_own",
+    moduleName: "agency",
+    description: "View own agency profile and resources",
+  },
+  {
+    permissionCode: "agency.manage_own_units",
+    moduleName: "agency",
+    description: "Manage units for own agency",
+  },
+  {
+    permissionCode: "dispatch.view_own_agency",
+    moduleName: "dispatch",
+    description: "View dispatches for own agency",
+  },
+  {
+    permissionCode: "dispatch.update_own_agency",
+    moduleName: "dispatch",
+    description: "Update dispatch status for own agency",
+  },
+  {
+    permissionCode: "response_log.create_own_agency",
+    moduleName: "response",
+    description: "Create field response logs for own agency incidents",
+  },
 ];
 
 const ROLE_DEFINITIONS = [
@@ -90,6 +122,20 @@ const ROLE_DEFINITIONS = [
       "Handles emergency call intake and triage, incidents, agency assignment, and dispatch progress",
     isSystemRole: true,
   },
+  {
+    roleCode: ROLE_CODES.AGENCY_REPRESENTATIVE,
+    name: "Agency Representative",
+    description: "Agency-side field operations for own agency units and dispatches",
+    isSystemRole: true,
+  },
+];
+
+const AGENCY_REPRESENTATIVE_PERMISSION_CODES = [
+  "agency.view_own",
+  "agency.manage_own_units",
+  "dispatch.view_own_agency",
+  "dispatch.update_own_agency",
+  "response_log.create_own_agency",
 ];
 
 async function ensureRolesAndPermissions() {
@@ -127,10 +173,19 @@ async function ensureRolesAndPermissions() {
       permissionCode,
     });
   }
+
+  for (const permissionCode of AGENCY_REPRESENTATIVE_PERMISSION_CODES) {
+    await grantPermissionToRole({
+      roleCode: ROLE_CODES.AGENCY_REPRESENTATIVE,
+      permissionCode,
+    });
+  }
 }
 
 export async function bootstrapDevelopmentSystemAdmin() {
   await ensureRolesAndPermissions();
+  await ensureAgencyMembershipsPublicUuid();
+  await bootstrapDemoAgencyRepresentatives();
 
   const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);
 
