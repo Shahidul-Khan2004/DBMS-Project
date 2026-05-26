@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  requireAuth,
+  requireAuth as defaultRequireAuth,
   requireAnyPermission,
   requirePermission,
 } from "../middlewares/auth.js";
@@ -65,9 +65,10 @@ import {
   validateOperationsServiceCasePublicUuidParam,
 } from "../validators/serviceCases.js";
 
-const router = express.Router();
+export function createOperationsRouter({ requireAuth = defaultRequireAuth } = {}) {
+  const router = express.Router();
 
-router.use(requireAuth);
+  router.use(requireAuth);
 
 router.get(
   "/dispatcher/overview",
@@ -254,4 +255,7 @@ router.post(
   postOperationsServiceCaseResolve,
 );
 
-export default router;
+  return router;
+}
+
+export default createOperationsRouter();

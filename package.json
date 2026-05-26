@@ -6,7 +6,8 @@
     "dev:backend": "cd backend && node src/app.js",
     "dev:frontend": "next dev frontend",
     "generate:admin-areas": "node backend/scripts/generate-admin-areas-seed.mjs",
-    "test": "node --test backend/test/*.test.js",
+    "test": "env -u MYSQL_DATABASE -u DATABASE_URL -u MYSQL_HOST -u MYSQL_USER -u MYSQL_PASSWORD node --test --test-force-exit backend/test/*.test.js",
+    "test:integration": "cd backend && node --import dotenv/config --test --test-force-exit test/integration/*.integration.test.js",
     "test:barikoi-live": "cd backend && RUN_BARIKOI_LIVE=1 node --import dotenv/config --test test/barikoiLiveApiKey.test.js"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
+    "supertest": "^7.2.2",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.0.0"
   }

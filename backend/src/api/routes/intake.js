@@ -10,7 +10,8 @@ import {
   patchMyIntakeReportLocation,
 } from "../controllers/intake.js";
 import {
-  requireAuth,
+  forbidEmergencyUrgencyWithoutIncidentClassify,
+  requireAuth as defaultRequireAuth,
   requirePermission,
   requireRole,
 } from "../middlewares/auth.js";
@@ -36,9 +37,10 @@ import {
   validatePatchIntakeReportLocation,
 } from "../validators/intake.js";
 
-const router = express.Router();
+export function createIntakeRouter({ requireAuth = defaultRequireAuth } = {}) {
+  const router = express.Router();
 
-router.use(requireAuth);
+  router.use(requireAuth);
 
 router.get("/reports/my", getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
@@ -98,4 +100,7 @@ router.post(
   postIntakeReportEscalateToEmergency,
 );
 
-export default router;
+  return router;
+}
+
+export default createIntakeRouter();

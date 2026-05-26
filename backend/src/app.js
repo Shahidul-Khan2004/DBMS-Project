@@ -1,40 +1,10 @@
 import "dotenv/config";
-import cors from "cors";
-import express from "express";
-import healthRouter from "./api/routes/health.js";
-import authRouter from "./api/routes/auth.js";
-import usersRouter from "./api/routes/users.js";
-import intakeRouter from "./api/routes/intake.js";
-import operationsRouter from "./api/routes/operations.js";
-import locationsRouter from "./api/routes/locations.js";
-import notificationsRouter from "./api/routes/notifications.js";
-import { errorHandler, notFound } from "./api/middlewares/error.js";
+import { createApp } from "./createApp.js";
 import { bootstrapDevelopmentSystemAdmin } from "./services/bootstrapService.js";
 import { startEmailQueueWorker } from "./workers/emailQueueWorker.js";
 
-const app = express();
-
 const PORT = process.env.PORT || 8080;
-
-app.use(
-  cors({
-    origin: "http://localhost:3000"
-  }),
-);
-app.use(express.json());
-
-app.use("/", healthRouter);
-app.use("/auth", authRouter);
-app.use("/users", usersRouter);
-app.use("/intake", intakeRouter);
-app.use("/operations", operationsRouter);
-app.use("/locations", locationsRouter);
-app.use("/notifications", notificationsRouter);
-
-app.use(notFound);
-
-//error handler should be the last middleware
-app.use(errorHandler);
+const app = createApp();
 
 async function startServer() {
   try {

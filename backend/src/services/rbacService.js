@@ -12,6 +12,7 @@ export const ROLE_CODES = {
   SYSTEM_ADMIN: "system_admin",
   CITIZEN: "citizen",
   DISPATCHER: "dispatcher",
+  AGENCY_REPRESENTATIVE: "agency_representative",
 };
 
 export async function resolveAuthorizationContext(userId) {
@@ -29,6 +30,14 @@ export async function assignRoleToUserByPublicId({
   roleCode,
   assignedByUserId,
 }) {
+  if (roleCode === ROLE_CODES.AGENCY_REPRESENTATIVE) {
+    throw new BackendError(
+      403,
+      "ROLE_ASSIGNMENT_NOT_ALLOWED",
+      "Assign agency representatives via POST /admin/agencies/onboard or POST /admin/agencies/:agencyPublicUuid/representatives",
+    );
+  }
+
   const targetUser = await findUserByPublicUuid(targetUserPublicId);
 
   if (!targetUser) {
