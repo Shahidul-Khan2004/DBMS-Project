@@ -6,7 +6,8 @@ The canonical database definition for Docker and fresh installs lives in **`dock
 2. `05_`–`18_` — `CREATE TABLE` DDL by domain (identity, geography, intake, … audit)  
 3. `19_`–`20_` — triggers, then views  
 4. `21_` — reference data seeds (roles, permissions, channels, …)  
-5. `22_` — Bangladesh `administrative_areas` hierarchy (from [nuhil/bangladesh-geocode](https://github.com/nuhil/bangladesh-geocode), MIT)
+5. `22_` — Bangladesh `administrative_areas` hierarchy (from [nuhil/bangladesh-geocode](https://github.com/nuhil/bangladesh-geocode), MIT); emitted as **4 bulk inserts** (one per level) for fast Docker init  
+6. `27_` — adds `agency_memberships.public_uuid` on DBs created before that column existed (also applied automatically on server bootstrap)
 
 The official MySQL image executes `/docker-entrypoint-initdb.d/*.sql` in **lexical** order; filenames use two-digit prefixes so sort order matches dependency order.
 
