@@ -48,11 +48,6 @@ function unionCode(id) {
   return `BD-UNION-${id}`;
 }
 
-/** MySQL disallows `INSERT … SELECT` from the same table without a derived wrapper (ER 1093). */
-function parentIdSubquery(code) {
-  return `(SELECT id FROM (SELECT id FROM administrative_areas WHERE code = '${code}' LIMIT 1) AS _aa_p)`;
-}
-
 /** Satisfy UNIQUE(parent_area_id, area_type, name) when source has duplicate names. */
 function makeNameDeduper() {
   const counts = new Map();
@@ -65,6 +60,37 @@ function makeNameDeduper() {
     const combined = `${baseName}${suffix}`;
     return combined.length <= 150 ? combined : `${baseName.slice(0, 150 - suffix.length)}${suffix}`;
   };
+}
+
+/** @param {{ parentCode: string | null, areaType: string, name: string, code: string }[]} rows */
+function emitDivisionValuesInsert(lines, rows) {
+  lines.push("INSERT INTO administrative_areas (parent_area_id, area_type, name, code) VALUES");
+  lines.push(
+    rows
+      .map((r) => `  (NULL, '${r.areaType}', '${esc(r.name)}', '${r.code}')`)
+      .join(",\n"),
+  );
+  lines.push(";");
+  lines.push("");
+}
+
+/** @param {{ parentCode: string, areaType: string, name: string, code: string }[]} rows */
+function emitInsertSelect(lines, rows) {
+  if (rows.length === 0) return;
+  lines.push("INSERT INTO administrative_areas (parent_area_id, area_type, name, code)");
+  lines.push("SELECT p.id, v.area_type, v.name, v.code");
+  lines.push("FROM (");
+  lines.push(
+    rows
+      .map(
+        (r, i) =>
+          `  SELECT '${r.parentCode}' AS parent_code, '${r.areaType}' AS area_type, '${esc(r.name)}' AS name, '${r.code}' AS code${i < rows.length - 1 ? "\n  UNION ALL" : ""}`,
+      )
+      .join("\n"),
+  );
+  lines.push(") AS v");
+  lines.push("INNER JOIN administrative_areas p ON p.code = v.parent_code;");
+  lines.push("");
 }
 
 async function main() {
@@ -84,42 +110,57 @@ async function main() {
   const nameUpazila = makeNameDeduper();
   const nameUnion = makeNameDeduper();
 
+  const divisionRows = divisions.map((d) => ({
+    parentCode: null,
+    areaType: "division",
+    name: String(d.name).trim(),
+    code: divCode(d.id),
+  }));
+
+  const districtRows = districts.map((d) => {
+    const parentCode = divCode(d.division_id);
+    return {
+      parentCode,
+      areaType: "district",
+      name: nameDistrict(parentCode, String(d.name).trim(), d.id),
+      code: distCode(d.id),
+    };
+  });
+
+  const upazilaRows = upazilas.map((u) => {
+    const parentCode = distCode(u.district_id);
+    return {
+      parentCode,
+      areaType: "upazila",
+      name: nameUpazila(parentCode, String(u.name).trim(), u.id),
+      code: upzCode(u.id),
+    };
+  });
+
+  const unionRows = unions.map((u) => {
+    const parentCode = upzCode(u["upazilla_id"]);
+    return {
+      parentCode,
+      areaType: "union",
+      name: nameUnion(parentCode, String(u.name).trim(), u.id),
+      code: unionCode(u.id),
+    };
+  });
+
   const lines = [];
   lines.push("-- Administrative areas: Bangladesh hierarchy (division → district → upazila → union)");
   lines.push("-- Data source: https://github.com/nuhil/bangladesh-geocode (MIT). Codes are stable IDs from that dataset.");
+  lines.push("-- Bulk inserts (4 statements) for fast Docker init.");
+  lines.push("");
+  lines.push("SET SESSION unique_checks = 0;");
   lines.push("");
 
-  for (const d of divisions) {
-    const code = divCode(d.id);
-    lines.push(
-      `INSERT INTO administrative_areas (parent_area_id, area_type, name, code) VALUES (NULL, 'division', '${esc(d.name)}', '${code}');`,
-    );
-  }
+  emitDivisionValuesInsert(lines, divisionRows);
+  emitInsertSelect(lines, districtRows);
+  emitInsertSelect(lines, upazilaRows);
+  emitInsertSelect(lines, unionRows);
 
-  for (const d of districts) {
-    const pcode = divCode(d.division_id);
-    const nm = nameDistrict(pcode, String(d.name).trim(), d.id);
-    lines.push(
-      `INSERT INTO administrative_areas (parent_area_id, area_type, name, code) VALUES (${parentIdSubquery(pcode)}, 'district', '${esc(nm)}', '${distCode(d.id)}');`,
-    );
-  }
-
-  for (const u of upazilas) {
-    const pcode = distCode(u.district_id);
-    const nm = nameUpazila(pcode, String(u.name).trim(), u.id);
-    lines.push(
-      `INSERT INTO administrative_areas (parent_area_id, area_type, name, code) VALUES (${parentIdSubquery(pcode)}, 'upazila', '${esc(nm)}', '${upzCode(u.id)}');`,
-    );
-  }
-
-  for (const u of unions) {
-    const pid = u["upazilla_id"];
-    const parentCode = upzCode(pid);
-    const nm = nameUnion(parentCode, String(u.name).trim(), u.id);
-    lines.push(
-      `INSERT INTO administrative_areas (parent_area_id, area_type, name, code) VALUES (${parentIdSubquery(parentCode)}, 'union', '${esc(nm)}', '${unionCode(u.id)}');`,
-    );
-  }
+  lines.push("SET SESSION unique_checks = 1;");
 
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, `${lines.join("\n")}\n`, "utf8");
