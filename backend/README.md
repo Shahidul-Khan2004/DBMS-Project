@@ -30,3 +30,24 @@ Source and license: [third_party/bangladesh-geocode/README.md](third_party/bangl
 ### Optional: Barikoi API key
 
 GPS-based `admin_area_id` resolution uses Barikoi when `BARIKOI_API_KEY` is set. See [docs/backend-external-dependencies.md](../docs/backend-external-dependencies.md).
+
+## Testing
+
+From the repository root:
+
+```bash
+# Fast contract + unit tests (no MySQL required)
+npm test
+
+# Full HTTP smoke tests against Docker MySQL + backend/.env
+npm run test:integration
+```
+
+**Integration prerequisites**
+
+- MySQL running (`cd backend && docker compose up`)
+- [`backend/.env`](.env) with `MYSQL_*`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
+- `SYSTEM_ADMIN__EMAIL` / `SYSTEM_ADMIN_PASSWORD` for admin/operations smoke tests
+- `DEMO_REP_PASSWORD` for agency rep smoke tests (`fire.rep@niers.test` seed user)
+
+Optional: `npm run test:barikoi-live` exercises the real Barikoi API when `BARIKOI_API_KEY` is set.

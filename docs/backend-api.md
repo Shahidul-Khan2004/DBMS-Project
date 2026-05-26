@@ -2,6 +2,8 @@
 
 Living reference for HTTP endpoints. Update this file whenever routes or contract-relevant validation change.
 
+**Automated checks:** run `npm test` for fast route contract tests (401/403/422); run `npm run test:integration` for MySQL-backed HTTP smoke tests. See [backend/README.md](../backend/README.md#testing).
+
 ## Base URL
 
 - Local: `http://localhost:8080`
@@ -96,6 +98,26 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Operations | PATCH | `/operations/dispatches/:dispatchPublicUuid/status` | `dispatch.update_status` |
 | Operations | GET | `/operations/agencies/workload` | `dispatch.create` or `incident.assign_agency` |
 | Operations | GET | `/operations/incidents/:incidentPublicUuid/response-timing` | `dispatch.create` or `incident.assign_agency` |
+| Admin | POST | `/admin/agencies/onboard` | `agency.manage` |
+| Admin | GET | `/admin/agencies` | `agency.manage` |
+| Admin | GET | `/admin/agencies/:agencyPublicUuid` | `agency.manage` |
+| Admin | PATCH | `/admin/agencies/:agencyPublicUuid` | `agency.manage` |
+| Admin | PATCH | `/admin/agencies/:agencyPublicUuid/deactivate` | `agency.manage` |
+| Admin | PATCH | `/admin/agencies/:agencyPublicUuid/activate` | `agency.manage` |
+| Admin | POST | `/admin/agencies/:agencyPublicUuid/representatives` | `agency.manage` |
+| Admin | GET | `/admin/agencies/:agencyPublicUuid/representatives` | `agency.manage` |
+| Admin | PATCH | `/admin/agency-memberships/:membershipPublicUuid/deactivate` | `agency.manage` |
+| Agency | GET | `/agency/me` | `agency.view_own` + active membership |
+| Agency | GET | `/agency/incidents` | `dispatch.view_own_agency` |
+| Agency | GET | `/agency/dispatches` | `dispatch.view_own_agency` |
+| Agency | PATCH | `/agency/dispatches/:dispatchPublicUuid/status` | `dispatch.update_own_agency` |
+| Agency | GET | `/agency/units` | `agency.view_own` |
+| Agency | POST | `/agency/units` | `agency.manage_own_units` |
+| Agency | PATCH | `/agency/units/:unitPublicUuid` | `agency.manage_own_units` |
+| Agency | PATCH | `/agency/units/:unitPublicUuid/deactivate` | `agency.manage_own_units` |
+| Agency | PATCH | `/agency/units/:unitPublicUuid/status` | `agency.manage_own_units` |
+| Agency | GET | `/agency/incidents/:incidentPublicUuid/response-logs` | `dispatch.view_own_agency` |
+| Agency | POST | `/agency/incidents/:incidentPublicUuid/response-logs` | `response_log.create_own_agency` |
 | Operations | GET | `/operations/service-cases` | Permission `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid` | `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid/messages` | `case.respond`; message thread only |
@@ -1188,9 +1210,215 @@ Inserts `case_resolutions` then status history to **`resolved`** (trigger syncs 
 
 ---
 
+## Admin — agencies and representatives
+
+All routes require JWT and permission **`agency.manage`** (`system_admin` receives this on bootstrap).
+
+Assigning role **`agency_representative`** via `POST /users/:userId/roles` is **blocked** (`403` `ROLE_ASSIGNMENT_NOT_ALLOWED`). Use onboard or representatives routes instead.
+
+### POST `/admin/agencies/onboard`
+
+Single transaction: link an **existing** user to an agency (create new agency **or** use existing), upsert **`agency_memberships`** (`representative`, `active`), assign **`agency_representative`** role if missing.
+
+**Body (new agency):**
+
+```json
+{
+  "user_public_uuid": "<user public uuid>",
+  "agency": {
+    "agency_code": "DHK-FIRE-02",
+    "name": "Dhaka Fire Service North",
+    "agency_type_code": "fire_service",
+    "description": "optional",
+    "head_office_location": {
+      "latitude": 23.81,
+      "longitude": 90.41,
+      "source": "manual_entry"
+    }
+  }
+}
+```
+
+**Body (existing agency):**
+
+```json
+{
+  "user_public_uuid": "<user public uuid>",
+  "agency_public_uuid": "b2000001-0000-4000-8000-000000000001"
+}
+```
+
+**Response (201):** `{ "message", "agency", "membership_public_uuid", "user_public_uuid" }`.
+
+**Errors:** `404` `USER_NOT_FOUND`, `404` `AGENCY_NOT_FOUND`, `409` `AGENCY_CODE_CONFLICT`, `409` `USER_ALREADY_REPRESENTATIVE`.
+
+### GET `/admin/agencies`
+
+Query: `limit` (1–100, default 20), `offset` (default 0).
+
+**Response (200):** `{ "total", "limit", "offset", "agencies": [{ "public_uuid", "agency_code", "name", "agency_type_code", "description", "is_active", "created_at", "updated_at" }] }`.
+
+### GET `/admin/agencies/:agencyPublicUuid`
+
+**Response (200):** `{ "agency", "representatives": [], "units": [], "contacts": [] }`.
+
+### PATCH `/admin/agencies/:agencyPublicUuid`
+
+Metadata only (`agency_code`, `name`, `description`, optional `head_office_location`). Use deactivate route for `is_active`.
+
+### PATCH `/admin/agencies/:agencyPublicUuid/deactivate`
+
+Sets `is_active = false` (no hard delete). In the same transaction, deactivates all **active representative** memberships for the agency (`membership_status = inactive`, `left_at = NOW()`). Removes `agency_representative` from `user_roles` per affected user when they have no remaining **active** representative memberships elsewhere. Use activate route to restore agency and representative access, or re-link via `POST /admin/agencies/:agencyPublicUuid/representatives` / onboard.
+
+### PATCH `/admin/agencies/:agencyPublicUuid/activate`
+
+Sets `is_active = true`. In the same transaction, reactivates all **inactive representative** memberships for the agency (`membership_status = active`, `left_at = NULL`). Restores `agency_representative` in `user_roles` per affected user. Fails with `409` `USER_ALREADY_REPRESENTATIVE` if any user would have active representative memberships at two agencies.
+
+**Errors:** `404` `AGENCY_NOT_FOUND`, `409` `USER_ALREADY_REPRESENTATIVE`.
+
+### POST `/admin/agencies/:agencyPublicUuid/representatives`
+
+**Body:** `{ "user_public_uuid": "<uuid>" }` — same membership/role rules as onboard user leg.
+
+### GET `/admin/agencies/:agencyPublicUuid/representatives`
+
+**Response (200):** `{ "agency_public_uuid", "representatives": [{ "public_uuid", "user_public_uuid", "full_name", "email", "membership_role", "membership_status", "joined_at", "left_at" }] }`.
+
+### PATCH `/admin/agency-memberships/:membershipPublicUuid/deactivate`
+
+Sets `membership_status = inactive`, `left_at = NOW()`. In the same transaction, removes `agency_representative` from `user_roles` when the user has no remaining **active** representative memberships (`membership_role = representative`, `membership_status = active`). Re-link via `POST /admin/agencies/:agencyPublicUuid/representatives` or onboard restores the role.
+
+**Errors:** `404` `MEMBERSHIP_NOT_FOUND`, `409` `MEMBERSHIP_ALREADY_INACTIVE`.
+
+---
+
+## Agency representative
+
+All routes require JWT, the listed permission, and an **active** `agency_memberships` row with `membership_role = representative` for the caller. Otherwise **`403` `MEMBERSHIP_INACTIVE`**.
+
+Ownership: dispatches/units via `emergency_units.agency_id`; incidents via `incident_agency_participation`; response logs require agency participation on the incident.
+
+### Demo stable UUIDs
+
+| Resource | UUID |
+| --- | --- |
+| Dhaka Fire Service | `b2000001-0000-4000-8000-000000000001` |
+| Dhaka Police | `b2000001-0000-4000-8000-000000000002` |
+| Dhaka Medical | `b2000001-0000-4000-8000-000000000003` |
+| Fire rep membership | `d4000001-0000-4000-8000-000000000001` |
+| Demo incident | `e5000001-0000-4000-8000-000000000001` |
+| Fire demo dispatch | `f5000001-0000-4000-8000-000000000001` |
+
+Demo users (bootstrap when `DEMO_REP_PASSWORD` is set): `fire.rep@niers.test`, `police.rep@niers.test`, `medical.rep@niers.test`.
+
+### GET `/agency/me`
+
+**Response (200):**
+
+```json
+{
+  "agency": { "public_uuid", "agency_code", "name", "description", "agency_type_code", "is_active" },
+  "membership": { "public_uuid", "membership_role", "membership_status", "joined_at" },
+  "counts": { "total_units", "active_units", "open_dispatches", "active_incidents" }
+}
+```
+
+### GET `/agency/incidents`
+
+Minimal list for own agency participation. Query: `limit`, `offset`.
+
+### GET `/agency/dispatches`
+
+Dispatches for units owned by the agency; each item includes nested `incident` and `unit` summaries.
+
+### PATCH `/agency/dispatches/:dispatchPublicUuid/status`
+
+Same body as operations dispatch PATCH: `{ "statusCode": "dispatched|arrived|completed|cancelled", "note": "optional" }`. Cross-agency UUID → **`404` `DISPATCH_NOT_FOUND`**.
+
+### GET `/agency/units` · POST `/agency/units` · PATCH `/agency/units/:unitPublicUuid`
+
+**Example POST body:**
+```json
+{
+  "unit_code": "FIRE-TRK-01",
+  "unit_name": "Fire Truck Alpha",
+  "unit_type_code": "fire_truck",
+  "base_location": {
+    "latitude": 23.8103,
+    "longitude": 90.4125
+  }
+}
+```
+Creates unit and initial `unit_status_history` → `available`.
+
+**PATCH:** metadata only (`unit_code`, `unit_name`, `base_location`).
+
+**Example PATCH body:**
+```json
+{
+  "unit_code": "FIRE-TRK-01",
+  "unit_name": "Fire Truck Beta",
+  "base_location": {
+    "latitude": 23.8103,
+    "longitude": 90.4125
+  }
+}
+```
+
+### PATCH `/agency/units/:unitPublicUuid/deactivate`
+
+`is_active = false` if no dispatch in `assigned|dispatched|arrived`. **`409` `UNIT_HAS_ACTIVE_DISPATCH`**.
+
+### PATCH `/agency/units/:unitPublicUuid/status`
+
+**Body:** `{ "status_code": "available|busy", "note": "optional" }` — representatives may only toggle **available ↔ busy**.
+
+### GET `/agency/incidents/:incidentPublicUuid/response-logs`
+
+Lists **this agency’s** response logs on the incident (newest first). Query: `limit` (1–100, default 20), `offset` (default 0).
+
+**Response (200):**
+
+```json
+{
+  "incident_public_uuid": "e5000001-0000-4000-8000-000000000001",
+  "limit": 20,
+  "offset": 0,
+  "response_logs": [
+    {
+      "id": 1,
+      "log_type": "update",
+      "message": "On scene, smoke visible on floor 3",
+      "logged_at": "2026-05-19T10:15:00.000Z",
+      "dispatch_public_uuid": "f5000001-0000-4000-8000-000000000001"
+    }
+  ]
+}
+```
+
+**Errors:** `404` `INCIDENT_NOT_IN_AGENCY`.
+
+### POST `/agency/incidents/:incidentPublicUuid/response-logs`
+
+**Body:**
+
+```json
+{
+  "log_type": "update",
+  "message": "On scene, smoke visible on floor 3",
+  "dispatch_public_uuid": "optional"
+}
+```
+
+**Response (201):** `{ "response_log": { "id", "log_type", "message", "logged_at", "dispatch_public_uuid" } }`.
+
+**Errors:** `404` `INCIDENT_NOT_IN_AGENCY`, `422` `RESPONSE_LOG_DISPATCH_MISMATCH`.
+
+---
+
 ## Development RBAC bootstrap
 
-On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and **`case.create`**, **`case.respond`**, **`case.assign`**, **`case.escalate`** when `ensureRolesAndPermissions()`
+On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and case permissions. **`agency_representative`** receives only: `agency.view_own`, `agency.manage_own_units`, `dispatch.view_own_agency`, `dispatch.update_own_agency`, `response_log.create_own_agency`. **`system_admin`** receives all bootstrap permissions including **`agency.manage`** and the `*_own` set.
 
 **Env vars:**
 
@@ -1198,5 +1426,6 @@ On server start, the backend seeds minimal RBAC and can bootstrap a dev **system
 - `SYSTEM_ADMIN_PASSWORD`
 - `SYSTEM_ADMIN_NAME`
 - `SYSTEM_ADMIN_PHONE` (exactly 11 digits)
+- `DEMO_REP_PASSWORD` (min 8 chars; creates demo reps when missing)
 
 If no active `system_admin` assignment exists and these are set, the app creates or finds the user and assigns **`system_admin`**.
