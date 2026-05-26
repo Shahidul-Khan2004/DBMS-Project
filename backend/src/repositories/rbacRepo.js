@@ -44,14 +44,31 @@ export async function findPermissionCodesByUserId(userId) {
   return result.rows.map((row) => row.permission_code);
 }
 
-export async function assignRoleToUser({ userId, roleId, assignedByUserId = null }) {
-  await query(
-    `
-      INSERT INTO user_roles (user_id, role_id, assigned_by_user_id)
-      VALUES (?, ?, ?)
-    `,
-    [userId, roleId, assignedByUserId]
-  );
+export async function assignRoleToUser({ userId, roleId, assignedByUserId = null, conn = null }) {
+  const sql = `
+    INSERT INTO user_roles (user_id, role_id, assigned_by_user_id)
+    VALUES (?, ?, ?)
+  `;
+  const params = [userId, roleId, assignedByUserId];
+  if (conn) {
+    await conn.execute(sql, params);
+  } else {
+    await query(sql, params);
+  }
+}
+
+export async function removeRoleFromUser({ userId, roleCode, conn = null }) {
+  const sql = `
+    DELETE ur FROM user_roles ur
+    INNER JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = ? AND r.role_code = ?
+  `;
+  const params = [userId, roleCode];
+  if (conn) {
+    await conn.execute(sql, params);
+  } else {
+    await query(sql, params);
+  }
 }
 
 export async function ensureRole({

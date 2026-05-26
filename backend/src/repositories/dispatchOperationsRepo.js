@@ -76,6 +76,7 @@ async function loadDispatchByPublicUuid(conn, dispatchPublicUuid) {
         d.public_uuid AS public_uuid,
         d.incident_id AS incident_id,
         d.unit_id AS unit_id,
+        eu.agency_id AS agency_id,
         d.priority_level AS priority_level,
         d.assigned_at AS assigned_at,
         d.dispatched_at AS dispatched_at,
@@ -633,6 +634,10 @@ export async function patchDispatchStatus(params) {
 
     const dispatch = await loadDispatchByPublicUuid(conn, params.dispatchPublicUuid);
     if (!dispatch) {
+      throw new BackendError(404, "DISPATCH_NOT_FOUND", "Dispatch not found");
+    }
+
+    if (params.agencyId != null && Number(dispatch.agency_id) !== Number(params.agencyId)) {
       throw new BackendError(404, "DISPATCH_NOT_FOUND", "Dispatch not found");
     }
 
