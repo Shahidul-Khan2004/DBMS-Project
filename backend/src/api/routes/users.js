@@ -1,5 +1,8 @@
 import express from "express";
-import { requireAuth, requirePermission } from "../middlewares/auth.js";
+import {
+  requireAuth as defaultRequireAuth,
+  requirePermission,
+} from "../middlewares/auth.js";
 import { getCurrentUser } from "../controllers/auth.js";
 import { assignRoleToUser } from "../controllers/users.js";
 import {
@@ -7,17 +10,21 @@ import {
   validateUserRoleAssignmentParams,
 } from "../validators/users.js";
 
-const router = express.Router();
+export function createUsersRouter({ requireAuth = defaultRequireAuth } = {}) {
+  const router = express.Router();
 
-router.use(requireAuth);
+  router.use(requireAuth);
 
-router.get("/me", getCurrentUser);
-router.post(
-  "/:userId/roles",
-  requirePermission("auth.manage_roles"),
-  validateUserRoleAssignmentParams,
-  validateUserRoleAssignment,
-  assignRoleToUser
-);
+  router.get("/me", getCurrentUser);
+  router.post(
+    "/:userId/roles",
+    requirePermission("auth.manage_roles"),
+    validateUserRoleAssignmentParams,
+    validateUserRoleAssignment,
+    assignRoleToUser,
+  );
 
-export default router;
+  return router;
+}
+
+export default createUsersRouter();

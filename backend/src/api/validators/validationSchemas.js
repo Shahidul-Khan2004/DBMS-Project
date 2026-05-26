@@ -333,3 +333,78 @@ export const operationsPatchDispatchStatusSchema = z.object({
   statusCode: z.enum(["dispatched", "arrived", "completed", "cancelled"]),
   note: z.string().trim().max(500).optional(),
 });
+
+export const paginationQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const agencyPublicUuidParamSchema = z.object({
+  agencyPublicUuid: z.uuid({ message: "Invalid agency id" }),
+});
+
+export const membershipPublicUuidParamSchema = z.object({
+  membershipPublicUuid: z.uuid({ message: "Invalid membership id" }),
+});
+
+export const unitPublicUuidParamSchema = z.object({
+  unitPublicUuid: z.uuid({ message: "Invalid unit id" }),
+});
+
+export const incidentPublicUuidParamSchema = z.object({
+  incidentPublicUuid: z.uuid({ message: "Invalid incident id" }),
+});
+
+const adminAgencyPayloadSchema = z.object({
+  agency_code: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(180),
+  agency_type_code: z.string().trim().min(1),
+  description: z.string().trim().max(1000).optional(),
+  head_office_location: locationObjectSchema.optional(),
+});
+
+export const adminOnboardAgencySchema = z
+  .object({
+    user_public_uuid: z.uuid({ message: "user_public_uuid must be a user public UUID" }),
+    agency_public_uuid: z.uuid({ message: "Invalid agency id" }).optional(),
+    agency: adminAgencyPayloadSchema.optional(),
+  })
+  .refine((data) => Boolean(data.agency_public_uuid) !== Boolean(data.agency), {
+    message: "Provide exactly one of agency_public_uuid or agency",
+    path: ["agency"],
+  });
+
+export const adminPatchAgencySchema = z.object({
+  agency_code: z.string().trim().min(1).max(80).optional(),
+  name: z.string().trim().min(1).max(180).optional(),
+  description: z.string().trim().max(1000).optional(),
+  head_office_location: locationObjectSchema.optional(),
+});
+
+export const adminLinkRepresentativeSchema = z.object({
+  user_public_uuid: z.uuid({ message: "user_public_uuid must be a user public UUID" }),
+});
+
+export const agencyCreateUnitSchema = z.object({
+  unit_code: z.string().trim().min(1).max(80),
+  unit_name: z.string().trim().min(1).max(150),
+  unit_type_code: z.string().trim().min(1),
+  base_location: locationObjectSchema,
+});
+
+export const agencyPatchUnitSchema = z.object({
+  unit_code: z.string().trim().min(1).max(80).optional(),
+  unit_name: z.string().trim().min(1).max(150).optional(),
+  base_location: locationObjectSchema.optional(),
+});
+
+export const agencyPatchUnitStatusSchema = z.object({
+  status_code: z.enum(["available", "busy"]),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const agencyCreateResponseLogSchema = z.object({
+  log_type: z.enum(["update", "hazard", "casualty", "resource_need", "completion_note"]).optional(),
+  message: z.string().trim().min(1, "message is required"),
+  dispatch_public_uuid: z.uuid({ message: "Invalid dispatch id" }).optional(),
+});

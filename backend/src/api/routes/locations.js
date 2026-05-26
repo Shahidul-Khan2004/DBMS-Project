@@ -6,20 +6,24 @@ import {
   getLocationSearch,
   postLocation,
 } from "../controllers/locations.js";
-import { requireAuth } from "../middlewares/auth.js";
+import { requireAuth as defaultRequireAuth } from "../middlewares/auth.js";
 import {
   validateCreateLocation,
   validateLocationPublicUuidParam,
 } from "../validators/location.js";
 
-const router = express.Router();
+export function createLocationsRouter({ requireAuth = defaultRequireAuth } = {}) {
+  const router = express.Router();
 
-router.use(requireAuth);
+  router.use(requireAuth);
 
-router.post("/", validateCreateLocation, postLocation);
-router.get("/my", getMyLocations);
-router.get("/search", getLocationSearch);
-router.get("/reverse", getLocationReverse);
-router.get("/:publicUuid", validateLocationPublicUuidParam, getLocationByPublicUuid);
+  router.post("/", validateCreateLocation, postLocation);
+  router.get("/my", getMyLocations);
+  router.get("/search", getLocationSearch);
+  router.get("/reverse", getLocationReverse);
+  router.get("/:publicUuid", validateLocationPublicUuidParam, getLocationByPublicUuid);
 
-export default router;
+  return router;
+}
+
+export default createLocationsRouter();
