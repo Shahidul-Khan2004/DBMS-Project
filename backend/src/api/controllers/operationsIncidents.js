@@ -39,6 +39,16 @@ export async function getOperationsIncident(req, res) {
   res.status(200).json(result);
 }
 
+export async function getOperationsIncidentNotes(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const query = req.validated?.query ?? req.query;
+  const result = await incidentOperationsService.operationsListIncidentNotes(
+    params.incidentPublicUuid,
+    query,
+  );
+  res.status(200).json(result);
+}
+
 export async function patchOperationsIncidentStatus(req, res) {
   const params = req.validated?.params ?? req.params;
   const incident = await incidentOperationsService.operationsPatchIncidentStatus(
