@@ -7,6 +7,7 @@ import {
 import {
   createOperationsIncident,
   getOperationsIncident,
+  getOperationsIncidentNotes,
   listOperationsIncidents,
   patchOperationsIncidentStatus,
   postGateway999IntakeAndIncident,
@@ -25,6 +26,7 @@ import {
   validateOperationsIncidentNote,
   validateOperationsIncidentUuidParam,
   validateOperationsListIncidentsQuery,
+  validateOperationsListIncidentNotesQuery,
   validateOperationsLinkIntakeToIncident,
   validateOperationsListIntakeQuery,
   validateOperationsPatchIncidentStatus,
@@ -140,6 +142,14 @@ router.patch(
   validateOperationsIncidentUuidParam,
   validateOperationsPatchIncidentStatus,
   patchOperationsIncidentStatus,
+);
+
+router.get(
+  "/incidents/:incidentPublicUuid/notes",
+  requireAnyPermission("incident.create", "incident.update_status"),
+  validateOperationsIncidentUuidParam,
+  validateOperationsListIncidentNotesQuery,
+  getOperationsIncidentNotes,
 );
 
 router.post(
