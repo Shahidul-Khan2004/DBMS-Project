@@ -78,6 +78,10 @@ export function agencyListResponseLogs(agencyId, incidentPublicUuid, query) {
   return agencyRepo.listResponseLogs(agencyId, incidentPublicUuid, query);
 }
 
+export function agencyListIncidentNotes(agencyId, incidentPublicUuid, query) {
+  return agencyRepo.listIncidentNotes(agencyId, incidentPublicUuid, query);
+}
+
 export function agencyCreateResponseLog(agencyId, incidentPublicUuid, body, actorUserId) {
   return agencyRepo.createResponseLog({
     agencyId,

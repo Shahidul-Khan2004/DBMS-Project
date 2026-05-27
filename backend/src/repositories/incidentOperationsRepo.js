@@ -968,20 +968,64 @@ export async function getIncidentDetailForOperations(publicUuid) {
             }
           : null,
       })),
-      timeline_preview: timeline.map((t) => ({
-        id: String(t.id),
-        event_type: t.event_type,
-        event_title: t.event_title,
-        event_description: t.event_description,
-        event_time: t.event_time,
-        created_at: t.created_at,
-      })),
+      timeline_preview: timeline.map(mapTimelineEventRow),
       participating_agencies,
       dispatches,
     };
   } finally {
     conn.release();
   }
+}
+
+function mapTimelineEventRow(row) {
+  return {
+    id: String(row.id),
+    event_type: row.event_type,
+    event_title: row.event_title,
+    event_description: row.event_description,
+    event_time: row.event_time,
+    created_at: row.created_at,
+  };
+}
+
+export async function listIncidentOperatorNotes(incidentPublicUuid, { limit = 20, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safeOffset = Math.max(offset, 0);
+
+  const [incidentRows] = await pool.execute(
+    `
+      SELECT id FROM emergency_incidents WHERE public_uuid = ? LIMIT 1
+    `,
+    [incidentPublicUuid],
+  );
+  if (!incidentRows[0]) {
+    throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
+  }
+
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        id,
+        event_type AS event_type,
+        event_title AS event_title,
+        event_description AS event_description,
+        event_time AS event_time,
+        created_at AS created_at
+      FROM incident_timeline_events
+      WHERE incident_id = ?
+        AND event_type = 'operator_note'
+      ORDER BY event_time DESC, id DESC
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
+    `,
+    [incidentRows[0].id],
+  );
+
+  return {
+    incident_public_uuid: incidentPublicUuid,
+    limit: safeLimit,
+    offset: safeOffset,
+    notes: rows.map(mapTimelineEventRow),
+  };
 }
 
 function mapIncidentDetail(row) {

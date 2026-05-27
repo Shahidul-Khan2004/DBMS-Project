@@ -8,6 +8,7 @@ import {
   createIncidentAdminStandalone,
   getIncidentDetailForOperations,
   listIncidentsForOperations,
+  listIncidentOperatorNotes,
   listMyIncidentsByReporterUserId,
   getIncidentReporterUserIds,
 } from "../repositories/incidentOperationsRepo.js";
@@ -161,6 +162,10 @@ export async function listMyIncidents(actorPublicUuid) {
 
 export async function operationsGetIncident(publicUuid) {
   return getIncidentDetailForOperations(publicUuid);
+}
+
+export async function operationsListIncidentNotes(incidentPublicUuid, query) {
+  return listIncidentOperatorNotes(incidentPublicUuid, query);
 }
 
 export async function operationsPatchIncidentStatus(actorUserId, incidentPublicUuid, body) {
