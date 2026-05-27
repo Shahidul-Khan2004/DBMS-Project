@@ -447,6 +447,63 @@ export const ROUTE_MANIFEST = [
     hasBodyValidator: true,
     validationPersona: "agencyRep",
   },
+
+  { method: "GET", path: "/public/disasters", public: true },
+  { method: "GET", path: `/public/disasters/${U}`, public: true },
+
+  {
+    method: "GET",
+    path: "/reference/administrative-areas/search",
+    anyPermissions: ["disaster.read", "disaster.create", "disaster.manage_affected_areas"],
+    validationPersona: "dispatcher",
+  },
+
+  {
+    method: "POST",
+    path: "/operations/disasters",
+    permissions: ["disaster.create"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
+  {
+    method: "GET",
+    path: "/operations/disasters",
+    permissions: ["disaster.read"],
+    denyPersona: "citizen",
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "GET",
+    path: `/operations/disasters/${U}`,
+    permissions: ["disaster.read"],
+    denyPersona: "citizen",
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "POST",
+    path: `/operations/disasters/${U}/declarations/initial`,
+    permissions: ["disaster.declare"],
+    denyPersona: "dispatcher",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
+
+  {
+    method: "GET",
+    path: "/admin/facilities",
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    validationPersona: "systemAdmin",
+  },
+  {
+    method: "POST",
+    path: "/admin/facilities",
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
 ];
 
 export const PROTECTED_ROUTES = ROUTE_MANIFEST.filter((r) => !r.public);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import pool from "../../src/config/db.js";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 
 const dbUp = await isDbAvailable();
 import { request, jsonHeaders } from "../helpers/http.js";
@@ -10,7 +10,6 @@ import { getAgencyRepToken } from "../helpers/authTokens.js";
 import { SEED } from "../helpers/fixtures.js";
 
 describe("agency integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 
