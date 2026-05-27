@@ -8,6 +8,7 @@ import {
   operationsIncidentUuidParamSchema,
   operationsListIncidentsQuerySchema,
   operationsListIntakeReportsQuerySchema,
+  paginationQuerySchema,
   operationsPatchIncidentStatusSchema,
   operationsReportUuidParamSchema,
 } from "./validationSchemas.js";
@@ -54,6 +55,12 @@ export const validateOperationsPatchIncidentStatus = validate(
 export const validateOperationsIncidentNote = validate(
   "operations incident note",
   operationsIncidentNoteSchema,
+);
+
+export const validateOperationsListIncidentNotesQuery = validate(
+  "operations incident notes list query",
+  paginationQuerySchema,
+  "query",
 );
 
 export const validateOperationsLinkIntakeToIncident = validate(
