@@ -251,7 +251,7 @@ export async function createIncidentAdminStandalone(params) {
     }
 
     const severityLevelId = await findSeverityLevelId(conn, params.severityCode);
-    const reportedStatusId = await findIncidentStatusId(conn, "reported");
+    const classifiedStatusId = await findIncidentStatusId(conn, "classified");
 
     const incidentPublicUuid = randomUUID();
     const incidentCode = generateCode("EMI");
@@ -284,7 +284,7 @@ export async function createIncidentAdminStandalone(params) {
         incidentCode,
         categoryId,
         severityLevelId,
-        reportedStatusId,
+        classifiedStatusId,
         locationId,
         title.trim(),
         params.description ?? intakeRow?.description ?? null,
@@ -307,7 +307,7 @@ export async function createIncidentAdminStandalone(params) {
       `,
       [
         incidentDbId,
-        reportedStatusId,
+        classifiedStatusId,
         params.actorUserId ?? null,
         intakeRow
           ? `Created from linked intake ${intakeRow.public_uuid}`
@@ -397,7 +397,7 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
     }
 
     const severityLevelId = await findSeverityLevelId(conn, params.severityCode);
-    const reportedStatusId = await findIncidentStatusId(conn, "reported");
+    const classifiedStatusId = await findIncidentStatusId(conn, "classified");
 
     const incidentPublicUuid = randomUUID();
     const incidentCode = generateCode("EMI");
@@ -430,7 +430,7 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
         incidentCode,
         intakeRow.category_id,
         severityLevelId,
-        reportedStatusId,
+        classifiedStatusId,
         intakeRow.reported_location_id,
         title,
         params.incidentDescription ?? intakeRow.description ?? null,
@@ -453,7 +453,7 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
       `,
       [
         incidentDbId,
-        reportedStatusId,
+        classifiedStatusId,
         params.actorUserId ?? null,
         `Promoted from intake ${intakeRow.public_uuid} (operations)`,
       ],

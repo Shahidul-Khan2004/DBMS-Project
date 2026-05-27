@@ -491,7 +491,7 @@ Rollup for dispatcher UIs: **counts** + merged **recent** timeline (intakes pend
       "kind": "incident",
       "public_uuid": "f3c2bb6c-1111-4a2e-9c61-aaaaaaaaaaaa",
       "summary": "Power line down",
-      "status": "reported",
+      "status": "classified",
       "category": "infrastructure_emergency",
       "occurred_at": "2026-05-06T07:41:03.000Z",
       "age_minutes": 18
@@ -693,8 +693,7 @@ For seeded demo data, see incident `e5000001-0000-4000-8000-000000000001` under 
 
 **Transitions (from → to):**
 
-- `reported` → `classified`, `cancelled`
-- `classified` → `in_progress`, `resolved`, `closed`, `cancelled`
+- `classified` → `in_progress`, `resolved`, `closed`, `cancelled` (initial status when an incident is created)
 - `in_progress` → `resolved`, `closed`, `cancelled`
 
 Terminal statuses cannot change again.

@@ -207,7 +207,7 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
       publicUuid: incidentPublicUuid,
       incidentCode,
       severityCode: body.severityCode,
-      initialIncidentStatusCode: "reported",
+      initialIncidentStatusCode: "classified",
       originType: "emergency_call",
       title: body.incidentTitle?.trim() || intake.summary,
       description: body.incidentDescription ?? intake.description ?? null,

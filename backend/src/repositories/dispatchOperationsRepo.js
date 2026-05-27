@@ -7,7 +7,6 @@ import {
 import pool from "../config/db.js";
 
 const INCIDENT_MILESTONE_ORDER = [
-  "reported",
   "classified",
   "agency_assigned",
   "unit_assigned",

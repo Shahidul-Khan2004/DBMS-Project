@@ -113,23 +113,21 @@ INSERT INTO incident_severity_levels (severity_code, name, priority_rank) VALUES
 ('critical','Critical',4);
 
 INSERT INTO incident_statuses (status_code, name, sort_order, is_terminal) VALUES
-('reported','Reported',1,FALSE),
-('classified','Classified',2,FALSE),
-('agency_assigned','Agency Assigned',3,FALSE),
-('unit_assigned','Unit Assigned',4,FALSE),
-('dispatched','Dispatched',5,FALSE),
-('in_progress','In Progress',6,FALSE),
-('resolved','Resolved',7,TRUE),
-('closed','Closed',8,TRUE),
-('cancelled','Cancelled',9,TRUE);
+('classified','Classified',1,FALSE),
+('agency_assigned','Agency Assigned',2,FALSE),
+('unit_assigned','Unit Assigned',3,FALSE),
+('dispatched','Dispatched',4,FALSE),
+('in_progress','In Progress',5,FALSE),
+('resolved','Resolved',6,TRUE),
+('closed','Closed',7,TRUE),
+('cancelled','Cancelled',8,TRUE);
 
 INSERT INTO incident_status_transitions (from_status_id, to_status_id, is_active, requires_note, requires_outcome)
 SELECT f.id, t.id, TRUE, FALSE,
        CASE WHEN t.status_code IN ('resolved', 'closed', 'cancelled') THEN TRUE ELSE FALSE END
 FROM incident_statuses f
 INNER JOIN incident_statuses t ON (
-    (f.status_code = 'reported' AND t.status_code IN ('classified', 'cancelled', 'agency_assigned', 'unit_assigned', 'dispatched', 'in_progress'))
-    OR (f.status_code = 'classified' AND t.status_code IN ('agency_assigned', 'unit_assigned', 'dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
+    (f.status_code = 'classified' AND t.status_code IN ('agency_assigned', 'unit_assigned', 'dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
     OR (f.status_code = 'agency_assigned' AND t.status_code IN ('unit_assigned', 'dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
     OR (f.status_code = 'unit_assigned' AND t.status_code IN ('dispatched', 'in_progress', 'resolved', 'closed', 'cancelled'))
     OR (f.status_code = 'dispatched' AND t.status_code IN ('in_progress', 'resolved', 'closed', 'cancelled'))

@@ -1169,7 +1169,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
     );
 
     const severityLevelId = await findSeverityLevelId(conn, params.severityCode);
-    const reportedStatusId = await findIncidentStatusId(conn, "reported");
+    const classifiedStatusId = await findIncidentStatusId(conn, "classified");
 
     const incidentPublicUuid = randomUUID();
     const incidentCode = generateCode("EMI");
@@ -1199,7 +1199,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
         incidentCode,
         intakeRow.category_id,
         severityLevelId,
-        reportedStatusId,
+        classifiedStatusId,
         locationId,
         title,
         params.incidentDescription ?? intakeRow.description ?? null,
@@ -1222,7 +1222,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
       `,
       [
         incidentDbId,
-        reportedStatusId,
+        classifiedStatusId,
         params.actorUserId ?? null,
         `Escalated from service case ${serviceCaseRow.case_code}`,
       ],
