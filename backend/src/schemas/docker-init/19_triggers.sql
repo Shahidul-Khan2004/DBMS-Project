@@ -517,4 +517,179 @@ BEGIN
     SET NEW.geo_point = ST_SRID(POINT(NEW.longitude, NEW.latitude), 4326);
 END$$
 
+CREATE TRIGGER trg_disaster_event_status_history_before_insert
+BEFORE INSERT ON disaster_event_status_history
+FOR EACH ROW
+BEGIN
+    DECLARE v_current_status_id BIGINT UNSIGNED;
+    DECLARE v_is_terminal BOOLEAN DEFAULT FALSE;
+    DECLARE v_transition_id BIGINT UNSIGNED DEFAULT NULL;
+
+    SELECT de.current_status_id, des.is_terminal
+      INTO v_current_status_id, v_is_terminal
+      FROM disaster_events de
+      INNER JOIN disaster_event_statuses des ON des.id = de.current_status_id
+     WHERE de.id = NEW.disaster_event_id
+     LIMIT 1;
+
+    IF v_current_status_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Disaster status history: parent disaster event not found.';
+    END IF;
+
+    IF NEW.status_id <> v_current_status_id THEN
+        IF v_is_terminal THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Cannot transition disaster from a terminal status.';
+        END IF;
+
+        SELECT dst.id
+          INTO v_transition_id
+          FROM disaster_event_status_transitions dst
+         WHERE dst.from_status_id = v_current_status_id
+           AND dst.to_status_id = NEW.status_id
+           AND dst.is_active = TRUE
+         LIMIT 1;
+
+        IF v_transition_id IS NULL THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Invalid disaster status transition.';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+              FROM disaster_event_status_transitions dst
+             WHERE dst.id = v_transition_id
+               AND dst.requires_note = TRUE
+               AND (NEW.note IS NULL OR CHAR_LENGTH(TRIM(NEW.note)) = 0)
+        ) THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Disaster status transition requires a note.';
+        END IF;
+    END IF;
+END$$
+
+CREATE TRIGGER trg_disaster_event_status_history_after_insert
+AFTER INSERT ON disaster_event_status_history
+FOR EACH ROW
+BEGIN
+    DECLARE v_status_code VARCHAR(100);
+
+    SELECT status_code INTO v_status_code
+      FROM disaster_event_statuses
+     WHERE id = NEW.status_id
+     LIMIT 1;
+
+    SET @allow_disaster_status_sync = TRUE;
+    UPDATE disaster_events
+       SET current_status_id = NEW.status_id,
+           ended_at = CASE
+             WHEN v_status_code IN ('closed', 'cancelled') AND ended_at IS NULL
+             THEN NEW.changed_at
+             ELSE ended_at
+           END
+     WHERE id = NEW.disaster_event_id;
+    SET @allow_disaster_status_sync = FALSE;
+END$$
+
+CREATE TRIGGER trg_disaster_events_prevent_direct_status_update
+BEFORE UPDATE ON disaster_events
+FOR EACH ROW
+BEGIN
+    IF OLD.current_status_id <> NEW.current_status_id
+       AND COALESCE(@allow_disaster_status_sync, FALSE) = FALSE THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'disaster_events.current_status_id cannot be updated directly; use disaster_event_status_history instead.';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_relief_request_status_history_before_insert
+BEFORE INSERT ON relief_request_status_history
+FOR EACH ROW
+BEGIN
+    DECLARE v_current_status_id BIGINT UNSIGNED;
+    DECLARE v_is_terminal BOOLEAN DEFAULT FALSE;
+    DECLARE v_transition_id BIGINT UNSIGNED DEFAULT NULL;
+
+    SELECT rr.current_status_id, rrs.is_terminal
+      INTO v_current_status_id, v_is_terminal
+      FROM relief_requests rr
+      INNER JOIN relief_request_statuses rrs ON rrs.id = rr.current_status_id
+     WHERE rr.id = NEW.relief_request_id
+     LIMIT 1;
+
+    IF v_current_status_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Relief request status history: parent request not found.';
+    END IF;
+
+    IF NEW.status_id <> v_current_status_id THEN
+        IF v_is_terminal THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Cannot transition relief request from a terminal status.';
+        END IF;
+
+        SELECT rst.id
+          INTO v_transition_id
+          FROM relief_request_status_transitions rst
+         WHERE rst.from_status_id = v_current_status_id
+           AND rst.to_status_id = NEW.status_id
+           AND rst.is_active = TRUE
+         LIMIT 1;
+
+        IF v_transition_id IS NULL THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Invalid relief request status transition.';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+              FROM relief_request_status_transitions rst
+             WHERE rst.id = v_transition_id
+               AND rst.requires_note = TRUE
+               AND (NEW.note IS NULL OR CHAR_LENGTH(TRIM(NEW.note)) = 0)
+        ) THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Relief request status transition requires a note.';
+        END IF;
+    END IF;
+END$$
+
+CREATE TRIGGER trg_relief_request_status_history_after_insert
+AFTER INSERT ON relief_request_status_history
+FOR EACH ROW
+BEGIN
+    SET @allow_relief_request_status_sync = TRUE;
+    UPDATE relief_requests
+       SET current_status_id = NEW.status_id
+     WHERE id = NEW.relief_request_id;
+    SET @allow_relief_request_status_sync = FALSE;
+END$$
+
+CREATE TRIGGER trg_relief_requests_prevent_direct_status_update
+BEFORE UPDATE ON relief_requests
+FOR EACH ROW
+BEGIN
+    IF OLD.current_status_id <> NEW.current_status_id
+       AND COALESCE(@allow_relief_request_status_sync, FALSE) = FALSE THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'relief_requests.current_status_id cannot be updated directly; use relief_request_status_history instead.';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_disaster_affected_areas_before_insert
+BEFORE INSERT ON disaster_affected_areas
+FOR EACH ROW
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+          FROM administrative_areas aa
+         WHERE aa.id = NEW.admin_area_id
+           AND aa.area_type = 'upazila'
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Disaster affected areas must reference an upazila administrative area.';
+    END IF;
+END$$
+
 DELIMITER ;

@@ -1,4 +1,12 @@
 -- Drop views first
+DROP VIEW IF EXISTS vw_disaster_relief_inventory_by_hub;
+DROP VIEW IF EXISTS vw_disaster_relief_shortage;
+DROP VIEW IF EXISTS vw_disaster_relief_inventory_balance;
+DROP VIEW IF EXISTS vw_disaster_shelter_capacity;
+DROP VIEW IF EXISTS vw_disaster_linked_incidents;
+DROP VIEW IF EXISTS vw_disaster_impact_by_upazila;
+DROP VIEW IF EXISTS vw_disaster_affected_area_current;
+DROP VIEW IF EXISTS vw_public_disaster_summary;
 DROP VIEW IF EXISTS vw_disaster_dashboard;
 DROP VIEW IF EXISTS vw_facility_capacity_status;
 DROP VIEW IF EXISTS vw_agency_workload;
