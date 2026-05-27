@@ -627,11 +627,51 @@ Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Or
       "event_time": "2026-05-04T13:00:00.000Z",
       "created_at": "2026-05-04T13:00:01.000Z"
     }
+  ],
+  "participating_agencies": [
+    {
+      "agency_public_uuid": "b2000001-0000-4000-8000-000000000001",
+      "agency_name": "Dhaka Fire Service",
+      "agency_type_code": "fire_service",
+      "is_lead_agency": true,
+      "participation_status": "active",
+      "joined_at": "2026-05-19T10:00:00.000Z"
+    }
+  ],
+  "dispatches": [
+    {
+      "public_uuid": "f5000001-0000-4000-8000-000000000001",
+      "status_code": "assigned",
+      "priority_level": "high",
+      "assigned_at": "2026-05-19T10:05:00.000Z",
+      "dispatched_at": null,
+      "arrived_at": null,
+      "completed_at": null,
+      "cancelled_at": null,
+      "unit": {
+        "public_uuid": "c3000001-0000-4000-8000-000000000001",
+        "unit_code": "FIRE-01",
+        "unit_name": "Fire Engine Alpha",
+        "unit_type_code": "fire_truck",
+        "status_code": "busy"
+      },
+      "owning_agency": {
+        "public_uuid": "b2000001-0000-4000-8000-000000000001",
+        "agency_name": "Dhaka Fire Service",
+        "agency_type_code": "fire_service"
+      }
+    }
   ]
 }
 ```
 
 `incident` is the full detail DTO; timeline preview is capped (e.g. last 50 by `event_time`).
+
+`participating_agencies` lists all rows from `incident_agency_participation` for the incident, ordered with lead agency first, then `joined_at` ascending.
+
+`dispatches` lists all dispatches for the incident, ordered by `assigned_at` descending. Each item includes dispatch status, priority, milestone timestamps, an assigned **unit** summary, and the unit’s **owning_agency** summary. External identifiers use `public_uuid` / `*_public_uuid` only.
+
+For seeded demo data, see incident `e5000001-0000-4000-8000-000000000001` under [Demo seed UUIDs](#demo-seed-uuids-24_seed_agencies_units_demosql).
 
 **Response (404):** `INCIDENT_NOT_FOUND`
 
@@ -751,6 +791,7 @@ Incident status may auto-advance on milestones (same transaction): agency add �
   "participation": {
     "agency_public_uuid": "…",
     "agency_name": "Dhaka Fire Service",
+    "agency_type_code": "fire_service",
     "is_lead_agency": false,
     "participation_status": "active",
     "joined_at": "2026-05-19T10:00:00.000Z"
