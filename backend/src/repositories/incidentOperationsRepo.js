@@ -15,6 +15,8 @@ import {
 import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
 import {
   finalizeIncidentDispatches,
+  listDispatchesForIncident,
+  listParticipatingAgenciesForIncident,
   releaseIncidentUnits,
 } from "./dispatchOperationsRepo.js";
 import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
@@ -938,6 +940,12 @@ export async function getIncidentDetailForOperations(publicUuid) {
       [row.id],
     );
 
+    const participating_agencies = await listParticipatingAgenciesForIncident(
+      conn,
+      row.id,
+    );
+    const dispatches = await listDispatchesForIncident(conn, row.id);
+
     return {
       incident: mapIncidentDetail(row),
       linked_intake_reports: links.map((l) => ({
@@ -968,6 +976,8 @@ export async function getIncidentDetailForOperations(publicUuid) {
         event_time: t.event_time,
         created_at: t.created_at,
       })),
+      participating_agencies,
+      dispatches,
     };
   } finally {
     conn.release();

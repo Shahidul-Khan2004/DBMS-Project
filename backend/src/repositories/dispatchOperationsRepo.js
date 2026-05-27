@@ -332,10 +332,93 @@ function mapParticipationRow(row) {
   return {
     agency_public_uuid: row.agency_public_uuid,
     agency_name: row.agency_name,
+    agency_type_code: row.agency_type_code,
     is_lead_agency: Boolean(row.is_lead_agency),
     participation_status: row.participation_status,
     joined_at: row.joined_at,
   };
+}
+
+function mapIncidentDetailDispatchRow(row) {
+  return {
+    public_uuid: row.public_uuid,
+    unit_public_uuid: row.unit_public_uuid,
+    status_code: row.status_code,
+    priority_level: row.priority_level,
+    assigned_at: row.assigned_at,
+    dispatched_at: row.dispatched_at,
+    arrived_at: row.arrived_at,
+    completed_at: row.completed_at,
+    cancelled_at: row.cancelled_at,
+    unit: {
+      public_uuid: row.unit_public_uuid,
+      unit_code: row.unit_code,
+      unit_name: row.unit_name,
+      unit_type_code: row.unit_type_code,
+      status_code: row.unit_status_code,
+    },
+    owning_agency: {
+      public_uuid: row.agency_public_uuid,
+      agency_name: row.agency_name,
+      agency_type_code: row.agency_type_code,
+    },
+  };
+}
+
+export async function listParticipatingAgenciesForIncident(conn, incidentId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        a.public_uuid AS agency_public_uuid,
+        a.name AS agency_name,
+        at.type_code AS agency_type_code,
+        iap.is_lead_agency AS is_lead_agency,
+        iap.participation_status AS participation_status,
+        iap.joined_at AS joined_at
+      FROM incident_agency_participation iap
+      INNER JOIN agencies a ON a.id = iap.agency_id
+      INNER JOIN agency_types at ON at.id = a.agency_type_id
+      WHERE iap.incident_id = ?
+      ORDER BY iap.is_lead_agency DESC, iap.joined_at ASC
+    `,
+    [incidentId],
+  );
+  return rows.map(mapParticipationRow);
+}
+
+export async function listDispatchesForIncident(conn, incidentId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        d.public_uuid AS public_uuid,
+        ds.status_code AS status_code,
+        d.priority_level AS priority_level,
+        d.assigned_at AS assigned_at,
+        d.dispatched_at AS dispatched_at,
+        d.arrived_at AS arrived_at,
+        d.completed_at AS completed_at,
+        d.cancelled_at AS cancelled_at,
+        eu.public_uuid AS unit_public_uuid,
+        eu.unit_code AS unit_code,
+        eu.unit_name AS unit_name,
+        eut.type_code AS unit_type_code,
+        us.status_code AS unit_status_code,
+        a.public_uuid AS agency_public_uuid,
+        a.name AS agency_name,
+        at.type_code AS agency_type_code
+      FROM dispatches d
+      INNER JOIN dispatch_statuses ds ON ds.id = d.current_status_id
+      INNER JOIN emergency_units eu ON eu.id = d.unit_id
+      INNER JOIN unit_statuses us ON us.id = eu.current_status_id
+      INNER JOIN emergency_unit_types eut ON eut.id = eu.unit_type_id
+      INNER JOIN agencies a ON a.id = eu.agency_id
+      INNER JOIN agency_types at ON at.id = a.agency_type_id
+      WHERE d.incident_id = ?
+      ORDER BY d.assigned_at DESC, d.id DESC
+    `,
+    [incidentId],
+  );
+  return rows.map(mapIncidentDetailDispatchRow);
 }
 
 function mapDispatchRow(row) {
@@ -437,11 +520,13 @@ export async function addAgencyToIncident(params) {
         SELECT
           a.public_uuid AS agency_public_uuid,
           a.name AS agency_name,
+          at.type_code AS agency_type_code,
           iap.is_lead_agency AS is_lead_agency,
           iap.participation_status AS participation_status,
           iap.joined_at AS joined_at
         FROM incident_agency_participation iap
         INNER JOIN agencies a ON a.id = iap.agency_id
+        INNER JOIN agency_types at ON at.id = a.agency_type_id
         WHERE iap.incident_id = ? AND iap.agency_id = ?
         LIMIT 1
       `,
