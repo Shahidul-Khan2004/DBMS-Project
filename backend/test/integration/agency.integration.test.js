@@ -70,6 +70,29 @@ describe("agency integration", { skip: !dbUp }, () => {
     assert.ok(Array.isArray(res.body.response_logs));
   });
 
+  it("GET /agency/incidents/:incidentPublicUuid/notes returns operator notes", async () => {
+    if (await skipIfNoDemoRep()) {
+      return;
+    }
+
+    const token = await getAgencyRepToken(app);
+    const listRes = await request(app).get("/agency/incidents").set(jsonHeaders(token));
+    assert.equal(listRes.status, 200);
+
+    const incidentUuid = listRes.body.incidents?.[0]?.incident_public_uuid;
+    if (!incidentUuid) {
+      return;
+    }
+
+    const res = await request(app)
+      .get(`/agency/incidents/${incidentUuid}/notes`)
+      .set(jsonHeaders(token));
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.incident_public_uuid, incidentUuid);
+    assert.ok(Array.isArray(res.body.notes));
+  });
+
   it("GET /agency/dispatches returns list", async () => {
     if (await skipIfNoDemoRep()) {
       return;

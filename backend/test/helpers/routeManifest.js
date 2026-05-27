@@ -174,6 +174,13 @@ export const ROUTE_MANIFEST = [
     validationPersona: "dispatcher",
   },
   {
+    method: "GET",
+    path: `/operations/incidents/${U}/notes`,
+    anyPermissions: ["incident.create", "incident.update_status"],
+    denyPersona: "citizen",
+    validationPersona: "dispatcher",
+  },
+  {
     method: "POST",
     path: `/operations/incidents/${U}/notes`,
     permissions: ["incident.update_status"],
@@ -428,6 +435,14 @@ export const ROUTE_MANIFEST = [
     denyPersona: "citizen",
     agencyRouter: true,
     hasBodyValidator: true,
+    validationPersona: "agencyRep",
+  },
+  {
+    method: "GET",
+    path: `/agency/incidents/${U}/notes`,
+    permissions: ["dispatch.view_own_agency"],
+    denyPersona: "citizen",
+    agencyRouter: true,
     validationPersona: "agencyRep",
   },
   {
