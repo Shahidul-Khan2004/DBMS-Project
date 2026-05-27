@@ -1452,9 +1452,81 @@ Lists **this agency’s** response logs on the incident (newest first). Query: `
 
 ---
 
+## Public disasters
+
+No auth required.
+
+### GET `/public/disasters`
+
+Lists disasters in `declared`, `resolved`, or `closed` status (safe summary fields only).
+
+### GET `/public/disasters/:disasterPublicUuid`
+
+Public summary: title, type, severity, status, guidance, dates. **`404` `DISASTER_NOT_PUBLIC`** for `monitoring` or `cancelled`.
+
+---
+
+## Reference data
+
+### GET `/reference/administrative-areas/search`
+
+**Auth:** dispatcher or system_admin disaster permissions.
+
+**Query:** `areaType=district|upazila`, `q` (prefix), optional `limit`.
+
+**Response:** `{ "areas": [{ "id", "code", "name", "areaType", "hierarchyPath" }] }` — e.g. `Kurigram Sadar, Kurigram, Rangpur`.
+
+---
+
+## Operations — disasters
+
+Base path: `/operations/disasters`. External IDs use `publicUuid` fields.
+
+| Method | Path | Permission |
+|--------|------|------------|
+| POST | `/operations/disasters` | `disaster.create` |
+| GET | `/operations/disasters` | `disaster.read` |
+| GET | `/operations/disasters/:disasterPublicUuid` | `disaster.read` (internal dashboard) |
+| POST | `/operations/disasters/:disasterPublicUuid/status` | `disaster.update_status` (`resolved`, `closed`, `cancelled`) |
+| POST | `.../affected-areas` | `disaster.manage_affected_areas` |
+| PATCH | `.../affected-areas/:affectedAreaPublicUuid` | `disaster.manage_affected_areas` |
+| POST | `.../responsibilities` | `disaster.manage_responsibilities` |
+| POST | `.../declarations/initial` | `disaster.declare` → status `declared`, auto shelter/hub activation |
+| POST | `.../declarations/amendments` | `disaster.declare` |
+| GET/POST/DELETE | `.../incidents` | `disaster.link_incidents` |
+| POST | `.../shelters`, `.../relief-hubs` | `shelter.manage` |
+| POST | `.../relief-requests`, distributions | `relief.*` |
+
+**Create disaster (201):** `{ "eventTypeCode": "flood", "title": "...", "severityLevel": "high" }` — starts in `monitoring`.
+
+**Affected areas:** `upazilaAdminAreaIds` and/or `districtAdminAreaId` (expands to all upazilas under district; only upazila rows stored). Optional `assessment` object on add.
+
+**Demo accounts (Kurigram live demo, `DEMO_REP_PASSWORD`):**
+
+| Email | Agency |
+|-------|--------|
+| `relief.rep@niers.test` | District Disaster Management & Relief Office (`b3000001-0000-4000-8000-000000000001`) |
+| `shelter.rep@niers.test` | Red Crescent Response Unit (`b3000001-0000-4000-8000-000000000002`) |
+| `fire.rep@niers.test` | Dhaka Fire (dispatch regression) |
+| `police.rep@niers.test` / `medical.rep@niers.test` | Dhaka demo agencies |
+
+Seeded Kurigram facilities (examples): `f6000001-0000-4000-8000-000000000001` (college shelter), `f6000001-0000-4000-8000-000000000005` (relief warehouse). Relief catalog: `rice`, `bottled_water`, `blanket`, `dry_food_packet`, `medicine_kit`, `hygiene_kit`.
+
+**No disaster operational rows are seeded** — create disasters, areas, declarations, and activations live during demo.
+
+---
+
+## Admin — facilities
+
+Base path: `/admin/facilities`. Requires `facility.manage`.
+
+- POST/GET facilities, PUT capabilities and default capacities (`shelter_people`, `hospital_beds`, `emergency_beds`).
+
+---
+
 ## Development RBAC bootstrap
 
-On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and case permissions. **`agency_representative`** receives only: `agency.view_own`, `agency.manage_own_units`, `dispatch.view_own_agency`, `dispatch.update_own_agency`, `response_log.create_own_agency`. **`system_admin`** receives all bootstrap permissions including **`agency.manage`** and the `*_own` set.
+On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and case permissions. **`agency_representative`** receives own-agency dispatch permissions plus `disaster.read`, `shelter.record_occupancy_own`, and `relief.request_own_shelter`. **`system_admin`** receives all bootstrap permissions including disaster, facility, shelter, and relief modules.
 
 **Env vars:**
 
