@@ -4,10 +4,11 @@ import {
   requirePermission,
 } from "../middlewares/auth.js";
 import { getCurrentUser } from "../controllers/auth.js";
-import { assignRoleToUser } from "../controllers/users.js";
+import { assignRoleToUser, updateMyProfileController } from "../controllers/users.js";
 import {
   validateUserRoleAssignment,
   validateUserRoleAssignmentParams,
+  validateUpdateMyProfile,
 } from "../validators/users.js";
 
 export function createUsersRouter({ requireAuth = defaultRequireAuth } = {}) {
@@ -16,6 +17,11 @@ export function createUsersRouter({ requireAuth = defaultRequireAuth } = {}) {
   router.use(requireAuth);
 
   router.get("/me", getCurrentUser);
+  router.patch(
+    "/me/profile",
+    validateUpdateMyProfile,
+    updateMyProfileController,
+  );
   router.post(
     "/:userId/roles",
     requirePermission("auth.manage_roles"),

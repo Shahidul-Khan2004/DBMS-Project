@@ -13,6 +13,7 @@ import {
 import { ROLE_CODES } from "./rbacService.js";
 import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js";
 import { ensureAgencyMembershipsPublicUuid } from "./schemaMigrations.js";
+import { ensureUserProfilesSecondaryPhoneNumber } from "./schemaMigrations.js"; 
 
 const DEFAULT_PERMISSIONS = [
   {
@@ -185,6 +186,7 @@ async function ensureRolesAndPermissions() {
 export async function bootstrapDevelopmentSystemAdmin() {
   await ensureRolesAndPermissions();
   await ensureAgencyMembershipsPublicUuid();
+  await ensureUserProfilesSecondaryPhoneNumber();
   await bootstrapDemoAgencyRepresentatives();
 
   const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);

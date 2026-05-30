@@ -21,6 +21,7 @@ export function toPublicUser(user) {
     email: user.email,
     full_name: user.full_name,
     phone_number: user.phone_number,
+    secondary_phone_number: user.secondary_phone_number ?? null,
     account_status: user.account_status,
     is_active: user.account_status === "active",
     created_at: user.created_at,

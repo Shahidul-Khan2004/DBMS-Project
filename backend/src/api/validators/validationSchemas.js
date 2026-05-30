@@ -421,3 +421,24 @@ export const agencyCreateResponseLogSchema = z.object({
   message: z.string().trim().min(1, "message is required"),
   dispatch_public_uuid: z.uuid({ message: "Invalid dispatch id" }).optional(),
 });
+
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{11}$/, "Phone number must be exactly 11 digits");
+
+export const updateMyProfileSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Full name must not be empty").max(150, "Full name must be at most 150 characters").optional(),
+    phoneNumber: phoneSchema.optional(),
+    secondaryPhoneNumber: z.union([phoneSchema, z.null()]).optional(),
+  })
+  .refine(
+    (data) =>
+      data.fullName !== undefined ||
+      data.phoneNumber !== undefined ||
+      data.secondaryPhoneNumber !== undefined,
+    {
+      message: "At least one editable field must be provided",
+    },
+  );

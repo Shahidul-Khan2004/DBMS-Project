@@ -26,6 +26,12 @@ export const ROUTE_MANIFEST = [
 
   { method: "GET", path: "/users/me" },
   {
+    method: "PATCH",
+    path: "/users/me/profile",
+    hasBodyValidator: true,
+    validationPersona: "citizen",
+  },
+  {
     method: "POST",
     path: `/users/${U}/roles`,
     permissions: ["auth.manage_roles"],

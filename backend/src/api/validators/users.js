@@ -2,6 +2,7 @@ import validate from "./validator.js";
 import {
   userRoleAssignmentParamsSchema,
   userRoleAssignmentSchema,
+  updateMyProfileSchema,
 } from "./validationSchemas.js";
 
 export const validateUserRoleAssignment = validate(
@@ -15,3 +16,7 @@ export const validateUserRoleAssignmentParams = validate(
   "params"
 );
 
+export const validateUpdateMyProfile = validate(
+  "profile update",
+  updateMyProfileSchema
+);
