@@ -301,9 +301,8 @@ Or reference an existing citizen location:
 
 **Rules:**
 
-- `location` / `locationId`: optional, mutually exclusive; follow [Location payloads](#location-payloads-intake-locations-operations).
+- `location` / `locationId`: **exactly one is required**; `locationId` is the public UUID of a saved location selected by the user in the UI (the frontend submits it automatically). Follow [Location payloads](#location-payloads-intake-locations-operations).
 - Plain string `location` is **not** accepted.
-- If the report may later go down the emergency path, ensure a stored location (`reported_location_id`) via inline location or `locationId` before classify/promote.
 
 **Response (201):**
 
@@ -543,19 +542,41 @@ Creates an **`emergency_incidents`** row from an intake **without** requiring an
 
 ### POST `/operations/gateway/999/intake-and-incident`
 
-Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures emergency call placeholder, then branches to **`service_case`** or **`emergency_incident`** per `disposition`.
+Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures emergency call placeholder, then branches to **`service_case`**, **`emergency_incident`**, or **`existing_incident`** per `disposition`.
 
 **Body (validated):**
 
-- `disposition`: `service_case` \| `emergency_incident` (**required**)
+- `disposition`: `service_case` \| `emergency_incident` \| `existing_incident` (**required**)
 - `categoryCode`, `summary` (**required**); `description`, `reportedAt` optional
 - Exactly one of **`location`** or **`locationId`** (**required**)
 - `callerPhoneNumber`, `callStartedAt` optional call metadata
 - `incidentTitle`, `incidentDescription` optional overrides
-- If `disposition === "emergency_incident"`: **`severityCode`** required
-- If `service_case`: **`priorityLevel`** optional (`low` \| `medium` \| `high` \| `urgent`)
+- If `disposition === "emergency_incident"`: **`severityCode`** required (`low` \| `medium` \| `high` \| `critical`)
+- If `disposition === "existing_incident"`: **`incidentPublicUuid`** required; `linkType` (`supporting_report` \| `follow_up_report`, default `supporting_report`) and `note` (max 500 chars) optional
+- If `disposition === "service_case"`: **`priorityLevel`** optional (`low` \| `medium` \| `high` \| `urgent`)
 
-**Response (201):** `{ "message": "999 intake and incident flow completed", … }` — spreads `intake`, branch-specific rows (`service_case` / emergency entities), and `emergency_call` as implemented in `createGateway999IntakeAndIncident`.
+**Response (201):** `{ "message": "999 intake and incident flow completed", … }` — spreads `intake`, branch-specific rows (`service_case` / emergency entities / `incident_report_link`), and `emergency_call` as implemented in `createGateway999IntakeAndIncident`.
+
+**Example — second caller linking to an existing incident:**
+
+```json
+{
+  "disposition": "existing_incident",
+  "categoryCode": "fire",
+  "summary": "Second caller reporting the same building fire on Mirpur Road",
+  "callerPhoneNumber": "01711000002",
+  "callStartedAt": "2026-05-23T10:05:00.000Z",
+  "location": {
+    "latitude": 23.8103,
+    "longitude": 90.4125,
+    "address_text": "Mirpur Road, Dhaka",
+    "source": "dispatcher_selected"
+  },
+  "incidentPublicUuid": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "linkType": "supporting_report",
+  "note": "Second witness call; confirms fire on upper floors"
+}
+```
 
 ### POST `/operations/incidents`
 

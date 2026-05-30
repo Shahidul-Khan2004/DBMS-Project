@@ -67,6 +67,10 @@ export const createIntakeReportSchema = z
   .refine((data) => !(data.location && data.locationId), {
     message: "Provide only one of location or locationId, not both",
     path: ["locationId"],
+  })
+  .refine((data) => Boolean(data.location || data.locationId), {
+    message: "location or locationId is required",
+    path: ["location"],
   });
 
 export const classifyServiceCaseSchema = z.object({
@@ -210,7 +214,7 @@ export const operationsLinkIntakeToIncidentSchema = z.object({
 
 export const gateway999CreateSchema = z
   .object({
-    disposition: z.enum(["service_case", "emergency_incident"]),
+    disposition: z.enum(["service_case", "emergency_incident", "existing_incident"]),
     categoryCode: z.string().trim().min(1, "categoryCode is required"),
     summary: z.string().trim().min(1).max(255),
     description: z.string().optional(),
@@ -223,6 +227,9 @@ export const gateway999CreateSchema = z
     incidentDescription: z.string().optional(),
     priorityLevel: z.enum(["low", "medium", "high", "urgent"]).optional(),
     severityCode: z.enum(["low", "medium", "high", "critical"]).optional(),
+    incidentPublicUuid: z.uuid({ message: "Invalid incident id" }).optional(),
+    linkType: z.enum(["supporting_report", "follow_up_report"]).optional(),
+    note: z.string().trim().max(500).optional(),
   })
   .refine((data) => !(data.location && data.locationId), {
     message: "Provide only one of location or locationId, not both",
@@ -235,10 +242,19 @@ export const gateway999CreateSchema = z
   .refine(
     (data) =>
       data.disposition === "service_case" ||
+      data.disposition === "existing_incident" ||
       (data.disposition === "emergency_incident" && Boolean(data.severityCode)),
     {
       message: "severityCode is required for emergency_incident disposition",
       path: ["severityCode"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.disposition !== "existing_incident" || Boolean(data.incidentPublicUuid),
+    {
+      message: "incidentPublicUuid is required for existing_incident disposition",
+      path: ["incidentPublicUuid"],
     },
   );
 
