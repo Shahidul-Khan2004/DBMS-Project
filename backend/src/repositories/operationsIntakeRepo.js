@@ -45,7 +45,7 @@ const INTAKE_SELECT = `
       SELECT 1 FROM service_cases sc WHERE sc.intake_report_id = ir.id
     ) AS has_service_case,
     EXISTS (
-      SELECT 1 FROM incident_report_links irl WHERE irl.intake_report_id = ir.id
+      SELECT 1 FROM incident_report_links irl WHERE irl.intake_report_id = ir.id AND irl.unlinked_at IS NULL
     ) AS has_incident
 `;
 

@@ -216,6 +216,16 @@ export const operationsLinkIntakeToIncidentSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+export const operationsUnlinkIntakeFromIncidentSchema = z.object({
+  params: z.object({
+    incidentPublicUuid: z.uuid({ message: "Invalid incident id" }),
+    reportPublicUuid: z.uuid({ message: "Invalid report id" }),
+  }),
+  body: z.object({
+    reason: z.string().trim().min(1, "reason is required").max(500, "reason must be at most 500 characters"),
+  }),
+});
+
 export const gateway999CreateSchema = z
   .object({
     disposition: z.enum(["service_case", "emergency_incident", "existing_incident"]),

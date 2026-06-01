@@ -199,6 +199,14 @@ export const ROUTE_MANIFEST = [
     validationPersona: "dispatcher",
   },
   {
+    method: "DELETE",
+    path: `/operations/incidents/${U}/intake-reports/${U}`,
+    permissions: ["incident.update_status"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "dispatcher",
+  },
+  {
     method: "POST",
     path: `/operations/incidents/${U}/agencies`,
     permissions: ["incident.assign_agency"],

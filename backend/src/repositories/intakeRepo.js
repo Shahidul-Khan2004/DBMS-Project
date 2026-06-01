@@ -340,7 +340,7 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
       INNER JOIN report_channels rc ON rc.id = ir.channel_id
       INNER JOIN report_categories rcat ON rcat.id = ir.category_id
       LEFT JOIN locations l ON l.id = ir.reported_location_id
-      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
+      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id AND irl.unlinked_at IS NULL
       LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
       LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
       WHERE ir.reporter_user_id = ?
@@ -411,7 +411,7 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         ) AS resolved_reports
       FROM intake_reports ir
       INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
-      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
+      LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id AND irl.unlinked_at IS NULL
       LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
       LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
       WHERE ir.reporter_user_id = ?

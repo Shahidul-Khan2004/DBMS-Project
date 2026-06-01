@@ -59,7 +59,7 @@ SELECT
     MIN(ec.call_started_at) AS first_call_at,
     MAX(ec.call_started_at) AS latest_call_at
 FROM emergency_incidents ei
-JOIN incident_report_links irl ON irl.incident_id = ei.id
+JOIN incident_report_links irl ON irl.incident_id = ei.id AND irl.unlinked_at IS NULL
 JOIN emergency_calls ec ON ec.intake_report_id = irl.intake_report_id
 GROUP BY ei.id, ei.incident_code, ei.title;
 
@@ -70,7 +70,7 @@ SELECT
     COUNT(ec.id) AS total_calls,
     AVG(TIMESTAMPDIFF(SECOND, ec.call_started_at, ei.created_at)) AS avg_seconds_call_to_incident
 FROM emergency_calls ec
-LEFT JOIN incident_report_links irl ON irl.intake_report_id = ec.intake_report_id
+LEFT JOIN incident_report_links irl ON irl.intake_report_id = ec.intake_report_id AND irl.unlinked_at IS NULL
 LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
 LEFT JOIN user_profiles up ON up.user_id = ec.dispatcher_id
 GROUP BY ec.dispatcher_id, up.full_name;
@@ -126,7 +126,7 @@ SELECT
     TIMESTAMPDIFF(MINUTE, MIN(iap.joined_at), MIN(d.dispatched_at)) AS agency_to_dispatch_minutes,
     TIMESTAMPDIFF(MINUTE, MIN(d.dispatched_at), MIN(d.arrived_at)) AS dispatch_to_arrival_minutes
 FROM emergency_incidents ei
-LEFT JOIN incident_report_links irl ON irl.incident_id = ei.id
+LEFT JOIN incident_report_links irl ON irl.incident_id = ei.id AND irl.unlinked_at IS NULL
 LEFT JOIN emergency_calls ec ON ec.intake_report_id = irl.intake_report_id
 LEFT JOIN incident_agency_participation iap ON iap.incident_id = ei.id
 LEFT JOIN dispatches d ON d.incident_id = ei.id

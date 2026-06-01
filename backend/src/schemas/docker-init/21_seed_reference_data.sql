@@ -74,7 +74,7 @@ INSERT INTO intake_statuses (status_code, name, sort_order, is_terminal) VALUES
 ('received','Received',1,FALSE),
 ('under_review','Under Review',2,FALSE),
 ('linked_to_case','Linked to Case',3,FALSE),
-('linked_to_incident','Linked to Incident',4,TRUE),
+('linked_to_incident','Linked to Incident',4,FALSE),
 ('duplicate','Duplicate',5,TRUE),
 ('false_report','False Report',6,TRUE),
 ('closed','Closed',7,TRUE);
@@ -86,6 +86,7 @@ INNER JOIN intake_statuses t ON (
     (f.status_code = 'received' AND t.status_code IN ('under_review', 'duplicate', 'false_report', 'closed'))
     OR (f.status_code = 'under_review' AND t.status_code IN ('linked_to_case', 'linked_to_incident', 'duplicate', 'false_report', 'closed'))
     OR (f.status_code = 'linked_to_case' AND t.status_code = 'linked_to_incident')
+    OR (f.status_code = 'linked_to_incident' AND t.status_code = 'under_review')
 );
 
 INSERT INTO dispatch_statuses (status_code, name, sort_order, is_terminal) VALUES
