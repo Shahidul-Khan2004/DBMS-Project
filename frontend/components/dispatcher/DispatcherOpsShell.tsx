@@ -17,7 +17,7 @@ export function DispatcherOpsShell({
 }: DispatcherOpsShellProps) {
   return (
     <DispatcherNavProvider>
-      <div className="-mx-4 -mt-6 flex min-h-[calc(100vh-8rem)] flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8">
+      <div className="-mx-4 -mt-6 flex min-h-[calc(100vh-8rem)] flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 2xl:-mx-10">
         <DispatcherAdminOversightBar />
         <DispatcherOpsNav />
         <DispatcherOpsDrawer />

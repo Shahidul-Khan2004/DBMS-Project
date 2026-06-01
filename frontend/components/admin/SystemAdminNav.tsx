@@ -21,7 +21,7 @@ export function SystemAdminNav() {
     <>
       <nav
         aria-label="System admin"
-        className="hidden h-12 shrink-0 items-center gap-4 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-sm xl:flex sm:px-6 lg:px-8"
+        className="hidden h-12 shrink-0 items-center border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-sm xl:flex sm:px-6 lg:px-8"
       >
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {ADMIN_OPS_TABS.map((tab) => {

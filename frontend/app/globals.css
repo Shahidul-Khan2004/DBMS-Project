@@ -154,7 +154,6 @@ html {
 
 /* --- NIERS landing: typography + landing-specific tokens --- */
 .landing-page {
-  --landing-container-max: 1800px;
   --landing-section-py-sm: clamp(1.75rem, 3vh, 2.5rem);
   --landing-stack-gap: clamp(1.5rem, 2.5vw, 2.5rem);
   --landing-heading-gap: clamp(1.5rem, 2vh, 2.5rem);
@@ -175,7 +174,6 @@ html {
 
 .landing-container {
   width: 100%;
-  max-width: var(--landing-container-max);
   margin-inline: auto;
   padding-inline: var(--page-x);
 }

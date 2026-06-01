@@ -248,7 +248,7 @@ export default function DispatcherServiceCaseDetailPage() {
       contentClassName="flex min-h-0 flex-col xl:h-[calc(100vh-11.5rem)]"
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col xl:h-full xl:min-h-0 xl:overflow-hidden">
-        <div className="mx-auto flex w-full max-w-[1680px] min-h-0 flex-col gap-1 py-0 xl:flex-1 xl:min-h-0 xl:gap-1.5 xl:overflow-hidden">
+        <div className="flex w-full min-h-0 flex-col gap-1 py-0 xl:flex-1 xl:min-h-0 xl:gap-1.5 xl:overflow-hidden">
           {isLoadingDetail ? (
             <ServiceCaseDetailSkeleton />
           ) : loadError ? (

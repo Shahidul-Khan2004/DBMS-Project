@@ -8,15 +8,22 @@ import { SystemAdminNav } from "@/components/admin/SystemAdminNav";
 interface SystemAdminShellProps {
   children: ReactNode;
   className?: string;
+  /** When true, shell fills the viewport (list workspaces). Overview uses natural height. */
+  fillViewport?: boolean;
 }
 
 export function SystemAdminShell({
   children,
   className = "",
+  fillViewport = false,
 }: SystemAdminShellProps) {
   return (
     <SystemAdminNavProvider>
-      <div className="-mx-4 -mt-6 flex min-h-[calc(100vh-8rem)] flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8">
+      <div
+        className={`-mx-4 -mt-6 flex flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 2xl:-mx-10 ${
+          fillViewport ? "min-h-[calc(100vh-8rem)]" : ""
+        }`}
+      >
         <SystemAdminNav />
         <SystemAdminDrawer />
         <div

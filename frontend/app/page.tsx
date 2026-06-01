@@ -231,7 +231,7 @@ export default function Home() {
             </p>
           </RevealOnScroll>
 
-          <div className="hidden md:flex items-stretch justify-between gap-4 max-w-5xl mx-auto">
+          <div className="hidden w-full items-stretch justify-between gap-4 md:flex">
             
             <RevealOnScroll className="flex-1 flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-[var(--card-p)] text-center ring-1 ring-[#006747]/15">
               <Phone className="w-10 h-10 shrink-0 text-[#DA291C] mb-3" />
@@ -273,7 +273,7 @@ export default function Home() {
             </RevealOnScroll>
           </div>
 
-          <div className="md:hidden space-y-6 max-w-md mx-auto">
+          <div className="w-full space-y-6 md:hidden">
             <RevealOnScroll className="flex flex-col items-center bg-gradient-to-br from-emerald-50/90 to-[#EFF6FF] rounded-3xl p-[var(--card-p)] text-center ring-1 ring-[#006747]/15">
               <Phone className="w-10 h-10 shrink-0 text-[#DA291C] mb-3" />
               <h3 className="font-semibold landing-text-card-title text-[#002D62]">Call 999</h3>
@@ -316,7 +316,7 @@ export default function Home() {
         className="scroll-mt-[var(--nav-h)] w-full py-[var(--section-y)] bg-[#EFF6FF]"
       >
         <Container>
-          <RevealOnScrollButton className="mx-auto w-full max-w-4xl text-left rounded-3xl border-2 border-[#006747]/35 bg-gradient-to-br from-emerald-100/95 via-emerald-50/90 to-[#c5e3d4] p-[var(--card-p)] shadow-lg shadow-[#006747]/15 transition-colors hover:border-[#006747]/55 flex flex-col lg:flex-row items-start gap-[var(--landing-stack-gap)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#006747] focus-visible:ring-offset-2 focus-visible:ring-offset-[#EFF6FF]">
+          <RevealOnScrollButton className="w-full text-left rounded-3xl border-2 border-[#006747]/35 bg-gradient-to-br from-emerald-100/95 via-emerald-50/90 to-[#c5e3d4] p-[var(--card-p)] shadow-lg shadow-[#006747]/15 transition-colors hover:border-[#006747]/55 flex flex-col lg:flex-row items-start gap-[var(--landing-stack-gap)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#006747] focus-visible:ring-offset-2 focus-visible:ring-offset-[#EFF6FF]">
             <div className="flex h-16 w-16 shrink-0 self-start items-center justify-center rounded-2xl bg-[#DA291C]">
               <AlertTriangle className="h-8 w-8 text-white" aria-hidden />
             </div>

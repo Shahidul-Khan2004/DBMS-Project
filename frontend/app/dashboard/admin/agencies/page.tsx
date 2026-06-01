@@ -36,7 +36,10 @@ function AgenciesPageContent() {
       showHealthBadge={false}
       contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
     >
-      <SystemAdminShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2">
+      <SystemAdminShell
+        fillViewport
+        className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2"
+      >
         <AgenciesWorkspace />
       </SystemAdminShell>
     </DashboardLayout>

@@ -11,7 +11,7 @@ import {
 } from "@/components/dispatcher/listRowHoverStyles";
 
 const CARD_LAYOUT =
-  "flex flex-col rounded-xl border p-5 shadow-sm lg:min-h-[180px] lg:max-h-[190px] lg:p-5";
+  "flex h-full min-h-[11rem] flex-col rounded-xl border p-5 shadow-sm sm:min-h-[12rem]";
 
 type AdminWorkflowCardProps = {
   area: AdminWorkflowArea;
@@ -70,7 +70,7 @@ function AvailableWorkflowFooter({
   secondaryActionLabel?: string;
 }) {
   return (
-    <div className="mt-2 flex flex-col gap-0.5">
+    <div className="mt-auto flex flex-col gap-0.5 pt-3">
       <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#002D62]">
         {primaryActionLabel}
         <ArrowRight
@@ -89,7 +89,7 @@ function AvailableWorkflowFooter({
 
 function DisabledWorkflowFooter({ label }: { label: string }) {
   return (
-    <p className="mt-2 text-sm font-medium text-slate-500">{label}</p>
+    <p className="mt-auto pt-3 text-sm font-medium text-slate-500">{label}</p>
   );
 }
 

@@ -222,7 +222,7 @@ export default function CreateStandaloneIncidentPage() {
       contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2">
-        <div className="mx-auto flex w-full max-w-[1680px] min-h-0 flex-1 flex-col gap-2.5 pb-2 pt-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-2 lg:pt-0">
+        <div className="flex w-full min-h-0 flex-1 flex-col gap-2.5 pb-2 pt-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-2 lg:pt-0">
           {error ? (
             <div className="shrink-0">
               <ErrorAlert message={error} />
