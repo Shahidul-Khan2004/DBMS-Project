@@ -9,11 +9,7 @@ import {
 } from "./validationSchemas.js";
 
 export const validateAdminOnboardAgency = validate("admin onboard agency", adminOnboardAgencySchema);
-export const validateAdminListAgenciesQuery = validate(
-  "admin list agencies query",
-  paginationQuerySchema,
-  "query",
-);
+export { validateAdminAgenciesListQuery as validateAdminListAgenciesQuery } from "./geoSort.js";
 export const validateAdminAgencyUuidParam = validate(
   "admin agency id",
   agencyPublicUuidParamSchema,

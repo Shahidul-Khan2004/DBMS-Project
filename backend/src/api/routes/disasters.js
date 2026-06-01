@@ -48,6 +48,7 @@ import {
   validateStockReceipt,
   validateUnlinkIncident,
 } from "../validators/disaster.js";
+import { validateOperationsDisasterDetailGeoQuery } from "../validators/geoSort.js";
 import validate from "../validators/validator.js";
 import { z } from "zod";
 
@@ -106,6 +107,7 @@ export function createDisastersRouter({ requireAuth = defaultRequireAuth } = {})
     "/:disasterPublicUuid",
     requirePermission("disaster.read"),
     validateDisasterUuidParam,
+    validateOperationsDisasterDetailGeoQuery,
     getDisaster,
   );
   router.post(

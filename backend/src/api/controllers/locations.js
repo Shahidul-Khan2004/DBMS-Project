@@ -12,7 +12,8 @@ export async function postLocation(req, res) {
 }
 
 export async function getMyLocations(req, res) {
-  const locations = await locationService.listLocationsForActor(req.actorUserId);
+  const query = req.validated?.query ?? req.query;
+  const locations = await locationService.listLocationsForActor(req.actorUserId, query);
   res.status(200).json({ locations });
 }
 

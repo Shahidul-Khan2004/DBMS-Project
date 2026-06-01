@@ -11,6 +11,7 @@ import {
   validateCreateLocation,
   validateLocationPublicUuidParam,
 } from "../validators/location.js";
+import { validateCitizenGeoListQuery } from "../validators/geoSort.js";
 
 export function createLocationsRouter({ requireAuth = defaultRequireAuth } = {}) {
   const router = express.Router();
@@ -18,7 +19,7 @@ export function createLocationsRouter({ requireAuth = defaultRequireAuth } = {})
   router.use(requireAuth);
 
   router.post("/", validateCreateLocation, postLocation);
-  router.get("/my", getMyLocations);
+  router.get("/my", validateCitizenGeoListQuery, getMyLocations);
   router.get("/search", getLocationSearch);
   router.get("/reverse", getLocationReverse);
   router.get("/:publicUuid", validateLocationPublicUuidParam, getLocationByPublicUuid);
