@@ -14,6 +14,7 @@ import {
   resolveServiceCaseInTransaction,
 } from "../repositories/serviceCaseOperationsRepo.js";
 import { createNotification } from "./notificationService.js";
+import { mergeGeoSortIntoFilters, resolveGeoSortFromQuery } from "./geoSortService.js";
 
 function auditMetaFromRequest(req) {
   return {
@@ -23,13 +24,20 @@ function auditMetaFromRequest(req) {
 }
 
 export async function operationsListServiceCases(query) {
-  return listServiceCasesForOperations({
-    status: query.status,
-    categoryCode: query.categoryCode,
-    assignedTo: query.assignedTo,
-    limit: query.limit,
-    offset: query.offset,
-  });
+  const geo = await resolveGeoSortFromQuery(query);
+  return listServiceCasesForOperations(
+    mergeGeoSortIntoFilters(
+      {
+        status: query.status,
+        categoryCode: query.categoryCode,
+        assignedTo: query.assignedTo,
+        limit: query.limit,
+        offset: query.offset,
+        sort: query.sort,
+      },
+      geo,
+    ),
+  );
 }
 
 export async function operationsGetServiceCase(publicUuid) {
@@ -157,12 +165,15 @@ export async function operationsPostServiceCaseResolve(actorUserId, casePublicUu
   return detail;
 }
 
-export async function listMyServiceCases(actorPublicUuid) {
+export async function listMyServiceCases(actorPublicUuid, query = {}) {
   const userRow = await findUserByPublicUuid(actorPublicUuid);
   if (!userRow) {
     throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
   }
-  const cases = await listMyServiceCasesByReporterUserId(userRow.id);
+  const geo = await resolveGeoSortFromQuery(query, { actorUserId: userRow.id });
+  const cases = await listMyServiceCasesByReporterUserId(userRow.id, {
+    geoSort: geo.geoSort,
+  });
   return { service_cases: cases };
 }
 

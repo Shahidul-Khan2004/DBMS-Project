@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { distanceKmSql, orderByDistanceAscSql } from "../lib/geoDistance.js";
+import { buildReferenceJoin } from "../lib/geoListSql.js";
 
 /**
  * @param {import("mysql2/promise").PoolConnection} conn
@@ -110,26 +112,38 @@ export async function getLocationRowByPublicUuid(conn, publicUuid) {
  * @param {import("mysql2/promise").PoolConnection} conn
  * @param {number} creatorUserId
  */
-export async function listLocationRowsByCreatorUserId(conn, creatorUserId) {
+export async function listLocationRowsByCreatorUserId(conn, creatorUserId, options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const refJoin = useDistance ? buildReferenceJoin(geoSort.ref) : null;
+  const refAlias = geoSort?.ref?.locationId != null ? "ref_loc" : "ref_geom";
+  const refJoinSql = useDistance ? refJoin.joinSql : "";
+  const distanceExpr = useDistance ? distanceKmSql(refAlias, "l") : null;
+  const distanceSelect = useDistance ? `, ${distanceExpr} AS distance_km_sort` : "";
+  const orderSql = useDistance ? orderByDistanceAscSql(distanceExpr, "l.id") : "l.created_at DESC";
+  const joinParams = useDistance ? refJoin.params : [];
+
   const [rows] = await conn.execute(
     `
       SELECT
-        id,
-        public_uuid,
-        admin_area_id,
-        latitude,
-        longitude,
-        ST_AsText(geo_point) AS geo_point_wkt,
-        address_text,
-        place_name,
-        source,
-        created_by_user_id,
-        created_at
-      FROM locations
-      WHERE created_by_user_id = ?
-      ORDER BY created_at DESC
+        l.id,
+        l.public_uuid,
+        l.admin_area_id,
+        l.latitude,
+        l.longitude,
+        ST_AsText(l.geo_point) AS geo_point_wkt,
+        l.address_text,
+        l.place_name,
+        l.source,
+        l.created_by_user_id,
+        l.created_at
+        ${distanceSelect}
+      FROM locations l
+      ${refJoinSql}
+      WHERE l.created_by_user_id = ?
+      ORDER BY ${orderSql}
     `,
-    [creatorUserId],
+    [...joinParams, creatorUserId],
   );
   return rows;
 }

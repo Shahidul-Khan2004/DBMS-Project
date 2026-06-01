@@ -15,9 +15,7 @@ export async function postOperationsIncidentAgency(req, res) {
 
 export async function getOperationsAvailableUnits(req, res) {
   const query = req.validated?.query ?? req.query;
-  const result = await dispatchOperationsService.operationsListAvailableUnits(
-    query.incidentPublicUuid,
-  );
+  const result = await dispatchOperationsService.operationsListAvailableUnits(query);
   res.status(200).json(result);
 }
 
@@ -48,7 +46,8 @@ export async function patchOperationsDispatchStatus(req, res) {
 }
 
 export async function getOperationsAgencyWorkload(req, res) {
-  const result = await dispatchOperationsService.operationsListAgencyWorkload();
+  const query = req.validated?.query ?? req.query;
+  const result = await dispatchOperationsService.operationsListAgencyWorkload(query);
   res.status(200).json(result);
 }
 

@@ -35,11 +35,7 @@ export const validateOperationsCreateIncident = validate(
   operationsCreateIncidentSchema,
 );
 
-export const validateOperationsListIncidentsQuery = validate(
-  "operations incidents list query",
-  operationsListIncidentsQuerySchema,
-  "query",
-);
+export { validateOperationsIncidentsListGeoQuery as validateOperationsListIncidentsQuery } from "./geoSort.js";
 
 export const validateOperationsIncidentUuidParam = validate(
   "operations incident id",

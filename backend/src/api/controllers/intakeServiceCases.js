@@ -1,7 +1,8 @@
 import * as serviceCaseOperationsService from "../../services/serviceCaseOperationsService.js";
 
 export async function getMyServiceCases(req, res) {
-  const result = await serviceCaseOperationsService.listMyServiceCases(req.user.id);
+  const query = req.validated?.query ?? req.query;
+  const result = await serviceCaseOperationsService.listMyServiceCases(req.user.id, query);
   res.status(200).json(result);
 }
 

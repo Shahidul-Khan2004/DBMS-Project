@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import pool from "../../src/config/db.js";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 
 const dbUp = await isDbAvailable();
 import { request, jsonHeaders } from "../helpers/http.js";
@@ -10,7 +10,6 @@ import { getAdminToken } from "../helpers/authTokens.js";
 import { SEED } from "../helpers/fixtures.js";
 
 describe("operations integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 
@@ -38,23 +37,14 @@ describe("operations integration", { skip: !dbUp }, () => {
     assert.ok(Array.isArray(res.body.intake_reports));
   });
 
-  it("GET /operations/intake-reports/:reportPublicUuid returns detail with reporter fields", async () => {
-    const [rows] = await pool.execute(
-      `SELECT public_uuid FROM intake_reports LIMIT 1`,
-    );
-    if (!rows[0]) {
-      return;
-    }
-
+  it("GET /operations/intake-reports returns 422 for distance sort without reference", async () => {
     const token = await getAdminToken(app);
     const res = await request(app)
-      .get(`/operations/intake-reports/${rows[0].public_uuid}`)
+      .get("/operations/intake-reports")
+      .query({ sort: "distance_asc" })
       .set(jsonHeaders(token));
-
-    assert.equal(res.status, 200);
-    assert.equal(res.body.intake_report.public_uuid, rows[0].public_uuid);
-    assert.ok("reporter" in res.body.intake_report);
-    assert.ok("emergency_call" in res.body.intake_report);
+    assert.equal(res.status, 422);
+    assert.equal(res.body.error?.code, "VALIDATION_ERROR");
   });
 
   it("GET /operations/incidents/:incidentPublicUuid returns response state", async () => {

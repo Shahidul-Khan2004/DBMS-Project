@@ -12,6 +12,7 @@ import {
 } from "./validationSchemas.js";
 
 export const validateAgencyListQuery = validate("agency list query", paginationQuerySchema, "query");
+export { validateAgencyUnitsListQuery } from "./geoSort.js";
 export const validateAgencyUnitUuidParam = validate(
   "agency unit id",
   unitPublicUuidParamSchema,

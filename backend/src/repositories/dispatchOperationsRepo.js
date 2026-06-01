@@ -5,6 +5,8 @@ import {
   findStatusIdByCode,
 } from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 
 const INCIDENT_MILESTONE_ORDER = [
   "classified",
@@ -542,13 +544,31 @@ export async function addAgencyToIncident(params) {
   }
 }
 
-export async function listAvailableUnitsForIncident(incidentPublicUuid) {
+export async function listAvailableUnitsForIncident(incidentPublicUuid, options = {}) {
   const conn = await pool.getConnection();
   try {
     const incident = await loadIncidentByPublicUuid(conn, incidentPublicUuid);
     if (!incident) {
       throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
     }
+
+    const geoSort = options.geoSort ?? null;
+    const useDistance = Boolean(geoSort?.ref);
+    const refJoinSql = useDistance
+      ? `
+        INNER JOIN emergency_incidents ei_ref ON ei_ref.id = ?
+        INNER JOIN locations ref_loc ON ref_loc.id = ei_ref.current_location_id
+        LEFT JOIN locations entity_loc ON entity_loc.id = eu.base_location_id
+      `
+      : "";
+    const distanceSelect = useDistance
+      ? ", ST_Distance_Sphere(ref_loc.geo_point, entity_loc.geo_point) / 1000 AS distance_km_sort"
+      : "";
+    const orderSql = useDistance
+      ? "(entity_loc.id IS NULL), distance_km_sort ASC"
+      : "a.name, eu.unit_code";
+
+    const sqlParams = useDistance ? [incident.id, incident.id] : [incident.id];
 
     const [rows] = await conn.execute(
       `
@@ -560,6 +580,7 @@ export async function listAvailableUnitsForIncident(incidentPublicUuid) {
           a.public_uuid AS agency_public_uuid,
           a.name AS agency_name,
           eut.type_code AS unit_type_code
+          ${distanceSelect}
         FROM emergency_units eu
         INNER JOIN unit_statuses us ON us.id = eu.current_status_id
         INNER JOIN agencies a ON a.id = eu.agency_id
@@ -568,16 +589,19 @@ export async function listAvailableUnitsForIncident(incidentPublicUuid) {
           ON iap.agency_id = eu.agency_id
          AND iap.incident_id = ?
          AND iap.participation_status IN ('requested', 'active')
+        ${refJoinSql}
         WHERE eu.is_active = TRUE
           AND us.status_code = 'available'
-        ORDER BY a.name, eu.unit_code
+        ORDER BY ${orderSql}
       `,
-      [incident.id],
+      sqlParams,
     );
 
     return {
       incident_public_uuid: incident.public_uuid,
-      units: rows.map(mapAvailableUnitRow),
+      units: rows.map((row) =>
+        mapRowWithOptionalDistance(mapAvailableUnitRow(row), row, geoSort),
+      ),
     };
   } finally {
     conn.release();
@@ -775,7 +799,22 @@ export async function patchDispatchStatus(params) {
   }
 }
 
-export async function listAgencyWorkload() {
+export async function listAgencyWorkload(options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = a.head_office_location_id
+      ${distance.joinSql}
+    `
+    : "";
+
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "a.name";
+  const joinParams = useDistance ? distance.joinParams : [];
+
   const [rows] = await pool.execute(
     `
       SELECT
@@ -786,22 +825,27 @@ export async function listAgencyWorkload() {
         w.available_units AS available_units,
         w.busy_units AS busy_units,
         w.total_dispatches AS total_dispatches
+        ${distanceSelect}
       FROM vw_agency_workload w
       INNER JOIN agencies a ON a.id = w.agency_id
-      ORDER BY a.name
+      ${refJoinSql}
+      ORDER BY ${orderSql}
     `,
+    joinParams,
   );
 
+  const mapRow = (row) => ({
+    agency_public_uuid: row.agency_public_uuid,
+    agency_name: row.agency_name,
+    active_incidents: Number(row.active_incidents),
+    total_units: Number(row.total_units),
+    available_units: Number(row.available_units),
+    busy_units: Number(row.busy_units),
+    total_dispatches: Number(row.total_dispatches),
+  });
+
   return {
-    agencies: rows.map((row) => ({
-      agency_public_uuid: row.agency_public_uuid,
-      agency_name: row.agency_name,
-      active_incidents: Number(row.active_incidents),
-      total_units: Number(row.total_units),
-      available_units: Number(row.available_units),
-      busy_units: Number(row.busy_units),
-      total_dispatches: Number(row.total_dispatches),
-    })),
+    agencies: rows.map((row) => mapRowWithOptionalDistance(mapRow(row), row, geoSort)),
   };
 }
 

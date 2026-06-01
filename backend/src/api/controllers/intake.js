@@ -10,7 +10,8 @@ export async function createIntakeReport(req, res) {
 }
 
 export async function getMyIntakeReports(req, res) {
-  const reports = await intakeService.listMyIntakeReports(req.user.id);
+  const query = req.validated?.query ?? req.query;
+  const reports = await intakeService.listMyIntakeReports(req.user.id, query);
   res.status(200).json({
     reports,
   });
