@@ -54,6 +54,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   ];
 
   const showLegacySidebar = role === "citizen" && !hideSidebar;
+  const isAdminConsole =
+    pathname?.startsWith("/dashboard/admin") ?? false;
+  const shellWidthClass = isAdminConsole
+    ? "w-full"
+    : "mx-auto max-w-screen-2xl";
 
   const accountActions = (
     <>
@@ -80,7 +85,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200">
       <div className="border-b border-[#002D62]/10 bg-zinc-200/95 shadow-sm backdrop-blur-md">
-        <div className="mx-auto max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8 2xl:px-10 xl:py-5">
+        <div
+          className={`${shellWidthClass} px-4 py-4 sm:px-6 lg:px-8 2xl:px-10 xl:py-5`}
+        >
           <div className="flex flex-nowrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <Link
@@ -125,8 +132,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       <div
         className={
           showLegacySidebar
-            ? "mx-auto grid max-w-screen-2xl items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8 2xl:px-10"
-            : "mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8 2xl:px-10"
+            ? `${shellWidthClass} grid items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8 2xl:px-10`
+            : `${shellWidthClass} w-full px-4 py-6 sm:px-6 lg:px-8 2xl:px-10`
         }
       >
         {showLegacySidebar ? (
