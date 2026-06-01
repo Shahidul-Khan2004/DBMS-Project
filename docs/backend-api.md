@@ -2078,9 +2078,9 @@ Assigning role **`agency_representative`** via `POST /users/:userId/roles` is **
 
 ### POST `/admin/agencies/onboard`
 
-Single transaction: link an **existing** user to an agency (create new agency **or** use existing), upsert **`agency_memberships`** (`representative`, `active`), assign **`agency_representative`** role if missing.
+Single transaction: create a new agency **or** use an existing one. When **`user_public_uuid`** is provided, link that **existing** user, upsert **`agency_memberships`** (`representative`, `active`), and assign **`agency_representative`** if missing. When omitted, only the agency is created or resolved (no membership or role changes).
 
-**Body (new agency):**
+**Body (new agency, with representative):**
 
 ```json
 {
@@ -2099,7 +2099,25 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Body (existing agency):**
+**Body (new agency, agency only):** omit `user_public_uuid`.
+
+```json
+{
+  "agency": {
+    "agency_code": "DHK-FIRE-02",
+    "name": "Dhaka Fire Service North",
+    "agency_type_code": "fire_service",
+    "description": "optional",
+    "head_office_location": {
+      "latitude": 23.81,
+      "longitude": 90.41,
+      "source": "manual_entry"
+    }
+  }
+}
+```
+
+**Body (existing agency, with representative):**
 
 ```json
 {
@@ -2108,7 +2126,15 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Response (201):**
+**Body (existing agency, agency only):** omit `user_public_uuid`.
+
+```json
+{
+  "agency_public_uuid": "b2000001-0000-4000-8000-000000000001"
+}
+```
+
+**Response (201, with representative):**
 
 ```json
 {
@@ -2128,7 +2154,9 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Errors:** `404` `USER_NOT_FOUND`, `404` `AGENCY_NOT_FOUND`, `409` `AGENCY_CODE_CONFLICT`, `409` `USER_ALREADY_REPRESENTATIVE`.
+**Response (201, agency only):** `"message": "Agency onboarded"`, same `agency` object; `membership_public_uuid` and `user_public_uuid` are omitted.
+
+**Errors:** `404` `USER_NOT_FOUND` (when `user_public_uuid` is sent), `404` `AGENCY_NOT_FOUND`, `409` `AGENCY_CODE_CONFLICT`, `409` `USER_ALREADY_REPRESENTATIVE` (when linking a representative).
 
 ### GET `/admin/agencies`
 

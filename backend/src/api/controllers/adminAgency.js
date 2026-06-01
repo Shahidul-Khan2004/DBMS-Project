@@ -4,7 +4,9 @@ export async function postAdminOnboardAgency(req, res) {
   const body = req.validated?.body ?? req.body;
   const result = await adminAgencyService.adminOnboardAgency(body, req.actorUserId);
   res.status(201).json({
-    message: "Agency representative onboarded",
+    message: body.user_public_uuid
+      ? "Agency representative onboarded"
+      : "Agency onboarded",
     ...result,
   });
 }

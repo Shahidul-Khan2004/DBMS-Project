@@ -402,7 +402,9 @@ const adminAgencyPayloadSchema = z.object({
 
 export const adminOnboardAgencySchema = z
   .object({
-    user_public_uuid: z.uuid({ message: "user_public_uuid must be a user public UUID" }),
+    user_public_uuid: z
+      .uuid({ message: "user_public_uuid must be a user public UUID" })
+      .optional(),
     agency_public_uuid: z.uuid({ message: "Invalid agency id" }).optional(),
     agency: adminAgencyPayloadSchema.optional(),
   })

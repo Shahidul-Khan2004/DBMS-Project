@@ -365,11 +365,6 @@ export async function onboardAgency(params) {
   try {
     await conn.beginTransaction();
 
-    const user = await findUserByPublicUuid(params.userPublicUuid);
-    if (!user) {
-      throw new BackendError(404, "USER_NOT_FOUND", "User not found");
-    }
-
     let agency;
     if (params.agencyPublicUuid) {
       agency = await loadAgencyByPublicUuid(conn, params.agencyPublicUuid);
@@ -417,6 +412,16 @@ export async function onboardAgency(params) {
         ],
       );
       agency = await loadAgencyByPublicUuid(conn, agencyPublicUuid);
+    }
+
+    if (!params.userPublicUuid) {
+      await conn.commit();
+      return { agency: mapAgencyRow(agency) };
+    }
+
+    const user = await findUserByPublicUuid(params.userPublicUuid);
+    if (!user) {
+      throw new BackendError(404, "USER_NOT_FOUND", "User not found");
     }
 
     const membershipPublicUuid = await upsertRepresentativeMembership(conn, {
