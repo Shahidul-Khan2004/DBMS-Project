@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="min-h-screen">
+    <html lang="en" className="min-h-screen" data-scroll-behavior="smooth">
       <body
         className={`${inter.className} h-full bg-zinc-200 antialiased overflow-x-hidden`}
       >
