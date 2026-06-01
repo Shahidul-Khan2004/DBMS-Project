@@ -3,6 +3,8 @@ import BackendError from "../lib/BackendError.js";
 import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
 import { query } from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import {
   ensureIntakeUnderReviewIfReceived,
@@ -643,6 +645,19 @@ export async function listIncidentsForOperations(filters) {
 
   const filterParams = [];
   const whereSql = buildIncidentListWhere(filters, filterParams);
+  const geoSort = filters.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = ei.current_location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "ei.reported_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
 
   const countSql = `
     SELECT COUNT(*) AS cnt
@@ -666,25 +681,29 @@ export async function listIncidentsForOperations(filters) {
       ist.status_code AS status_code,
       rcat.category_code AS category_code,
       sev.severity_code AS severity_code
+      ${distanceSelect}
     FROM emergency_incidents ei
     INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
     INNER JOIN report_categories rcat ON rcat.id = ei.category_id
     INNER JOIN incident_severity_levels sev ON sev.id = ei.severity_level_id
+    ${refJoinSql}
     ${whereSql}
-    ORDER BY ei.reported_at DESC
+    ORDER BY ${orderSql}
     LIMIT ?
     OFFSET ?
   `;
 
   const countResult = await query(countSql, filterParams);
-  const listResult = await query(listSql, [...filterParams, limit, offset]);
+  const listResult = await query(listSql, [...joinParams, ...filterParams, limit, offset]);
   const total =
     typeof countResult.rows[0]?.cnt === "bigint"
       ? Number(countResult.rows[0].cnt)
       : Number(countResult.rows[0]?.cnt || 0);
 
   return {
-    incidents: listResult.rows.map(mapIncidentListRow),
+    incidents: listResult.rows.map((row) =>
+      mapRowWithOptionalDistance(mapIncidentListRow(row), row, geoSort),
+    ),
     pagination: { limit, offset, total },
   };
 }
@@ -747,7 +766,21 @@ function mapMyIncidentRow(row) {
  * Lists emergency incidents linked to intake reports owned by the reporter.
  * Prefers primary_report link when multiple reports from the same reporter exist.
  */
-export async function listMyIncidentsByReporterUserId(reporterUserId) {
+export async function listMyIncidentsByReporterUserId(reporterUserId, options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc
+        ON entity_loc.id = COALESCE(ei.current_location_id, preferred.reported_location_id)
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "ei.updated_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
+
   const { rows } = await query(
     `
       SELECT
@@ -773,6 +806,7 @@ export async function listMyIncidentsByReporterUserId(reporterUserId) {
         l.place_name AS location_place_name,
         l.admin_area_id AS location_admin_area_id,
         l.source AS location_source
+        ${distanceSelect}
       FROM emergency_incidents ei
       INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
       INNER JOIN report_categories rcat ON rcat.id = ei.category_id
@@ -793,12 +827,13 @@ export async function listMyIncidentsByReporterUserId(reporterUserId) {
       ) preferred ON preferred.incident_id = ei.id AND preferred.rn = 1
       LEFT JOIN locations l
         ON l.id = COALESCE(ei.current_location_id, preferred.reported_location_id)
-      ORDER BY ei.updated_at DESC
+      ${refJoinSql}
+      ORDER BY ${orderSql}
     `,
-    [reporterUserId],
+    useDistance ? [reporterUserId, ...joinParams] : [reporterUserId],
   );
 
-  return rows.map(mapMyIncidentRow);
+  return rows.map((row) => mapRowWithOptionalDistance(mapMyIncidentRow(row), row, geoSort));
 }
 
 const ACTIVE_INCIDENT_BASE = `

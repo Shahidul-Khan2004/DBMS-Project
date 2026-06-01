@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import pool from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { findUserByPublicUuid } from "./userRepo.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
 import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
@@ -125,9 +127,21 @@ async function insertHeadOfficeLocation(conn, locationPayload, actorUserId) {
   return Number(inserted.id);
 }
 
-export async function listAgencies({ limit = 20, offset = 0 }) {
+export async function listAgencies({ limit = 20, offset = 0, geoSort = null } = {}) {
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const safeOffset = Math.max(offset, 0);
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = a.head_office_location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "a.name";
+  const joinParams = useDistance ? distance.joinParams : [];
 
   const [countRows] = await pool.execute(`SELECT COUNT(*) AS total FROM agencies`);
   const [rows] = await pool.execute(
@@ -141,18 +155,23 @@ export async function listAgencies({ limit = 20, offset = 0 }) {
         a.created_at,
         a.updated_at,
         at.type_code AS agency_type_code
+        ${distanceSelect}
       FROM agencies a
       INNER JOIN agency_types at ON at.id = a.agency_type_id
-      ORDER BY a.name
+      ${refJoinSql}
+      ORDER BY ${orderSql}
       LIMIT ${safeLimit} OFFSET ${safeOffset}
     `,
+    joinParams,
   );
 
   return {
     total: Number(countRows[0].total),
     limit: safeLimit,
     offset: safeOffset,
-    agencies: rows.map(mapAgencyRow),
+    agencies: rows.map((row) =>
+      mapRowWithOptionalDistance(mapAgencyRow(row), row, geoSort),
+    ),
   };
 }
 

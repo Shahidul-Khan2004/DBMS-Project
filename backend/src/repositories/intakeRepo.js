@@ -1,5 +1,7 @@
 import pool, { query } from "../config/db.js";
 import BackendError from "../lib/BackendError.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import {
   requireAdministrativeAreaInTransaction,
@@ -314,7 +316,20 @@ export async function findIntakeReportByPublicUuid(publicUuid) {
   return result.rows[0] || null;
 }
 
-export async function listIntakeReportsByReporterUserId(reporterUserId) {
+export async function listIntakeReportsByReporterUserId(reporterUserId, options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const refJoinSql = useDistance
+    ? `
+      INNER JOIN locations entity_loc ON entity_loc.id = ir.reported_location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "ir.created_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
+
   const result = await query(
     `
       SELECT
@@ -335,6 +350,7 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
         l.place_name AS location_place_name,
         l.admin_area_id AS location_admin_area_id,
         l.source AS location_source
+        ${distanceSelect}
       FROM intake_reports ir
       INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
       INNER JOIN report_channels rc ON rc.id = ir.channel_id
@@ -343,13 +359,16 @@ export async function listIntakeReportsByReporterUserId(reporterUserId) {
       LEFT JOIN incident_report_links irl ON irl.intake_report_id = ir.id
       LEFT JOIN emergency_incidents ei ON ei.id = irl.incident_id
       LEFT JOIN incident_statuses ist ON ist.id = ei.current_status_id
+      ${refJoinSql}
       WHERE ir.reporter_user_id = ?
-      ORDER BY ir.created_at DESC
+      ORDER BY ${orderSql}
     `,
-    [reporterUserId],
+    [...joinParams, reporterUserId],
   );
 
-  return result.rows.map(mapIntakeReportCore);
+  return result.rows.map((row) =>
+    mapRowWithOptionalDistance(mapIntakeReportCore(row), row, geoSort),
+  );
 }
 
 export async function findIntakeReportByPublicUuidForReporter(reportPublicUuid, reporterUserId) {

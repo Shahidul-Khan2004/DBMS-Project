@@ -1,5 +1,7 @@
 import BackendError from "../lib/BackendError.js";
 import { query } from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -70,8 +72,25 @@ export async function listIntakeReportsForOperations(filters) {
   const filterParams = [];
   const whereSql = buildListWhere(filters, filterParams);
 
-  const orderSql =
+  const geoSort = filters.geoSort ?? null;
+  const useDistance = filters.sort === "distance_asc" && geoSort?.ref;
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+
+  const refJoinSql = useDistance
+    ? `
+      INNER JOIN locations entity_loc ON entity_loc.id = ir.reported_location_id
+      ${distance.joinSql}
+    `
+    : "";
+
+  let orderSql =
     filters.sort === "reported_at_asc" ? "ir.reported_at ASC" : "ir.reported_at DESC";
+  if (useDistance) {
+    orderSql = distance.orderBySql;
+  }
+
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const joinParams = useDistance ? distance.joinParams : [];
 
   const countSql = `
     SELECT COUNT(*) AS cnt
@@ -80,8 +99,9 @@ export async function listIntakeReportsForOperations(filters) {
   `;
 
   const listSql = `
-    ${INTAKE_SELECT}
+    ${INTAKE_SELECT}${distanceSelect}
     ${INTAKE_FROM}
+    ${refJoinSql}
     ${whereSql}
     ORDER BY ${orderSql}
     LIMIT ?
@@ -89,7 +109,7 @@ export async function listIntakeReportsForOperations(filters) {
   `;
 
   const countResult = await query(countSql, filterParams);
-  const listResult = await query(listSql, [...filterParams, limit, offset]);
+  const listResult = await query(listSql, [...joinParams, ...filterParams, limit, offset]);
   const countRows = countResult.rows;
 
   const total =
@@ -99,7 +119,9 @@ export async function listIntakeReportsForOperations(filters) {
   const rows = listResult.rows;
 
   return {
-    intake_reports: rows.map(formatIntakeRow),
+    intake_reports: rows.map((row) =>
+      mapRowWithOptionalDistance(formatIntakeRow(row), row, geoSort),
+    ),
     pagination: { limit, offset, total },
   };
 }

@@ -6,6 +6,8 @@ import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
 import { query } from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { listUpazilaIdsUnderDistrict } from "./administrativeAreaSearchRepo.js";
 
 const DEFAULT_DISASTER_LIMIT = 50;
@@ -693,7 +695,126 @@ export async function getDisasterByPublicUuid(publicUuid) {
   }
 }
 
-export async function getDisasterDashboard(publicUuid) {
+function mapLinkedIncidentRow(row, geoSort) {
+  const item = {
+    incident_public_uuid: row.incident_public_uuid,
+    incident_code: row.incident_code,
+    title: row.title,
+    incident_status: row.incident_status,
+    linked_at: row.linked_at,
+    link_note: row.link_note,
+    location_admin_area_id:
+      row.location_admin_area_id != null ? Number(row.location_admin_area_id) : null,
+    location_upazila_name: row.location_upazila_name ?? null,
+  };
+  return mapRowWithOptionalDistance(item, row, geoSort);
+}
+
+async function listLinkedIncidentsForDashboard(conn, disasterEventId, geoSort = null) {
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = ei.current_location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "dil.linked_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
+
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        ei.public_uuid AS incident_public_uuid,
+        ei.incident_code,
+        ei.title,
+        ist.status_code AS incident_status,
+        dil.linked_at,
+        dil.link_note,
+        l.admin_area_id AS location_admin_area_id,
+        aa.name AS location_upazila_name
+        ${distanceSelect}
+      FROM disaster_incident_links dil
+      INNER JOIN emergency_incidents ei ON ei.id = dil.incident_id
+      INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+      LEFT JOIN locations l ON l.id = ei.current_location_id
+      LEFT JOIN administrative_areas aa ON aa.id = l.admin_area_id
+      ${refJoinSql}
+      WHERE dil.disaster_event_id = ?
+        AND dil.unlinked_at IS NULL
+      ORDER BY ${orderSql}
+    `,
+    [...joinParams, disasterEventId],
+  );
+
+  return rows.map((row) => mapLinkedIncidentRow(row, geoSort));
+}
+
+async function listSheltersForDashboard(conn, disasterEventId, geoSort = null) {
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const refJoinSql = useDistance
+    ? `
+      INNER JOIN facilities f ON f.id = v.facility_id
+      LEFT JOIN locations entity_loc ON entity_loc.id = f.location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "v.facility_name";
+  const joinParams = useDistance ? distance.joinParams : [];
+
+  const [rows] = await conn.execute(
+    `
+      SELECT v.*${distanceSelect}
+      FROM vw_disaster_shelter_capacity v
+      ${refJoinSql}
+      WHERE v.disaster_event_id = ?
+      ORDER BY ${orderSql}
+    `,
+    [...joinParams, disasterEventId],
+  );
+
+  return rows.map((row) => mapRowWithOptionalDistance({ ...row }, row, geoSort));
+}
+
+async function listReliefHubsForDashboard(conn, disasterEventId, geoSort = null) {
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = f.location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "f.name";
+  const joinParams = useDistance ? distance.joinParams : [];
+
+  const [rows] = await conn.execute(
+    `
+      SELECT
+        rha.id AS relief_hub_activation_id,
+        rha.public_uuid AS relief_hub_public_uuid,
+        rha.activation_status,
+        rha.activation_source,
+        f.public_uuid AS facility_public_uuid,
+        f.name AS facility_name
+        ${distanceSelect}
+      FROM relief_hub_activations rha
+      INNER JOIN facilities f ON f.id = rha.facility_id
+      ${refJoinSql}
+      WHERE rha.disaster_event_id = ?
+      ORDER BY ${orderSql}
+    `,
+    [...joinParams, disasterEventId],
+  );
+
+  return rows.map((row) => mapRowWithOptionalDistance({ ...row }, row, geoSort));
+}
+
+export async function getDisasterDashboard(publicUuid, options = {}) {
   const conn = await pool.getConnection();
   try {
     const disaster = await requireDisaster(conn, publicUuid);
@@ -782,34 +903,14 @@ export async function getDisasterDashboard(publicUuid) {
       [disasterEventId],
     );
 
-    const linkedIncidents = await listLinkedIncidents(publicUuid);
-
-    const [shelters] = await conn.execute(
-      `
-        SELECT *
-        FROM vw_disaster_shelter_capacity
-        WHERE disaster_event_id = ?
-        ORDER BY facility_name
-      `,
-      [disasterEventId],
+    const geoSort = options.geoSort ?? null;
+    const linkedIncidents = await listLinkedIncidentsForDashboard(
+      conn,
+      disasterEventId,
+      geoSort,
     );
-
-    const [reliefHubs] = await conn.execute(
-      `
-        SELECT
-          rha.id AS relief_hub_activation_id,
-          rha.public_uuid AS relief_hub_public_uuid,
-          rha.activation_status,
-          rha.activation_source,
-          f.public_uuid AS facility_public_uuid,
-          f.name AS facility_name
-        FROM relief_hub_activations rha
-        INNER JOIN facilities f ON f.id = rha.facility_id
-        WHERE rha.disaster_event_id = ?
-        ORDER BY f.name
-      `,
-      [disasterEventId],
-    );
+    const shelters = await listSheltersForDashboard(conn, disasterEventId, geoSort);
+    const reliefHubs = await listReliefHubsForDashboard(conn, disasterEventId, geoSort);
 
     const [inventory] = await conn.execute(
       `
