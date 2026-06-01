@@ -6,6 +6,7 @@ import {
   Eye,
   Radio,
   Shield,
+  Warehouse,
 } from "lucide-react";
 
 export type WorkflowAvailability = "available" | "coming_later";
@@ -74,12 +75,22 @@ export const ADMIN_WORKFLOW_AREAS: readonly AdminWorkflowArea[] = [
     primaryActionLabel: "Open Dispatcher Oversight",
   },
   {
-    id: "disaster-protocol",
-    title: "Disaster Protocol",
+    id: "facilities",
+    title: "Facilities",
     description:
-      "Future disaster events, affected areas, shelters, relief, and facilities.",
+      "Manage shelters, hospitals, relief hubs, warehouses, and support facilities.",
+    icon: Warehouse,
+    availability: "available",
+    href: "/dashboard/admin/facilities",
+    primaryActionLabel: "Manage Facilities",
+  },
+  {
+    id: "natural-disasters",
+    title: "Natural Disasters",
+    description: "Create, declare, and monitor disaster events.",
     icon: AlertTriangle,
-    availability: "coming_later",
-    primaryActionLabel: "Unavailable",
+    availability: "available",
+    href: "/dashboard/admin/disasters",
+    primaryActionLabel: "Open Disasters",
   },
 ];

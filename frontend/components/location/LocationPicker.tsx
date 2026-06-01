@@ -29,6 +29,8 @@ export type LocationPickerValue = {
 export type LocationPickerSelectionDetails = {
   addressText?: string;
   placeName?: string;
+  adminAreaId?: number;
+  adminAreaLabel?: string;
 };
 
 const CLEARED_LOCATION_DETAILS: LocationPickerSelectionDetails = {
@@ -377,18 +379,27 @@ export function LocationPicker({
   };
 
   const handleResultSelect = (result: SearchResult) => {
-    selectionRequestRef.current += 1;
-    onChange(
-      { latitude: result.latitude, longitude: result.longitude },
-      {
-        addressText: result.addressText || result.label,
-        placeName: result.placeName,
-      },
-    );
+    const requestId = selectionRequestRef.current + 1;
+    selectionRequestRef.current = requestId;
+    const location = { latitude: result.latitude, longitude: result.longitude };
+    onChange(location, {
+      addressText: result.addressText || result.label,
+      placeName: result.placeName,
+    });
     setQuery(result.label);
     setResults([]);
     setSearchError("");
     setLocationError("");
+
+    void resolveLocationDetails(location).then((details) => {
+      if (selectionRequestRef.current !== requestId) return;
+      onChange(location, {
+        addressText: details.addressText || result.addressText || result.label,
+        placeName: result.placeName || details.placeName,
+        adminAreaId: details.adminAreaId,
+        adminAreaLabel: details.adminAreaLabel,
+      });
+    });
   };
 
   const resolveLocationDetails = async (
@@ -398,13 +409,20 @@ export function LocationPicker({
     resolvingRequestRef.current = resolvingRequestId;
     setIsResolvingLocation(true);
     try {
-      const response = await apiGet<{ addressText?: string; placeName?: string }>(
+      const response = await apiGet<{
+        addressText?: string;
+        placeName?: string;
+        adminAreaId?: number;
+        adminAreaLabel?: string;
+      }>(
         `/locations/reverse?latitude=${location.latitude}&longitude=${location.longitude}`,
       );
 
       return {
         addressText: response.addressText,
         placeName: response.placeName,
+        adminAreaId: response.adminAreaId,
+        adminAreaLabel: response.adminAreaLabel,
       };
     } catch {
       return {};
@@ -431,7 +449,14 @@ export function LocationPicker({
 
     void resolveLocationDetails(location).then((details) => {
       if (selectionRequestRef.current !== requestId) return;
-      if (!details.addressText && !details.placeName) return;
+      if (
+        !details.addressText &&
+        !details.placeName &&
+        !details.adminAreaLabel &&
+        details.adminAreaId == null
+      ) {
+        return;
+      }
       onChange(location, details);
     });
   };
@@ -472,7 +497,14 @@ export function LocationPicker({
         setQuery("");
         void resolveLocationDetails(location).then((details) => {
           if (selectionRequestRef.current !== requestId) return;
-          if (!details.addressText && !details.placeName) return;
+          if (
+            !details.addressText &&
+            !details.placeName &&
+            !details.adminAreaLabel &&
+            details.adminAreaId == null
+          ) {
+            return;
+          }
           onChange(location, details);
         });
         setIsLocating(false);

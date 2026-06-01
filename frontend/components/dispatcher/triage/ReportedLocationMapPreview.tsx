@@ -23,6 +23,8 @@ export type ReportedLocationMapPreviewProps = {
   previewKey?: string;
   /** Tailwind height class for the map container (default h-[180px]) */
   heightClassName?: string;
+  /** Optional classes for the outer map wrapper (e.g. h-full for split layouts) */
+  className?: string;
 };
 
 function MapRecenter({
@@ -89,12 +91,14 @@ function MapResizeHandler() {
 
 export function MapPreviewUnavailable({
   heightClassName = "h-[180px]",
+  className = "",
 }: {
   heightClassName?: string;
+  className?: string;
 }) {
   return (
     <div
-      className={`flex w-full flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-center ${heightClassName}`}
+      className={`flex w-full flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-center ${heightClassName} ${className}`.trim()}
     >
       <p className="text-sm font-medium text-slate-700">
         Map preview unavailable
@@ -108,12 +112,14 @@ export function MapPreviewUnavailable({
 
 function MapPreviewLoading({
   heightClassName = "h-[180px]",
+  className = "",
 }: {
   heightClassName?: string;
+  className?: string;
 }) {
   return (
     <div
-      className={`w-full animate-pulse rounded-lg bg-slate-100 ${heightClassName}`}
+      className={`w-full animate-pulse rounded-lg bg-slate-100 ${heightClassName} ${className}`.trim()}
       aria-hidden
     />
   );
@@ -124,11 +130,17 @@ function ReportedLocationMapPreviewInner({
   longitude,
   previewKey,
   heightClassName = "h-[180px]",
+  className = "",
 }: ReportedLocationMapPreviewProps) {
   const coordinates = getValidReportedCoordinates(latitude, longitude);
 
   if (!coordinates) {
-    return <MapPreviewUnavailable heightClassName={heightClassName} />;
+    return (
+      <MapPreviewUnavailable
+        heightClassName={heightClassName}
+        className={className}
+      />
+    );
   }
 
   const { latitude: lat, longitude: lng } = coordinates;
@@ -138,7 +150,7 @@ function ReportedLocationMapPreviewInner({
 
   return (
     <div
-      className="reported-location-map-preview relative isolate z-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+      className={`reported-location-map-preview relative isolate z-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 ${className}`.trim()}
       aria-label={`Map preview for ${formatReportedCoordinates(lat, lng)}`}
     >
       <MapContainer
@@ -185,7 +197,12 @@ export function ReportedLocationMapPreview(props: ReportedLocationMapPreviewProp
   }, []);
 
   if (!isClientReady) {
-    return <MapPreviewLoading heightClassName={props.heightClassName} />;
+    return (
+      <MapPreviewLoading
+        heightClassName={props.heightClassName}
+        className={props.className}
+      />
+    );
   }
 
   return <ReportedLocationMapPreviewInner {...props} />;
