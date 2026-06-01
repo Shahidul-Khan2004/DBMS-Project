@@ -47,3 +47,21 @@ export async function putFacilityDefaultCapacities(req, res) {
   );
   res.status(200).json({ facility });
 }
+
+export async function patchDeactivateFacility(req, res) {
+  const { facilityPublicUuid } = req.validated?.params ?? req.params;
+  const facility = await facilityService.deactivateFacility(facilityPublicUuid);
+  res.status(200).json({
+    message: "Facility deactivated",
+    facility,
+  });
+}
+
+export async function patchActivateFacility(req, res) {
+  const { facilityPublicUuid } = req.validated?.params ?? req.params;
+  const facility = await facilityService.activateFacility(facilityPublicUuid);
+  res.status(200).json({
+    message: "Facility activated",
+    facility,
+  });
+}

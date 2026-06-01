@@ -2,6 +2,8 @@ import express from "express";
 import {
   getFacilities,
   getFacility,
+  patchActivateFacility,
+  patchDeactivateFacility,
   postFacility,
   putFacilityCapabilities,
   putFacilityDefaultCapacities,
@@ -41,6 +43,16 @@ export function createFacilitiesRouter({ requireAuth = defaultRequireAuth } = {}
     validateFacilityUuidParam,
     validateFacilityDefaultCapacities,
     putFacilityDefaultCapacities,
+  );
+  router.patch(
+    "/:facilityPublicUuid/deactivate",
+    validateFacilityUuidParam,
+    patchDeactivateFacility,
+  );
+  router.patch(
+    "/:facilityPublicUuid/activate",
+    validateFacilityUuidParam,
+    patchActivateFacility,
   );
   return router;
 }
