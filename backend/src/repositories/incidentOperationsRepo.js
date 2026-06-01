@@ -874,12 +874,20 @@ async function loadIncidentDetailRow(conn, publicUuid) {
         ist.status_code AS status_code,
         rcat.category_code AS category_code,
         sev.severity_code AS severity_code,
-        io.outcome_code AS outcome_code
+        io.outcome_code AS outcome_code,
+        loc.public_uuid AS location_public_uuid,
+        loc.latitude AS location_latitude,
+        loc.longitude AS location_longitude,
+        loc.address_text AS location_address_text,
+        loc.place_name AS location_place_name,
+        loc.admin_area_id AS location_admin_area_id,
+        loc.source AS location_source
       FROM emergency_incidents ei
       INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
       INNER JOIN report_categories rcat ON rcat.id = ei.category_id
       INNER JOIN incident_severity_levels sev ON sev.id = ei.severity_level_id
       LEFT JOIN incident_outcomes io ON io.id = ei.final_outcome_id
+      LEFT JOIN locations loc ON loc.id = ei.current_location_id
       WHERE ei.public_uuid = ?
       LIMIT 1
     `,
@@ -901,6 +909,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
         SELECT
           irl.link_type AS link_type,
           irl.linked_at AS linked_at,
+          irl.note AS link_note,
           ir.public_uuid AS intake_public_uuid,
           ir.report_code AS intake_report_code,
           ir.summary AS intake_summary,
@@ -951,6 +960,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
       linked_intake_reports: links.map((l) => ({
         link_type: l.link_type,
         linked_at: l.linked_at,
+        link_note: l.link_note ?? null,
         intake_public_uuid: l.intake_public_uuid,
         intake_report_code: l.intake_report_code,
         intake_summary: l.intake_summary,
@@ -1045,6 +1055,7 @@ function mapIncidentDetail(row) {
     closed_at: row.closed_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    location: mapLocationRow(row),
   };
 }
 

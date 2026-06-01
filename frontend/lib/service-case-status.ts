@@ -24,8 +24,22 @@ export function isServiceCaseEscalated(statusCode: string | null | undefined) {
 }
 
 export function getServiceCaseStatusLabel(statusCode: string | null | undefined) {
+  if (!statusCode) return "-";
   if (statusCode === "escalated_to_emergency") {
     return "Escalated to Emergency";
   }
-  return statusCode ? statusCode.replace(/_/g, " ") : "-";
+  if (statusCode === "awaiting_user_response") {
+    return "Awaiting User Response";
+  }
+  if (statusCode === "under_review") {
+    return "Under Review";
+  }
+  if (statusCode === "no_action_needed") {
+    return "No Action Needed";
+  }
+  return statusCode
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }

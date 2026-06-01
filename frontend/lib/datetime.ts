@@ -63,6 +63,23 @@ export function formatBangladeshTime(value?: string | null): string {
   });
 }
 
+export function formatBangladeshTimeOfDay(value?: string | null): string | null {
+  if (!value) return null;
+
+  const date = parseBangladeshTimestamp(value);
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleString("en-US", {
+    timeZone: "Asia/Dhaka",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export function isValidBangladeshLocalDatetime(
   value?: string | null,
 ): boolean {

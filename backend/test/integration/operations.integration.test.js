@@ -38,6 +38,25 @@ describe("operations integration", { skip: !dbUp }, () => {
     assert.ok(Array.isArray(res.body.intake_reports));
   });
 
+  it("GET /operations/intake-reports/:reportPublicUuid returns detail with reporter fields", async () => {
+    const [rows] = await pool.execute(
+      `SELECT public_uuid FROM intake_reports LIMIT 1`,
+    );
+    if (!rows[0]) {
+      return;
+    }
+
+    const token = await getAdminToken(app);
+    const res = await request(app)
+      .get(`/operations/intake-reports/${rows[0].public_uuid}`)
+      .set(jsonHeaders(token));
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.intake_report.public_uuid, rows[0].public_uuid);
+    assert.ok("reporter" in res.body.intake_report);
+    assert.ok("emergency_call" in res.body.intake_report);
+  });
+
   it("GET /operations/incidents/:incidentPublicUuid returns response state", async () => {
     const [rows] = await pool.execute(
       `SELECT id FROM emergency_incidents WHERE public_uuid = ? LIMIT 1`,
@@ -54,6 +73,11 @@ describe("operations integration", { skip: !dbUp }, () => {
 
     assert.equal(res.status, 200);
     assert.equal(res.body.incident.public_uuid, SEED.demoIncidentPublicUuid);
+    if (res.body.incident.location) {
+      assert.ok(res.body.incident.location.public_uuid);
+      assert.equal(typeof res.body.incident.location.latitude, "number");
+      assert.equal(typeof res.body.incident.location.longitude, "number");
+    }
     assert.ok(Array.isArray(res.body.linked_intake_reports));
     assert.ok(Array.isArray(res.body.timeline_preview));
     assert.ok(Array.isArray(res.body.participating_agencies));

@@ -57,6 +57,26 @@ const INTAKE_FROM = `
   LEFT JOIN locations l ON l.id = ir.reported_location_id
 `;
 
+const INTAKE_DETAIL_SELECT = `
+  ${INTAKE_SELECT.trim()},
+    ru.public_uuid AS reporter_user_public_uuid,
+    rct.full_name AS reporter_contact_full_name,
+    rct.phone_number AS reporter_contact_phone_number,
+    rct.email AS reporter_contact_email,
+    rct.is_anonymous AS reporter_is_anonymous,
+    up.full_name AS reporter_profile_full_name,
+    up.phone_number AS reporter_profile_phone_number,
+    ec.caller_phone_number AS emergency_caller_phone_number
+`;
+
+const INTAKE_DETAIL_FROM = `
+  ${INTAKE_FROM.trim()}
+  LEFT JOIN reporter_contacts rct ON rct.id = ir.reporter_contact_id
+  LEFT JOIN users ru ON ru.id = ir.reporter_user_id
+  LEFT JOIN user_profiles up ON up.user_id = ru.id
+  LEFT JOIN emergency_calls ec ON ec.intake_report_id = ir.id
+`;
+
 /**
  * Paginated dispatcher queue view of intake reports.
  */
@@ -104,6 +124,52 @@ export async function listIntakeReportsForOperations(filters) {
   };
 }
 
+function mapIntakeLocation(row) {
+  if (!row.location_public_uuid) return null;
+  return {
+    public_uuid: row.location_public_uuid,
+    latitude: Number(row.location_latitude),
+    longitude: Number(row.location_longitude),
+    address_text: row.location_address_text,
+    place_name: row.location_place_name ?? null,
+    admin_area_id:
+      row.location_admin_area_id != null ? Number(row.location_admin_area_id) : null,
+    source: row.location_source ?? null,
+  };
+}
+
+function formatReporterFields(row) {
+  const isAnonymous = Boolean(row.reporter_is_anonymous);
+  if (isAnonymous) {
+    return {
+      user_public_uuid: null,
+      full_name: null,
+      phone_number: null,
+      email: null,
+      is_anonymous: true,
+    };
+  }
+
+  const contactName = row.reporter_contact_full_name?.trim() || null;
+  const profileName = row.reporter_profile_full_name?.trim() || null;
+  const contactPhone = row.reporter_contact_phone_number?.trim() || null;
+  const profilePhone = row.reporter_profile_phone_number?.trim() || null;
+
+  return {
+    user_public_uuid: row.reporter_user_public_uuid ?? null,
+    full_name: contactName || profileName,
+    phone_number: contactPhone || profilePhone,
+    email: row.reporter_contact_email?.trim() || null,
+    is_anonymous: false,
+  };
+}
+
+function formatEmergencyCallFields(row) {
+  const callerPhone = row.emergency_caller_phone_number?.trim() || null;
+  if (!callerPhone) return null;
+  return { caller_phone_number: callerPhone };
+}
+
 function formatIntakeRow(row) {
   return {
     public_uuid: row.public_uuid,
@@ -115,23 +181,23 @@ function formatIntakeRow(row) {
     final_disposition: row.final_disposition,
     channel_code: row.channel_code,
     category_code: row.category_code,
-    location: row.location_public_uuid
-      ? {
-          public_uuid: row.location_public_uuid,
-          latitude: Number(row.location_latitude),
-          longitude: Number(row.location_longitude),
-          address_text: row.location_address_text,
-          place_name: row.location_place_name ?? null,
-          admin_area_id:
-            row.location_admin_area_id != null ? Number(row.location_admin_area_id) : null,
-          source: row.location_source ?? null,
-        }
-      : null,
+    location: mapIntakeLocation(row),
     has_service_case: Boolean(row.has_service_case),
     has_incident: Boolean(row.has_incident),
     reported_at: row.reported_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+  };
+}
+
+function formatIntakeDetailRow(row) {
+  const base = formatIntakeRow(row);
+  const reporter = formatReporterFields(row);
+  const emergencyCall = formatEmergencyCallFields(row);
+  return {
+    ...base,
+    reporter,
+    emergency_call: emergencyCall,
   };
 }
 
@@ -182,8 +248,8 @@ export async function listRecentIntakeReportsPendingClassification(limit) {
 export async function findIntakeReportDetailForOperations(publicUuid) {
   const { rows } = await query(
     `
-      ${INTAKE_SELECT}
-      ${INTAKE_FROM}
+      ${INTAKE_DETAIL_SELECT}
+      ${INTAKE_DETAIL_FROM}
       WHERE ir.public_uuid = ?
       LIMIT 1
     `,
@@ -198,5 +264,5 @@ export async function findIntakeReportDetailForOperations(publicUuid) {
     );
   }
 
-  return formatIntakeRow(rows[0]);
+  return formatIntakeDetailRow(rows[0]);
 }
