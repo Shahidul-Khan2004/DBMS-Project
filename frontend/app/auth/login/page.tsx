@@ -8,6 +8,7 @@ import { LoginCard } from "../../../components/auth/LoginCard";
 import { LoginForm } from "../../../components/auth/LoginForm";
 import {
   saveAuthSession,
+  saveAuthz,
   determineRole,
   getDashboardUrlFromRoleCodes,
 } from "../../../lib/auth-store";
@@ -22,6 +23,9 @@ export default function LoginPage() {
     setLoggedInUser(data);
     const role = determineRole(data.authz?.roleCodes ?? []);
     saveAuthSession(data.accessToken, data.refreshToken, role);
+    if (data.authz) {
+      saveAuthz(data.authz);
+    }
     sessionStorage.setItem("loggedInUser", JSON.stringify(data.user));
   };
 

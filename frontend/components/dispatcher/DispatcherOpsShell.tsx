@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { DispatcherNavProvider } from "@/components/dispatcher/DispatcherNavContext";
 import { DispatcherOpsDrawer } from "@/components/dispatcher/DispatcherOpsDrawer";
+import { DispatcherAdminOversightBar } from "@/components/dispatcher/DispatcherAdminOversightBar";
 import { DispatcherOpsNav } from "@/components/dispatcher/DispatcherOpsNav";
 
 interface DispatcherOpsShellProps {
@@ -17,6 +18,7 @@ export function DispatcherOpsShell({
   return (
     <DispatcherNavProvider>
       <div className="-mx-4 -mt-6 flex min-h-[calc(100vh-8rem)] flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 2xl:-mx-10">
+        <DispatcherAdminOversightBar />
         <DispatcherOpsNav />
         <DispatcherOpsDrawer />
         <div

@@ -17,6 +17,7 @@ import type {
 import { PageLoading } from "@/components/ui/StatusState";
 import { ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
@@ -47,7 +48,7 @@ function TriageQueuePageContent() {
   const reportParam = searchParams.get("report")?.trim() || null;
   const pendingDeepLinkRef = useRef<string | null>(null);
   const prevReportParamRef = useRef<string | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard();
   const [queueItems, setQueueItems] = useState<IntakeQueueItem[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
   const [queueError, setQueueError] = useState<string | null>(null);
@@ -153,30 +154,6 @@ function TriageQueuePageContent() {
   }, [loadQueue, queueItems, selectedId]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const accessToken = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !accessToken) {
-        router.push("/auth/login");
-        return;
-      }
-
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
     if (reportParam === prevReportParamRef.current) return;
     prevReportParamRef.current = reportParam;
 
@@ -184,19 +161,19 @@ function TriageQueuePageContent() {
 
     pendingDeepLinkRef.current = reportParam;
 
-    if (isLoadingSession || queueLoading) return;
+    if (isChecking || queueLoading) return;
 
     const match = queueItems.find((item) => item.id === reportParam);
     if (match) {
       setSelectedId(reportParam);
     }
-  }, [reportParam, isLoadingSession, queueLoading, queueItems]);
+  }, [reportParam, isChecking, queueLoading, queueItems]);
 
   useEffect(() => {
-    if (isLoadingSession) return;
+    if (isChecking) return;
     void loadOverview();
     void loadQueue();
-  }, [isLoadingSession, loadOverview, loadQueue]);
+  }, [isChecking, loadOverview, loadQueue]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -209,7 +186,7 @@ function TriageQueuePageContent() {
       ? "1 Pending Report"
       : `${pendingCount} Pending Reports`;
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading triage queue" />;
   }
 

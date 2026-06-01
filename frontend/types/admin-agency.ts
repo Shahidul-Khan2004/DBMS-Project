@@ -57,30 +57,51 @@ export type AdminAgencyRepresentativesResponse = {
   representatives: AdminAgencyRepresentative[];
 };
 
-export type AdminOnboardAgencyNewPayload = {
-  user_public_uuid: string;
-  agency: {
-    agency_code: string;
-    name: string;
-    agency_type_code: string;
-    description?: string;
-  };
+export type AdminAgencyHeadOfficeLocation = {
+  latitude: number;
+  longitude: number;
+  source: "manual_entry";
+  place_name?: string;
+  address_text?: string;
 };
 
-export type AdminOnboardAgencyExistingPayload = {
+export type AdminOnboardAgencyFields = {
+  agency_code: string;
+  name: string;
+  agency_type_code: string;
+  description?: string;
+  head_office_location?: AdminAgencyHeadOfficeLocation;
+};
+
+export type AdminOnboardAgencyOnlyPayload = {
+  agency: AdminOnboardAgencyFields;
+};
+
+export type AdminOnboardAgencyWithRepresentativePayload = {
+  user_public_uuid: string;
+  agency: AdminOnboardAgencyFields;
+};
+
+export type AdminOnboardAgencyExistingOnlyPayload = {
+  agency_public_uuid: string;
+};
+
+export type AdminOnboardAgencyExistingWithRepresentativePayload = {
   user_public_uuid: string;
   agency_public_uuid: string;
 };
 
 export type AdminOnboardAgencyPayload =
-  | AdminOnboardAgencyNewPayload
-  | AdminOnboardAgencyExistingPayload;
+  | AdminOnboardAgencyOnlyPayload
+  | AdminOnboardAgencyWithRepresentativePayload
+  | AdminOnboardAgencyExistingOnlyPayload
+  | AdminOnboardAgencyExistingWithRepresentativePayload;
 
 export type AdminOnboardAgencyResponse = {
   message: string;
   agency: AdminAgencyListItem;
-  membership_public_uuid: string;
-  user_public_uuid: string;
+  membership_public_uuid?: string;
+  user_public_uuid?: string;
 };
 
 export type AdminPatchAgencyPayload = {

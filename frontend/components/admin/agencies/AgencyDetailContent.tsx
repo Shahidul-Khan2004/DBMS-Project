@@ -178,14 +178,6 @@ export function AgencyDetailContent({
             Activate agency
           </Button>
         )}
-        <Button
-          type="button"
-          size="sm"
-          onClick={onAddRepresentative}
-          disabled={isMutating}
-        >
-          Add representative
-        </Button>
       </div>
 
       <section>
@@ -244,7 +236,17 @@ export function AgencyDetailContent({
       </section>
 
       <section>
-        <h3 className="text-sm font-semibold text-slate-900">Representatives</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">Representatives</h3>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onAddRepresentative}
+            disabled={isMutating}
+          >
+            + Link Representative
+          </Button>
+        </div>
         <div className="mt-3">
           <RepresentativesTable
             representatives={detail.representatives}

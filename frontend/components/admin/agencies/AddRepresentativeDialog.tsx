@@ -5,14 +5,18 @@ import { FieldLabel } from "@/components/dispatcher/FieldLabel";
 import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { ApiError } from "@/lib/api";
-import { addAgencyRepresentative } from "@/lib/admin-agency-api";
-import { UUID_PATTERN } from "@/lib/admin-role-errors";
+import { linkAgencyRepresentative } from "@/lib/admin-agency-api";
+import {
+  formatAdminAgencyError,
+  UUID_PATTERN,
+} from "@/lib/admin-agency-errors";
+import { toast } from "sonner";
 
 type AddRepresentativeDialogProps = {
   open: boolean;
   agencyPublicUuid: string | null;
   agencyName?: string;
+  agencyCode?: string;
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -21,6 +25,7 @@ export function AddRepresentativeDialog({
   open,
   agencyPublicUuid,
   agencyName,
+  agencyCode,
   onClose,
   onSuccess,
 }: AddRepresentativeDialogProps) {
@@ -35,6 +40,26 @@ export function AddRepresentativeDialog({
     setFieldError(null);
     setSubmitError(null);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, isSubmitting, onClose]);
 
   const handleClose = () => {
     if (isSubmitting) return;
@@ -60,17 +85,12 @@ export function AddRepresentativeDialog({
     setIsSubmitting(true);
 
     try {
-      await addAgencyRepresentative(agencyPublicUuid, trimmed);
+      await linkAgencyRepresentative(agencyPublicUuid, trimmed);
+      toast.success("Agency representative linked.");
       onClose();
       onSuccess();
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Could not add representative.",
-      );
+      setSubmitError(formatAdminAgencyError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -92,18 +112,31 @@ export function AddRepresentativeDialog({
             id="add-rep-title"
             className="text-lg font-semibold text-slate-900"
           >
-            Add representative
+            Link agency representative
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {agencyName
-              ? `Link a user to ${agencyName}.`
-              : "Link a user as an agency representative."}{" "}
-            Provide the user public UUID.
+            Link an existing user to this agency as a representative.
           </p>
         </div>
 
         <div className="space-y-4 px-5 py-4">
           {submitError ? <ErrorAlert message={submitError} /> : null}
+
+          <dl className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-sm">
+            <div>
+              <dt className="text-xs text-slate-500">Agency name</dt>
+              <dd className="mt-0.5 font-medium text-slate-900">
+                {agencyName ?? "Selected agency"}
+              </dd>
+            </div>
+            {agencyCode ? (
+              <div>
+                <dt className="text-xs text-slate-500">Agency code</dt>
+                <dd className="mt-0.5 text-slate-900">{agencyCode}</dd>
+              </div>
+            ) : null}
+          </dl>
+
           <div>
             <FieldLabel htmlFor="add-rep-user-uuid" required>
               User public UUID
@@ -115,8 +148,12 @@ export function AddRepresentativeDialog({
               onChange={(e) => setUserPublicUuid(e.target.value)}
               className={triageFieldClassName}
               autoComplete="off"
-              required
+              disabled={isSubmitting}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Enter the existing user public UUID. User search is not available
+              in the current API.
+            </p>
             {fieldError ? (
               <p className="mt-1 text-xs text-red-600">{fieldError}</p>
             ) : null}
@@ -134,7 +171,7 @@ export function AddRepresentativeDialog({
             Cancel
           </Button>
           <Button type="submit" size="sm" isLoading={isSubmitting}>
-            Add representative
+            Link representative
           </Button>
         </div>
       </form>

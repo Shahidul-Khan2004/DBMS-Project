@@ -97,6 +97,10 @@ export function AgencyDetailDrawer({
     onMutated();
   };
 
+  const handleRepresentativeLinked = async () => {
+    await loadDetail();
+  };
+
   const runConfirm = async () => {
     if (!confirmAction || !trimmedUuid) return;
 
@@ -218,8 +222,9 @@ export function AgencyDetailDrawer({
         open={addRepOpen}
         agencyPublicUuid={trimmedUuid || null}
         agencyName={detail?.agency.name}
+        agencyCode={detail?.agency.agency_code}
         onClose={() => setAddRepOpen(false)}
-        onSuccess={() => void handleMutationSuccess()}
+        onSuccess={() => void handleRepresentativeLinked()}
       />
 
       <ConfirmModal

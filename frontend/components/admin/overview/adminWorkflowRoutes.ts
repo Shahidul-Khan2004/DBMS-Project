@@ -1,5 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, BarChart3, Building2, Shield } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Building2,
+  Eye,
+  Radio,
+  Shield,
+} from "lucide-react";
 
 export type WorkflowAvailability = "available" | "coming_later";
 
@@ -45,6 +52,26 @@ export const ADMIN_WORKFLOW_AREAS: readonly AdminWorkflowArea[] = [
     availability: "available",
     href: "/dashboard/admin/reports",
     primaryActionLabel: "Open Reports",
+  },
+  {
+    id: "dispatcher-workspace",
+    title: "Dispatcher Workspace",
+    description:
+      "Access dispatcher operational tools with system administrator permissions.",
+    icon: Radio,
+    availability: "available",
+    href: "/dashboard/dispatcher",
+    primaryActionLabel: "Open Dispatcher Workspace",
+  },
+  {
+    id: "dispatcher-oversight",
+    title: "Dispatcher Oversight",
+    description:
+      "Review intake reports, incidents, service cases, and operational records.",
+    icon: Eye,
+    availability: "available",
+    href: "/dashboard/admin/dispatcher-oversight",
+    primaryActionLabel: "Open Dispatcher Oversight",
   },
   {
     id: "disaster-protocol",

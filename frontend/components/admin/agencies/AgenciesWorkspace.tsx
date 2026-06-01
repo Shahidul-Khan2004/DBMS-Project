@@ -7,12 +7,15 @@ import { AgenciesToolbar } from "@/components/admin/agencies/AgenciesToolbar";
 import { AgencyCategorySwitcher } from "@/components/admin/agencies/AgencyCategorySwitcher";
 import { AgencyDetailDrawer } from "@/components/admin/agencies/AgencyDetailDrawer";
 import { AgencyListRow } from "@/components/admin/agencies/AgencyListRow";
+import { AddRepresentativeDialog } from "@/components/admin/agencies/AddRepresentativeDialog";
 import { OnboardAgencyDialog } from "@/components/admin/agencies/OnboardAgencyDialog";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import {
   buildAgencyCategoryOptions,
+  filterAdminAgencyNetworkAgencies,
   getAgencyListHeading,
+  isAdminAgencyNetworkCategoryCode,
 } from "@/lib/admin-agency-types";
 import { listAdminAgencies } from "@/lib/admin-agency-api";
 import type { AdminAgencyListItem } from "@/types/admin-agency";
@@ -32,6 +35,8 @@ export function AgenciesWorkspace() {
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [onboardOpen, setOnboardOpen] = useState(false);
+  const [postOnboardLinkAgency, setPostOnboardLinkAgency] =
+    useState<AdminAgencyListItem | null>(null);
   const [selectedAgencyType, setSelectedAgencyType] = useState("all");
 
   const loadAgencies = useCallback(async (nextOffset: number) => {
@@ -65,24 +70,42 @@ export function AgenciesWorkspace() {
     setDrawerOpen(true);
   }, [agencyFromQuery]);
 
+  useEffect(() => {
+    if (!isAdminAgencyNetworkCategoryCode(selectedAgencyType)) {
+      setSelectedAgencyType("all");
+    }
+  }, [selectedAgencyType]);
+
+  const networkAgencies = useMemo(
+    () => filterAdminAgencyNetworkAgencies(agencies),
+    [agencies],
+  );
+
   const categoryOptions = useMemo(
     () => buildAgencyCategoryOptions(agencies),
     [agencies],
   );
 
-  const visibleAgencies = useMemo(
-    () =>
-      selectedAgencyType === "all"
-        ? agencies
-        : agencies.filter(
-            (agency) => agency.agency_type_code === selectedAgencyType,
-          ),
-    [agencies, selectedAgencyType],
-  );
+  const visibleAgencies = useMemo(() => {
+    if (selectedAgencyType === "all") return networkAgencies;
+    return networkAgencies.filter(
+      (agency) => agency.agency_type_code === selectedAgencyType,
+    );
+  }, [networkAgencies, selectedAgencyType]);
 
   const listHeading = useMemo(
     () => getAgencyListHeading(selectedAgencyType, visibleAgencies.length),
     [selectedAgencyType, visibleAgencies.length],
+  );
+
+  const handleSelectAgencyType = useCallback(
+    (code: string) => {
+      setSelectedAgencyType(code);
+      if (offset !== 0) {
+        setOffset(0);
+      }
+    },
+    [offset],
   );
 
   const openDrawer = (uuid: string) => {
@@ -114,28 +137,27 @@ export function AgenciesWorkspace() {
       <AdminPageHeader
         title="Agencies"
         subtitle="Onboard agencies, manage representatives, and maintain agency access."
+        action={
+          <AgenciesToolbar
+            resultLabel={listHeading.subtitle}
+            total={total}
+            limit={PAGE_LIMIT}
+            offset={offset}
+            isLoading={isLoading}
+            onRefresh={() => void loadAgencies(offset)}
+            onPrev={() => setOffset((o) => Math.max(0, o - PAGE_LIMIT))}
+            onNext={() => setOffset((o) => o + PAGE_LIMIT)}
+            onOnboard={() => setOnboardOpen(true)}
+          />
+        }
       />
 
-      <div className="mb-3 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {agencies.length > 0 ? (
-          <AgencyCategorySwitcher
-            options={categoryOptions}
-            selectedCode={selectedAgencyType}
-            onSelect={setSelectedAgencyType}
-            disabled={isLoading}
-          />
-        ) : null}
-        <AgenciesToolbar
-          resultLabel={listHeading.subtitle}
-          total={total}
-          limit={PAGE_LIMIT}
-          offset={offset}
-          isLoading={isLoading}
-          className={agencies.length === 0 ? "lg:ml-auto" : ""}
-          onRefresh={() => void loadAgencies(offset)}
-          onPrev={() => setOffset((o) => Math.max(0, o - PAGE_LIMIT))}
-          onNext={() => setOffset((o) => o + PAGE_LIMIT)}
-          onOnboard={() => setOnboardOpen(true)}
+      <div className="mb-4 w-full min-w-0 shrink-0">
+        <AgencyCategorySwitcher
+          options={categoryOptions}
+          selectedCode={selectedAgencyType}
+          onSelect={handleSelectAgencyType}
+          disabled={isLoading}
         />
       </div>
 
@@ -147,13 +169,13 @@ export function AgenciesWorkspace() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 lg:p-4">
           {isLoading && agencies.length === 0 ? (
             <LoadingSkeleton lines={6} />
-          ) : agencies.length === 0 ? (
+          ) : !isLoading && agencies.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-600">
               No agencies found.
             </p>
           ) : visibleAgencies.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-600">
-              No agencies found in this category.
+              No agencies found for this type.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -183,7 +205,28 @@ export function AgenciesWorkspace() {
       <OnboardAgencyDialog
         open={onboardOpen}
         onClose={() => setOnboardOpen(false)}
-        onSuccess={() => void loadAgencies(0)}
+        onSuccess={(result) => {
+          if (
+            selectedAgencyType !== "all" &&
+            selectedAgencyType !== result.agencyTypeCode
+          ) {
+            setSelectedAgencyType(result.agencyTypeCode);
+          }
+          setOffset(0);
+          void loadAgencies(0);
+          if (result.openLinkRepresentative) {
+            setPostOnboardLinkAgency(result.agency);
+          }
+        }}
+      />
+
+      <AddRepresentativeDialog
+        open={postOnboardLinkAgency !== null}
+        agencyPublicUuid={postOnboardLinkAgency?.public_uuid ?? null}
+        agencyName={postOnboardLinkAgency?.name}
+        agencyCode={postOnboardLinkAgency?.agency_code}
+        onClose={() => setPostOnboardLinkAgency(null)}
+        onSuccess={() => setPostOnboardLinkAgency(null)}
       />
     </div>
   );

@@ -37,7 +37,7 @@ import {
   DISPATCHER_DASHBOARD_TITLE,
 } from "@/lib/dispatcher-dashboard";
 import { getOperationsServiceCaseDetail } from "@/lib/service-case-api";
-import { useAuthGuard } from "@/lib/use-auth-guard";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import type { ServiceCaseDetailResponse } from "@/types/service-case";
 
 const LOAD_ERROR_MESSAGE =
@@ -71,7 +71,7 @@ export default function DispatcherServiceCaseDetailPage() {
   const casePublicUuid =
     typeof params.publicUuid === "string" ? params.publicUuid : "";
 
-  const isChecking = useAuthGuard(["dispatcher", "system_admin"]);
+  const isChecking = useDispatcherWorkspaceGuard("serviceCases");
   const [detail, setDetail] = useState<ServiceCaseDetailResponse | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);

@@ -88,6 +88,8 @@ export function addAgencyRepresentative(
   );
 }
 
+export const linkAgencyRepresentative = addAgencyRepresentative;
+
 export function deactivateAgencyMembership(membershipPublicUuid: string) {
   return apiPatch<AdminDeactivateMembershipResponse>(
     `/admin/agency-memberships/${encodeURIComponent(membershipPublicUuid)}/deactivate`,

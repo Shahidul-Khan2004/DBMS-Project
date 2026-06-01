@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
@@ -47,7 +48,7 @@ export default function CreateStandaloneIncidentPage() {
   const [addressText, setAddressText] = useState("");
   const [placeName, setPlaceName] = useState("");
 
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard("incidentMutate");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showValidation, setShowValidation] = useState(false);
@@ -57,30 +58,6 @@ export default function CreateStandaloneIncidentPage() {
     clearAuthSession();
     router.push("/auth/login");
   }, [router]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const token = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !token) {
-        redirectToLogin();
-        return;
-      }
-
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [redirectToLogin]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -231,7 +208,7 @@ export default function CreateStandaloneIncidentPage() {
     }
   }
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading incident form" />;
   }
 

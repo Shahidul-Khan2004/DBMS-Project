@@ -1,5 +1,9 @@
+import type { AuthzInfo } from '@/types/auth';
+
 // Role determination from backend authz.roleCodes
 export type UserRole = 'citizen' | 'dispatcher' | 'system_admin';
+
+const AUTHZ_STORAGE_KEY = 'authz';
 
 interface StoredAuthSession {
   accessToken: string;
@@ -44,6 +48,26 @@ export function clearAuthSession() {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('userRole');
+  clearAuthz();
+}
+
+export function saveAuthz(authz: AuthzInfo) {
+  localStorage.setItem(AUTHZ_STORAGE_KEY, JSON.stringify(authz));
+}
+
+export function getAuthz(): AuthzInfo | null {
+  const raw = localStorage.getItem(AUTHZ_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as AuthzInfo;
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthz() {
+  localStorage.removeItem(AUTHZ_STORAGE_KEY);
 }
 
 export function getValidAccessToken() {

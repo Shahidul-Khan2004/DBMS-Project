@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ActiveIncidentsList } from "@/components/dispatcher/incidents/ActiveIncidentsList";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
@@ -30,7 +31,7 @@ const LIST_OFFSET = 0;
 
 export default function ActiveIncidentsPage() {
   const router = useRouter();
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard();
   const [incidents, setIncidents] = useState<ActiveIncidentListItem[]>([]);
   const [isLoadingIncidents, setIsLoadingIncidents] = useState(true);
   const [incidentsError, setIncidentsError] = useState<string | null>(null);
@@ -94,36 +95,9 @@ export default function ActiveIncidentsPage() {
   }, [router, resetCardLocations]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const accessToken = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !accessToken) {
-        sessionStorage.removeItem("loggedInUser");
-        clearAuthSession();
-        startTransition(() => {
-          router.replace("/auth/login");
-        });
-        return;
-      }
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (isLoadingSession) return;
+    if (isChecking) return;
     void loadIncidents();
-  }, [isLoadingSession, loadIncidents]);
+  }, [isChecking, loadIncidents]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -135,7 +109,7 @@ export default function ActiveIncidentsPage() {
     router.push("/dashboard/dispatcher/incidents/create-incident");
   };
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading active incidents" />;
   }
 

@@ -337,6 +337,13 @@ export function LocationPicker({
     void handleSearch();
   };
 
+  const handleQueryChange = (nextQuery: string) => {
+    setQuery(nextQuery);
+    if (searchError) {
+      setSearchError("");
+    }
+  };
+
   const searchBarikoiPlaces = async (text: string) => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 18_000);
@@ -496,7 +503,7 @@ export function LocationPicker({
         >
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => handleQueryChange(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder={searchPlaceholder}
             disabled={disabled || isSearching}
@@ -527,7 +534,7 @@ export function LocationPicker({
         <div className={embedded ? "space-y-2" : "mt-3 space-y-3"}>
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => handleQueryChange(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder={searchPlaceholder}
             disabled={disabled || isSearching}
