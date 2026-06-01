@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 import { request } from "../helpers/http.js";
 import { createIntegrationApp } from "../helpers/testApp.js";
 
 const dbUp = await isDbAvailable();
 
 describe("GET /health integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 

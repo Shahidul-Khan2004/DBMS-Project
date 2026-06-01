@@ -100,6 +100,86 @@ const DEFAULT_PERMISSIONS = [
     moduleName: "response",
     description: "Create field response logs for own agency incidents",
   },
+  {
+    permissionCode: "disaster.create",
+    moduleName: "disaster",
+    description: "Create disaster events",
+  },
+  {
+    permissionCode: "disaster.read",
+    moduleName: "disaster",
+    description: "View disaster operations",
+  },
+  {
+    permissionCode: "disaster.update_status",
+    moduleName: "disaster",
+    description: "Update disaster lifecycle status",
+  },
+  {
+    permissionCode: "disaster.declare",
+    moduleName: "disaster",
+    description: "Issue disaster declarations",
+  },
+  {
+    permissionCode: "disaster.manage_affected_areas",
+    moduleName: "disaster",
+    description: "Manage disaster affected upazilas",
+  },
+  {
+    permissionCode: "disaster.manage_responsibilities",
+    moduleName: "disaster",
+    description: "Assign disaster agency responsibilities",
+  },
+  {
+    permissionCode: "disaster.link_incidents",
+    moduleName: "disaster",
+    description: "Link incidents to disasters",
+  },
+  {
+    permissionCode: "facility.manage",
+    moduleName: "facility",
+    description: "Manage facility master data",
+  },
+  {
+    permissionCode: "facility.read",
+    moduleName: "facility",
+    description: "View facilities and capacity",
+  },
+  {
+    permissionCode: "shelter.manage",
+    moduleName: "shelter",
+    description: "Manage shelter activations",
+  },
+  {
+    permissionCode: "shelter.record_occupancy",
+    moduleName: "shelter",
+    description: "Record shelter occupancy",
+  },
+  {
+    permissionCode: "shelter.record_occupancy_own",
+    moduleName: "shelter",
+    description: "Record occupancy for own managed shelter",
+  },
+  {
+    permissionCode: "relief.manage_inventory",
+    moduleName: "relief",
+    description: "Record verified relief stock",
+  },
+  {
+    permissionCode: "relief.manage_requests",
+    moduleName: "relief",
+    description: "Approve or reject relief requests",
+  },
+  {
+    permissionCode: "relief.request_own_shelter",
+    moduleName: "relief",
+    description: "Create relief requests for own shelter",
+  },
+  {
+    permissionCode: "relief.distribute",
+    moduleName: "relief",
+    description: "Record relief distributions",
+  },
 ];
 
 const ROLE_DEFINITIONS = [
@@ -136,6 +216,9 @@ const AGENCY_REPRESENTATIVE_PERMISSION_CODES = [
   "dispatch.view_own_agency",
   "dispatch.update_own_agency",
   "response_log.create_own_agency",
+  "disaster.read",
+  "shelter.record_occupancy_own",
+  "relief.request_own_shelter",
 ];
 
 async function ensureRolesAndPermissions() {
@@ -165,6 +248,10 @@ async function ensureRolesAndPermissions() {
     "case.respond",
     "case.assign",
     "case.escalate",
+    "disaster.read",
+    "disaster.manage_affected_areas",
+    "disaster.link_incidents",
+    "facility.read",
   ];
 
   for (const permissionCode of dispatcherPermissionCodes) {

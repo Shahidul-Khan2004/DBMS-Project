@@ -27,5 +27,10 @@ export async function isDbAvailable() {
 export const HAS_DB = HAS_DB_CONFIG;
 
 export function integrationSkipMessage() {
-  return "Set MYSQL_DATABASE, start backend Docker MySQL, and configure backend/.env before integration tests.";
+  return "Set MYSQL_DATABASE (or DATABASE_URL), start backend Docker MySQL, and configure backend/.env before integration tests.";
+}
+
+/** Use as describe options when DB is required: `{ skip: integrationDescribeSkip(!dbUp) }` */
+export function integrationDescribeSkip(skip) {
+  return skip ? integrationSkipMessage() : false;
 }

@@ -6,6 +6,8 @@ const STATUS_TABLES = {
   intake: "intake_statuses",
   dispatch: "dispatch_statuses",
   unit: "unit_statuses",
+  disaster: "disaster_event_statuses",
+  relief_request: "relief_request_statuses",
 };
 
 const TRANSITION_TABLES = {
@@ -14,6 +16,8 @@ const TRANSITION_TABLES = {
   intake: "intake_status_transitions",
   dispatch: "dispatch_status_transitions",
   unit: "unit_status_transitions",
+  disaster: "disaster_event_status_transitions",
+  relief_request: "relief_request_status_transitions",
 };
 
 export async function findStatusIdByCode(conn, domain, statusCode) {

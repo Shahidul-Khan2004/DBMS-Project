@@ -21,6 +21,22 @@ const ALL_PERMISSION_CODES = [
   "dispatch.view_own_agency",
   "dispatch.update_own_agency",
   "response_log.create_own_agency",
+  "disaster.create",
+  "disaster.read",
+  "disaster.update_status",
+  "disaster.declare",
+  "disaster.manage_affected_areas",
+  "disaster.manage_responsibilities",
+  "disaster.link_incidents",
+  "facility.manage",
+  "facility.read",
+  "shelter.manage",
+  "shelter.record_occupancy",
+  "shelter.record_occupancy_own",
+  "relief.manage_inventory",
+  "relief.manage_requests",
+  "relief.request_own_shelter",
+  "relief.distribute",
 ];
 
 const DISPATCHER_PERMISSION_CODES = [
@@ -34,6 +50,10 @@ const DISPATCHER_PERMISSION_CODES = [
   "case.respond",
   "case.assign",
   "case.escalate",
+  "disaster.read",
+  "disaster.manage_affected_areas",
+  "disaster.link_incidents",
+  "facility.read",
 ];
 
 const AGENCY_REP_PERMISSION_CODES = [
@@ -42,6 +62,9 @@ const AGENCY_REP_PERMISSION_CODES = [
   "dispatch.view_own_agency",
   "dispatch.update_own_agency",
   "response_log.create_own_agency",
+  "disaster.read",
+  "shelter.record_occupancy_own",
+  "relief.request_own_shelter",
 ];
 
 function baseUser() {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import pool from "../../src/config/db.js";
 import { ROLE_CODES } from "../../src/services/rbacService.js";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 import { SEED } from "../helpers/fixtures.js";
 import { request, jsonHeaders } from "../helpers/http.js";
 import { createIntegrationApp } from "../helpers/testApp.js";
@@ -12,7 +12,6 @@ import { registerTestUser } from "../helpers/registerTestUser.js";
 const dbUp = await isDbAvailable();
 
 describe("admin agency membership integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 
