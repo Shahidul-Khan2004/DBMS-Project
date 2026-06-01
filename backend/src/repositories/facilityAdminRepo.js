@@ -32,14 +32,24 @@ export async function listFacilities({ activeOnly = false, geoSort = null } = {}
         ft.name AS facilityTypeName,
         f.is_active AS isActive,
         l.public_uuid AS locationPublicUuid,
+        l.admin_area_id AS adminAreaId,
         l.latitude,
         l.longitude,
         l.address_text AS addressText,
-        l.place_name AS placeName
+        l.place_name AS placeName,
+        CASE
+          WHEN aa.id IS NULL THEN NULL
+          WHEN aa.area_type = 'upazila' THEN CONCAT(aa.name, ', ', d_aa.name, ', ', div_aa.name)
+          WHEN aa.area_type = 'district' THEN CONCAT(aa.name, ', ', div_aa.name)
+          ELSE aa.name
+        END AS adminAreaLabel
         ${distanceSelect}
       FROM facilities f
       JOIN facility_types ft ON ft.id = f.facility_type_id
       JOIN locations l ON l.id = f.location_id
+      LEFT JOIN administrative_areas aa ON aa.id = l.admin_area_id
+      LEFT JOIN administrative_areas d_aa ON d_aa.id = aa.parent_area_id
+      LEFT JOIN administrative_areas div_aa ON div_aa.id = d_aa.parent_area_id
       ${refJoinSql}
       ${whereClause}
       ORDER BY ${orderSql}
@@ -57,6 +67,8 @@ export async function listFacilities({ activeOnly = false, geoSort = null } = {}
     isActive: Boolean(r.isActive),
     location: {
       publicUuid: r.locationPublicUuid,
+      adminAreaId: r.adminAreaId != null ? Number(r.adminAreaId) : null,
+      adminAreaLabel: r.adminAreaLabel ?? null,
       latitude: Number(r.latitude),
       longitude: Number(r.longitude),
       addressText: r.addressText,
@@ -82,10 +94,19 @@ export async function getFacilityByPublicUuid(publicUuid) {
         l.admin_area_id AS adminAreaId,
         l.latitude,
         l.longitude,
-        l.address_text AS addressText
+        l.address_text AS addressText,
+        CASE
+          WHEN aa.id IS NULL THEN NULL
+          WHEN aa.area_type = 'upazila' THEN CONCAT(aa.name, ', ', d_aa.name, ', ', div_aa.name)
+          WHEN aa.area_type = 'district' THEN CONCAT(aa.name, ', ', div_aa.name)
+          ELSE aa.name
+        END AS adminAreaLabel
       FROM facilities f
       JOIN facility_types ft ON ft.id = f.facility_type_id
       JOIN locations l ON l.id = f.location_id
+      LEFT JOIN administrative_areas aa ON aa.id = l.admin_area_id
+      LEFT JOIN administrative_areas d_aa ON d_aa.id = aa.parent_area_id
+      LEFT JOIN administrative_areas div_aa ON div_aa.id = d_aa.parent_area_id
       WHERE f.public_uuid = ?
       LIMIT 1
     `,
@@ -120,6 +141,7 @@ export async function getFacilityByPublicUuid(publicUuid) {
     location: {
       publicUuid: f.locationPublicUuid,
       adminAreaId: f.adminAreaId != null ? Number(f.adminAreaId) : null,
+      adminAreaLabel: f.adminAreaLabel ?? null,
       latitude: Number(f.latitude),
       longitude: Number(f.longitude),
       addressText: f.addressText,
@@ -241,4 +263,74 @@ async function loadFacilityId(conn, publicUuid) {
     throw new BackendError(404, "FACILITY_NOT_FOUND", "Facility not found");
   }
   return { id: rows[0].id };
+}
+
+export async function deactivateFacility(publicUuid) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.execute(
+      `SELECT id, is_active FROM facilities WHERE public_uuid = ? LIMIT 1`,
+      [publicUuid],
+    );
+    if (!rows[0]) {
+      throw new BackendError(404, "FACILITY_NOT_FOUND", "Facility not found");
+    }
+    if (!rows[0].is_active) {
+      throw new BackendError(
+        409,
+        "FACILITY_ALREADY_INACTIVE",
+        "Facility is already inactive",
+      );
+    }
+
+    await conn.execute(`UPDATE facilities SET is_active = FALSE WHERE id = ?`, [
+      rows[0].id,
+    ]);
+
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+
+  return getFacilityByPublicUuid(publicUuid);
+}
+
+export async function activateFacility(publicUuid) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.execute(
+      `SELECT id, is_active FROM facilities WHERE public_uuid = ? LIMIT 1`,
+      [publicUuid],
+    );
+    if (!rows[0]) {
+      throw new BackendError(404, "FACILITY_NOT_FOUND", "Facility not found");
+    }
+    if (rows[0].is_active) {
+      throw new BackendError(
+        409,
+        "FACILITY_ALREADY_ACTIVE",
+        "Facility is already active",
+      );
+    }
+
+    await conn.execute(`UPDATE facilities SET is_active = TRUE WHERE id = ?`, [
+      rows[0].id,
+    ]);
+
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+
+  return getFacilityByPublicUuid(publicUuid);
 }
