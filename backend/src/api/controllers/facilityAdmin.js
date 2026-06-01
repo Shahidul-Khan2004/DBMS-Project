@@ -1,8 +1,9 @@
 import BackendError from "../../lib/BackendError.js";
 import * as facilityService from "../../services/facilityAdminService.js";
 
-export async function getFacilities(_req, res) {
-  const facilities = await facilityService.listFacilities();
+export async function getFacilities(req, res) {
+  const query = req.validated?.query ?? req.query;
+  const facilities = await facilityService.listFacilities(query);
   res.status(200).json({ facilities });
 }
 

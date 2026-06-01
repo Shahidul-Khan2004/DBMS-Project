@@ -82,6 +82,30 @@ Structured `location` objects use **`latitude`** and **`longitude`** (required n
 
 Do not send **`location`** and **`locationId`** in the same request.
 
+## Distance sorting (list endpoints)
+
+Optional proximity sorting uses **stored** `locations` rows only (no raw `latitude`/`longitude` query params).
+
+| Query | Meaning |
+| --- | --- |
+| `sort=distance_asc` | Order by increasing distance from the reference point |
+| `includeDistance=true` | Include `distance_km` on each row (only valid with `sort=distance_asc`) |
+| `nearIncidentPublicUuid` | Reference = incident `current_location_id` |
+| `nearIntakeReportPublicUuid` | Reference = intake `reported_location_id` |
+| `nearServiceCasePublicUuid` | Reference = case `current_location_id`, else linked intake location |
+| `nearFacilityPublicUuid` | Reference = facility `location_id` |
+| `nearDisasterAffectedAreaPublicUuid` | Reference = geographic anchor for that upazila on the disaster (shelters/hubs/linked incidents in area); `422` `GEO_REFERENCE_UNAVAILABLE` if none |
+| `nearLocationId` | Citizen only: numeric `id` from **`GET /locations/my`** (must be owned by caller) |
+
+**Rules:**
+
+- Exactly **one** `near*` parameter is required when `sort=distance_asc` (except **`GET /operations/units/available`**, which uses the required `incidentPublicUuid` as the reference).
+- Any `near*` without `sort=distance_asc` → `422` `VALIDATION_ERROR`.
+- Unknown or inaccessible reference → `404` (or `403` `LOCATION_NOT_OWNED` for citizen `nearLocationId`).
+- Rows with no resolvable entity location stay in the result, sorted **last**; with `includeDistance=true`, `distance_km` is `null` for those rows.
+- Agency distance uses **`head_office_location_id`** only.
+- Default date/name ordering is unchanged when distance sort is not requested.
+
 ## Route index
 
 | Area | Method | Path | Notes |
@@ -386,6 +410,8 @@ Citizen-owned saved locations; `public_uuid` is used as **`locationId`** on inta
 Field names are **camelCase** in JSON.
 
 ### GET `/locations/my`
+
+Query (optional distance sort): `sort=distance_asc`, `nearLocationId` (numeric `id` from this list), `includeDistance=true`.
 
 **Response (200):**
 
@@ -815,7 +841,7 @@ Rollup for dispatcher UIs: **counts** + merged **recent** timeline (intakes pend
 
 ### GET `/operations/intake-reports`
 
-Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc`).
+Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc` \| `distance_asc`). For `distance_asc`, require `nearIncidentPublicUuid` and optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -1062,7 +1088,9 @@ When `disposition` is `service_case`, the response includes `service_case` inste
 
 ### GET `/operations/incidents`
 
-Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Ordered by `reported_at` descending.
+Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Default order: `reported_at` descending.
+
+Distance sort: `sort=distance_asc`, `nearIntakeReportPublicUuid`, optional `includeDistance=true` (see [Distance sorting](#distance-sorting-list-endpoints)).
 
 **Response (200):**
 
@@ -1384,7 +1412,7 @@ Incident status may auto-advance on milestones (same transaction): agency add �
 
 **Permission:** `dispatch.create`.
 
-**Query:** `incidentPublicUuid` (required UUID) — only units whose agency participates on the incident (`participation_status` `requested` or `active`) and `status_code` = `available`.
+**Query:** `incidentPublicUuid` (required UUID) — only units whose agency participates on the incident (`participation_status` `requested` or `active`) and `status_code` = `available`. Optional `sort=distance_asc` sorts by distance from that incident’s location; optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -1496,7 +1524,7 @@ On `completed` or `cancelled`, unit returns to `available`.
 
 **Permission:** `dispatch.create` or `incident.assign_agency`.
 
-Reads `vw_agency_workload` joined with agency `public_uuid`.
+Reads `vw_agency_workload` joined with agency `public_uuid`. Default order: agency name. Distance sort: `sort=distance_asc`, `nearIncidentPublicUuid`, optional `includeDistance=true` (agency point = head office).
 
 **Response (200):**
 
@@ -2081,7 +2109,7 @@ Single transaction: link an **existing** user to an agency (create new agency **
 
 ### GET `/admin/agencies`
 
-Query: `limit` (1–100, default 20), `offset` (default 0).
+Query: `limit` (1–100, default 20), `offset` (default 0). Optional distance sort: any one of `nearIncidentPublicUuid`, `nearIntakeReportPublicUuid`, `nearServiceCasePublicUuid`, `nearDisasterAffectedAreaPublicUuid`, `nearFacilityPublicUuid`, plus `sort=distance_asc` and optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -2744,6 +2772,8 @@ Alternatively pass `districtAdminAreaId` to expand to all upazilas under the dis
 ```
 
 ### GET `/operations/disasters/:disasterPublicUuid`
+
+Optional query: `sort=distance_asc`, `nearDisasterAffectedAreaPublicUuid`, `includeDistance=true` — re-sorts **`linked_incidents`**, **`shelters`**, and **`relief_hubs`** by distance from the affected upazila anchor; other dashboard sections keep default ordering.
 
 **Response (200):** internal dashboard (abbreviated):
 

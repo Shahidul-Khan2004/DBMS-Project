@@ -10,11 +10,7 @@ import {
   operationsServiceCasePublicUuidParamSchema,
 } from "./validationSchemas.js";
 
-export const validateOperationsListServiceCasesQuery = validate(
-  "operations service cases list query",
-  operationsListServiceCasesQuerySchema,
-  "query",
-);
+export { validateOperationsServiceCasesListGeoQuery as validateOperationsListServiceCasesQuery } from "./geoSort.js";
 
 export const validateOperationsServiceCasePublicUuidParam = validate(
   "operations service case id",

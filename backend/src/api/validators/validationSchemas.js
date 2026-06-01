@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  includeDistanceField,
+  nearUuidFields,
+  withGeoSortRefinements,
+} from "./geoSortQuery.js";
 
 export const registerUserSchema = z
   .object({
@@ -136,13 +141,20 @@ export const operationsCreateIncidentSchema = z
     },
   );
 
-export const operationsListIntakeReportsQuerySchema = z.object({
-  intake_status: z.string().trim().optional(),
-  categoryCode: z.string().trim().optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
-  sort: z.enum(["reported_at_desc", "reported_at_asc"]).optional(),
-});
+export const operationsListIntakeReportsQuerySchema = withGeoSortRefinements(
+  z.object({
+    intake_status: z.string().trim().optional(),
+    categoryCode: z.string().trim().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    sort: z
+      .enum(["reported_at_desc", "reported_at_asc", "distance_asc"])
+      .optional(),
+    ...includeDistanceField,
+    nearIncidentPublicUuid: nearUuidFields.nearIncidentPublicUuid,
+  }),
+  ["nearIncidentPublicUuid"],
+);
 
 export const operationsListIncidentsQuerySchema = z.object({
   status_code: z.string().trim().optional(),
@@ -328,9 +340,21 @@ export const operationsAddIncidentAgencySchema = z.object({
   isLeadAgency: z.boolean().optional().default(false),
 });
 
-export const operationsAvailableUnitsQuerySchema = z.object({
-  incidentPublicUuid: z.uuid({ message: "incidentPublicUuid is required" }),
-});
+export const operationsAvailableUnitsQuerySchema = z
+  .object({
+    incidentPublicUuid: z.uuid({ message: "incidentPublicUuid is required" }),
+    sort: z.enum(["distance_asc"]).optional(),
+    ...includeDistanceField,
+  })
+  .superRefine((data, ctx) => {
+    if (data.includeDistance === true && data.sort !== "distance_asc") {
+      ctx.addIssue({
+        code: "custom",
+        message: "includeDistance requires sort=distance_asc",
+        path: ["includeDistance"],
+      });
+    }
+  });
 
 export const operationsCreateDispatchSchema = z.object({
   unitPublicUuid: z.uuid({ message: "Invalid unit id" }),

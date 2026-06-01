@@ -2,10 +2,25 @@ import { randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import { generateCode } from "../lib/generateCode.js";
 import pool from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { requireAdministrativeAreaInTransaction } from "../domain/locationAccess.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
 
-export async function listFacilities({ activeOnly = false } = {}) {
+export async function listFacilities({ activeOnly = false, geoSort = null } = {}) {
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+  const whereClause = activeOnly ? "WHERE f.is_active = TRUE" : "";
+  const refJoinSql = useDistance
+    ? `
+      INNER JOIN locations entity_loc ON entity_loc.id = f.location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "f.name";
+  const joinParams = useDistance ? distance.joinParams : [];
+
   const [rows] = await pool.execute(
     `
       SELECT
@@ -21,14 +36,18 @@ export async function listFacilities({ activeOnly = false } = {}) {
         l.longitude,
         l.address_text AS addressText,
         l.place_name AS placeName
+        ${distanceSelect}
       FROM facilities f
       JOIN facility_types ft ON ft.id = f.facility_type_id
       JOIN locations l ON l.id = f.location_id
-      ${activeOnly ? "WHERE f.is_active = TRUE" : ""}
-      ORDER BY f.name
+      ${refJoinSql}
+      ${whereClause}
+      ORDER BY ${orderSql}
     `,
+    joinParams,
   );
-  return rows.map((r) => ({
+
+  const mapFacility = (r) => ({
     id: Number(r.id),
     publicUuid: r.publicUuid,
     facilityCode: r.facilityCode,
@@ -43,7 +62,9 @@ export async function listFacilities({ activeOnly = false } = {}) {
       addressText: r.addressText,
       placeName: r.placeName ?? null,
     },
-  }));
+  });
+
+  return rows.map((r) => mapRowWithOptionalDistance(mapFacility(r), r, geoSort));
 }
 
 export async function getFacilityByPublicUuid(publicUuid) {

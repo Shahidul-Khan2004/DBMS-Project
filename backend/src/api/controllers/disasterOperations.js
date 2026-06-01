@@ -32,7 +32,11 @@ export async function getDisasters(req, res) {
 
 export async function getDisaster(req, res) {
   const params = req.validated?.params ?? req.params;
-  const dashboard = await disasterService.getDisasterDashboard(params.disasterPublicUuid);
+  const query = req.validated?.query ?? req.query;
+  const dashboard = await disasterService.getDisasterDashboard(
+    params.disasterPublicUuid,
+    query,
+  );
   if (!dashboard) {
     throw new BackendError(404, "DISASTER_NOT_FOUND", "Disaster not found");
   }
