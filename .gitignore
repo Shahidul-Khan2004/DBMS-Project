@@ -166,3 +166,4 @@ next-env.d.ts
 
 # codex
 .codex
+.cursor
