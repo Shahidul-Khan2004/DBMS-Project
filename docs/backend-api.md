@@ -3058,6 +3058,36 @@ Base path: `/admin/facilities`. Requires `facility.manage`.
 
 **Response (200):** `{ "facility": { … } }` with updated `defaultCapacities`.
 
+### PATCH `/admin/facilities/:facilityPublicUuid/deactivate`
+
+Deactivates the facility (`isActive: false`). Inactive facilities are excluded from disaster activation eligibility.
+
+**Response (200):**
+
+```json
+{
+  "message": "Facility deactivated",
+  "facility": { "…": "same shape as GET detail" }
+}
+```
+
+**Errors:** `404 FACILITY_NOT_FOUND`, `409 FACILITY_ALREADY_INACTIVE`.
+
+### PATCH `/admin/facilities/:facilityPublicUuid/activate`
+
+Activates the facility (`isActive: true`). Restores eligibility for disaster activation.
+
+**Response (200):**
+
+```json
+{
+  "message": "Facility activated",
+  "facility": { "…": "same shape as GET detail" }
+}
+```
+
+**Errors:** `404 FACILITY_NOT_FOUND`, `409 FACILITY_ALREADY_ACTIVE`.
+
 ---
 
 ## Development RBAC bootstrap
