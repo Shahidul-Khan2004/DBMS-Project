@@ -1,9 +1,16 @@
 import * as disasterRepo from "../repositories/disasterOperationsRepo.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
 
 export const createDisaster = disasterRepo.createDisaster;
 export const listDisasters = disasterRepo.listDisasters;
 export const getDisasterByPublicUuid = disasterRepo.getDisasterByPublicUuid;
-export const getDisasterDashboard = disasterRepo.getDisasterDashboard;
+
+export async function getDisasterDashboard(publicUuid, query = {}) {
+  const { geoSort } = await resolveGeoSortFromQuery(query, {
+    disasterPublicUuid: publicUuid,
+  });
+  return disasterRepo.getDisasterDashboard(publicUuid, { geoSort });
+}
 export const transitionDisasterStatus = disasterRepo.transitionDisasterStatus;
 export const addAffectedAreas = disasterRepo.addAffectedAreas;
 export const updateAffectedAreaAssessment = disasterRepo.updateAffectedAreaAssessment;

@@ -17,6 +17,7 @@ import {
   linkGateway999IntakeToExistingIncident,
 } from "../repositories/intakeGatewayRepo.js";
 import { createNotification } from "./notificationService.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -239,13 +240,14 @@ export async function classifyIntakeAsEmergency999(actorPublicUuid, reportPublic
   return result;
 }
 
-export async function listMyIntakeReports(actorPublicUuid) {
+export async function listMyIntakeReports(actorPublicUuid, query = {}) {
   const userRow = await findUserByPublicUuid(actorPublicUuid);
   if (!userRow) {
     throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
   }
 
-  return listIntakeReportsByReporterUserId(userRow.id);
+  const geo = await resolveGeoSortFromQuery(query, { actorUserId: userRow.id });
+  return listIntakeReportsByReporterUserId(userRow.id, { geoSort: geo.geoSort });
 }
 
 export async function getMyIntakeReportStats(actorPublicUuid) {

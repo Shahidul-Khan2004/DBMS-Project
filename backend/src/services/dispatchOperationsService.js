@@ -1,4 +1,7 @@
+import pool from "../config/db.js";
 import * as dispatchOperationsRepo from "../repositories/dispatchOperationsRepo.js";
+import { resolveReferencePoint } from "../repositories/geoReferenceRepo.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
 
 export async function operationsAddAgencyToIncident(actorUserId, incidentPublicUuid, body) {
   const participation = await dispatchOperationsRepo.addAgencyToIncident({
@@ -10,8 +13,23 @@ export async function operationsAddAgencyToIncident(actorUserId, incidentPublicU
   return { participation };
 }
 
-export async function operationsListAvailableUnits(incidentPublicUuid) {
-  return dispatchOperationsRepo.listAvailableUnitsForIncident(incidentPublicUuid);
+export async function operationsListAvailableUnits(query) {
+  let geoSort = null;
+  if (query.sort === "distance_asc") {
+    const conn = await pool.getConnection();
+    try {
+      const ref = await resolveReferencePoint(conn, {
+        kind: "incident",
+        value: query.incidentPublicUuid,
+      });
+      geoSort = { ref, includeDistance: query.includeDistance === true };
+    } finally {
+      conn.release();
+    }
+  }
+  return dispatchOperationsRepo.listAvailableUnitsForIncident(query.incidentPublicUuid, {
+    geoSort,
+  });
 }
 
 export async function operationsCreateDispatch(actorUserId, incidentPublicUuid, body) {
@@ -35,8 +53,9 @@ export async function operationsPatchDispatchStatus(actorUserId, dispatchPublicU
   return { dispatch };
 }
 
-export async function operationsListAgencyWorkload() {
-  return dispatchOperationsRepo.listAgencyWorkload();
+export async function operationsListAgencyWorkload(query = {}) {
+  const { geoSort } = await resolveGeoSortFromQuery(query);
+  return dispatchOperationsRepo.listAgencyWorkload({ geoSort });
 }
 
 export async function operationsGetIncidentResponseTiming(incidentPublicUuid) {

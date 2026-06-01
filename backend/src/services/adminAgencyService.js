@@ -1,9 +1,12 @@
 import * as adminAgencyRepo from "../repositories/adminAgencyRepo.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
 
-export function adminListAgencies(query) {
+export async function adminListAgencies(query) {
+  const { geoSort } = await resolveGeoSortFromQuery(query);
   return adminAgencyRepo.listAgencies({
     limit: query.limit ?? 20,
     offset: query.offset ?? 0,
+    geoSort,
   });
 }
 
