@@ -7,6 +7,7 @@ import { requireAgencyContext as defaultRequireAgencyContext } from "../middlewa
 import {
   getAgencyDispatches,
   getAgencyIncidents,
+  getAgencyIncidentNotes,
   getAgencyMe,
   getAgencyResponseLogs,
   getAgencyUnits,
@@ -84,6 +85,13 @@ export function createAgencyRouter({
     validateAgencyUnitUuidParam,
     validateAgencyPatchUnitStatus,
     patchAgencyUnitStatus,
+  );
+  router.get(
+    "/incidents/:incidentPublicUuid/notes",
+    requirePermission("dispatch.view_own_agency"),
+    validateAgencyIncidentUuidParam,
+    validateAgencyListQuery,
+    getAgencyIncidentNotes,
   );
   router.get(
     "/incidents/:incidentPublicUuid/response-logs",

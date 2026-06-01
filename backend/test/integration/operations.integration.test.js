@@ -82,4 +82,25 @@ describe("operations integration", { skip: !dbUp }, () => {
     assert.ok(dispatch.owning_agency?.agency_name);
     assert.ok(dispatch.owning_agency?.agency_type_code);
   });
+
+  it("GET /operations/incidents/:incidentPublicUuid/notes returns notes list", async () => {
+    const [rows] = await pool.execute(
+      `SELECT id FROM emergency_incidents WHERE public_uuid = ? LIMIT 1`,
+      [SEED.demoIncidentPublicUuid],
+    );
+    if (!rows[0]) {
+      return;
+    }
+
+    const token = await getAdminToken(app);
+    const res = await request(app)
+      .get(`/operations/incidents/${SEED.demoIncidentPublicUuid}/notes`)
+      .set(jsonHeaders(token));
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.incident_public_uuid, SEED.demoIncidentPublicUuid);
+    assert.ok(Array.isArray(res.body.notes));
+    assert.equal(typeof res.body.limit, "number");
+    assert.equal(typeof res.body.offset, "number");
+  });
 });

@@ -118,6 +118,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Operations | GET | `/operations/incidents` | `incident.create` or `incident.update_status` |
 | Operations | GET | `/operations/incidents/:incidentPublicUuid` | Same |
 | Operations | PATCH | `/operations/incidents/:incidentPublicUuid/status` | `incident.update_status` |
+| Operations | GET | `/operations/incidents/:incidentPublicUuid/notes` | `incident.create` or `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/notes` | `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/intake-reports` | `incident.create` or `incident.update_status` |
 | Operations | POST | `/operations/incidents/:incidentPublicUuid/agencies` | `incident.assign_agency` |
@@ -144,6 +145,7 @@ Do not send **`location`** and **`locationId`** in the same request.
 | Agency | PATCH | `/agency/units/:unitPublicUuid` | `agency.manage_own_units` |
 | Agency | PATCH | `/agency/units/:unitPublicUuid/deactivate` | `agency.manage_own_units` |
 | Agency | PATCH | `/agency/units/:unitPublicUuid/status` | `agency.manage_own_units` |
+| Agency | GET | `/agency/incidents/:incidentPublicUuid/notes` | `dispatch.view_own_agency` |
 | Agency | GET | `/agency/incidents/:incidentPublicUuid/response-logs` | `dispatch.view_own_agency` |
 | Agency | POST | `/agency/incidents/:incidentPublicUuid/response-logs` | `response_log.create_own_agency` |
 | Operations | GET | `/operations/service-cases` | Permission `case.respond` |
@@ -480,9 +482,8 @@ Or reference an existing citizen location:
 
 **Rules:**
 
-- `location` / `locationId`: optional, mutually exclusive; follow [Location payloads](#location-payloads-intake-locations-operations).
+- `location` / `locationId`: **exactly one is required**; `locationId` is the public UUID of a saved location selected by the user in the UI (the frontend submits it automatically). Follow [Location payloads](#location-payloads-intake-locations-operations).
 - Plain string `location` is **not** accepted.
-- If the report may later go down the emergency path, ensure a stored location (`reported_location_id`) via inline location or `locationId` before classify/promote.
 
 **Response (201):**
 
@@ -938,17 +939,18 @@ Creates an **`emergency_incidents`** row from an intake **without** requiring an
 
 ### POST `/operations/gateway/999/intake-and-incident`
 
-Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures emergency call placeholder, then branches to **`service_case`** or **`emergency_incident`** per `disposition`.
+Dispatcher quick flow: creates intake on **`emergency_call`** channel, ensures emergency call placeholder, then branches to **`service_case`**, **`emergency_incident`**, or **`existing_incident`** per `disposition`.
 
 **Body (validated):**
 
-- `disposition`: `service_case` \| `emergency_incident` (**required**)
+- `disposition`: `service_case` \| `emergency_incident` \| `existing_incident` (**required**)
 - `categoryCode`, `summary` (**required**); `description`, `reportedAt` optional
 - Exactly one of **`location`** or **`locationId`** (**required**)
 - `callerPhoneNumber`, `callStartedAt` optional call metadata
 - `incidentTitle`, `incidentDescription` optional overrides
-- If `disposition === "emergency_incident"`: **`severityCode`** required
-- If `service_case`: **`priorityLevel`** optional (`low` \| `medium` \| `high` \| `urgent`)
+- If `disposition === "emergency_incident"`: **`severityCode`** required (`low` \| `medium` \| `high` \| `critical`)
+- If `disposition === "existing_incident"`: **`incidentPublicUuid`** required; `linkType` (`supporting_report` \| `follow_up_report`, default `supporting_report`) and `note` (max 500 chars) optional
+- If `disposition === "service_case"`: **`priorityLevel`** optional (`low` \| `medium` \| `high` \| `urgent`)
 
 **Example request (`disposition: "emergency_incident"`):**
 
@@ -1224,6 +1226,36 @@ When transitioning to **`resolved`**, **`closed`**, or **`cancelled`**, the serv
 ```
 
 **Response (409):** `INVALID_STATUS_TRANSITION`
+
+### GET `/operations/incidents/:incidentPublicUuid/notes`
+
+**Permission:** `incident.create` or `incident.update_status`.
+
+Lists operator notes for the incident (`event_type = operator_note` in `incident_timeline_events`), newest first. Unlike `timeline_preview` on incident detail, this endpoint is paginated and returns notes only.
+
+**Query:** `limit` (1–100, default 20), `offset` (default 0).
+
+**Response (200):**
+
+```json
+{
+  "incident_public_uuid": "e5000001-0000-4000-8000-000000000001",
+  "limit": 20,
+  "offset": 0,
+  "notes": [
+    {
+      "id": "1",
+      "event_type": "operator_note",
+      "event_title": "Radio check",
+      "event_description": "Optional body",
+      "event_time": "2026-05-04T14:00:00.000Z",
+      "created_at": "2026-05-04T13:00:01.000Z"
+    }
+  ]
+}
+```
+
+**Response (404):** `INCIDENT_NOT_FOUND`
 
 ### POST `/operations/incidents/:incidentPublicUuid/notes`
 
@@ -2469,6 +2501,12 @@ Representatives may only toggle **available ↔ busy**.
   }
 }
 ```
+
+### GET `/agency/incidents/:incidentPublicUuid/notes`
+
+Lists operator notes on an incident the caller’s agency participates in (`participation_status` `requested` or `active`). Same payload shape as operations GET notes. Query: `limit` (1–100, default 20), `offset` (default 0).
+
+**Response (404):** `INCIDENT_NOT_IN_AGENCY`
 
 ### GET `/agency/incidents/:incidentPublicUuid/response-logs`
 

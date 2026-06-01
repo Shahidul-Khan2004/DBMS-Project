@@ -6,6 +6,7 @@ import {
   findStatusIdByCode,
 } from "../lib/statusWorkflow.js";
 import { patchDispatchStatus } from "./dispatchOperationsRepo.js";
+import { listIncidentOperatorNotes } from "./incidentOperationsRepo.js";
 import { insertLocationInTransaction } from "./locationRepo.js";
 import { deriveAddressAndSourceForLocation } from "../services/locationAddressService.js";
 import { resolveAdminAreaIdForLocationPayload } from "../services/adminAreaFromGpsService.js";
@@ -613,6 +614,27 @@ export async function patchAgencyUnitStatus(params) {
   } finally {
     conn.release();
   }
+}
+
+export async function listIncidentNotes(agencyId, incidentPublicUuid, { limit = 20, offset = 0 } = {}) {
+  const [incidentRows] = await pool.execute(
+    `
+      SELECT ei.id
+      FROM emergency_incidents ei
+      INNER JOIN incident_agency_participation iap
+        ON iap.incident_id = ei.id
+       AND iap.agency_id = ?
+       AND iap.participation_status IN ('requested', 'active')
+      WHERE ei.public_uuid = ?
+      LIMIT 1
+    `,
+    [agencyId, incidentPublicUuid],
+  );
+  if (!incidentRows[0]) {
+    throw new BackendError(404, "INCIDENT_NOT_IN_AGENCY", "Incident not found for this agency");
+  }
+
+  return listIncidentOperatorNotes(incidentPublicUuid, { limit, offset });
 }
 
 export async function listResponseLogs(agencyId, incidentPublicUuid, { limit = 20, offset = 0 }) {

@@ -92,6 +92,17 @@ export async function getAgencyResponseLogs(req, res) {
   res.status(200).json(result);
 }
 
+export async function getAgencyIncidentNotes(req, res) {
+  const { incidentPublicUuid } = req.validated?.params ?? req.params;
+  const query = req.validated?.query ?? req.query;
+  const result = await agencyService.agencyListIncidentNotes(
+    req.agencyContext.agencyId,
+    incidentPublicUuid,
+    query,
+  );
+  res.status(200).json(result);
+}
+
 export async function postAgencyResponseLog(req, res) {
   const { incidentPublicUuid } = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;

@@ -75,7 +75,7 @@ CREATE TABLE intake_reports (
     reporter_contact_id BIGINT UNSIGNED NULL,
     channel_id BIGINT UNSIGNED NOT NULL,
     category_id BIGINT UNSIGNED NOT NULL,
-    reported_location_id BIGINT UNSIGNED NULL,
+    reported_location_id BIGINT UNSIGNED NOT NULL,
     summary VARCHAR(255) NOT NULL,
     description TEXT NULL,
     current_status_id BIGINT UNSIGNED NOT NULL,

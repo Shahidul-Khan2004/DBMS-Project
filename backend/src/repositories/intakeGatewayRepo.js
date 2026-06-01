@@ -521,6 +521,278 @@ export async function createEmergency999PathFromIntake(params) {
   }
 }
 
+const TERMINAL_INCIDENT_STATUSES_GATEWAY = new Set(["resolved", "closed", "cancelled"]);
+
+/**
+ * Transaction: link a new gateway 999 intake to an existing active incident.
+ * Creates/ensures the emergency_calls row, inserts into incident_report_links,
+ * and moves the intake to linked_to_incident.
+ * NEVER inserts into emergency_incidents.
+ */
+export async function linkGateway999IntakeToExistingIncident(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Load and validate the target incident.
+    const [incidentRows] = await conn.execute(
+      `
+        SELECT
+          ei.id AS id,
+          ei.public_uuid AS public_uuid,
+          ei.incident_code AS incident_code,
+          ist.status_code AS status_code
+        FROM emergency_incidents ei
+        INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+        WHERE ei.public_uuid = ?
+        LIMIT 1
+      `,
+      [params.incidentPublicUuid],
+    );
+    const incident = incidentRows[0] || null;
+    if (!incident) {
+      throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
+    }
+    if (TERMINAL_INCIDENT_STATUSES_GATEWAY.has(incident.status_code)) {
+      throw new BackendError(
+        409,
+        "INCIDENT_NOT_LINKABLE",
+        "Cannot link intake report to a terminal incident",
+      );
+    }
+
+    // Load and validate the new intake.
+    const [intakeRows] = await conn.execute(
+      `
+        SELECT
+          ir.id AS id,
+          ir.public_uuid AS public_uuid,
+          ir.report_code AS report_code,
+          ir.reporter_user_id AS reporter_user_id,
+          ir.reported_location_id AS reported_location_id,
+          ir.summary AS summary,
+          ir.description AS description,
+          ist2.status_code AS intake_status,
+          ir.reported_at AS reported_at
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ist2 ON ist2.id = ir.current_status_id
+        WHERE ir.public_uuid = ?
+        LIMIT 1
+      `,
+      [params.intakePublicUuid],
+    );
+    const intake = intakeRows[0] || null;
+    if (!intake) {
+      throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+    }
+
+    // Require reported location.
+    if (intake.reported_location_id == null) {
+      throw new BackendError(
+        422,
+        "EMERGENCY_INCIDENT_REQUIRES_LOCATION",
+        "Intake report has no location; cannot link to incident",
+      );
+    }
+
+    // Reject an intake already linked to an incident.
+    const [linkDup] = await conn.execute(
+      `SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1`,
+      [intake.id],
+    );
+    if (linkDup[0]) {
+      throw new BackendError(
+        409,
+        "INTAKE_ALREADY_LINKED",
+        "Intake report is already linked to an incident",
+      );
+    }
+
+    // Create or ensure the emergency_calls row.
+    const [existingCallRows] = await conn.execute(
+      `SELECT id FROM emergency_calls WHERE intake_report_id = ? LIMIT 1`,
+      [intake.id],
+    );
+    let emergencyCallId;
+    if (existingCallRows[0]) {
+      emergencyCallId = existingCallRows[0].id;
+      await conn.execute(
+        `
+          UPDATE emergency_calls
+          SET
+            recording_url = COALESCE(recording_url, ?),
+            caller_phone_number = COALESCE(caller_phone_number, ?),
+            call_started_at = COALESCE(call_started_at, ?)
+          WHERE id = ?
+        `,
+        [
+          params.recordingUrl ?? null,
+          params.callerPhoneNumber ?? null,
+          toMySqlDateTimeOrNull(params.callStartedAt),
+          emergencyCallId,
+        ],
+      );
+    } else {
+      const [callInsert] = await conn.execute(
+        `
+          INSERT INTO emergency_calls (
+            intake_report_id,
+            dispatcher_id,
+            caller_phone_number,
+            call_started_at,
+            call_ended_at,
+            triaged_at,
+            call_status,
+            recording_url
+          )
+          VALUES (?, ?, ?, ?, NULL, NULL, 'received', ?)
+        `,
+        [
+          intake.id,
+          params.dispatcherUserId,
+          params.callerPhoneNumber ?? null,
+          toMySqlDateTimeOrNull(params.callStartedAt) ?? toMySqlDateTimeOrNull(new Date().toISOString()),
+          params.recordingUrl ?? null,
+        ],
+      );
+      emergencyCallId = callInsert.insertId;
+    }
+
+    // Insert into incident_report_links.
+    const [linkInsert] = await conn.execute(
+      `
+        INSERT INTO incident_report_links (
+          incident_id,
+          intake_report_id,
+          link_type,
+          linked_by_user_id,
+          note
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        incident.id,
+        intake.id,
+        params.linkType ?? "supporting_report",
+        params.actorUserId ?? null,
+        params.note ?? `Linked as additional 999 call for incident ${incident.incident_code}`,
+      ],
+    );
+
+    // Move intake status to linked_to_incident via the existing workflow.
+    await ensureIntakeUnderReviewIfReceived(
+      conn,
+      intake.id,
+      intake.intake_status,
+      params.actorUserId,
+      "Under review before incident linkage",
+    );
+
+    await updateIntakeReportStatusInTransaction(
+      conn,
+      intake.id,
+      "linked_to_incident",
+      params.actorUserId,
+      `Linked to incident ${incident.incident_code}`,
+    );
+
+    // Update call status.
+    await conn.execute(
+      `UPDATE emergency_calls SET call_status = 'linked_to_incident' WHERE id = ?`,
+      [emergencyCallId],
+    );
+
+    // Read back updated rows.
+    const [callRows] = await conn.execute(
+      `
+        SELECT
+          id,
+          intake_report_id,
+          dispatcher_id,
+          caller_phone_number,
+          call_started_at,
+          call_ended_at,
+          triaged_at,
+          call_status,
+          recording_url,
+          transcript_text,
+          created_at
+        FROM emergency_calls
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [emergencyCallId],
+    );
+    const [updatedLinkRows] = await conn.execute(
+      `
+        SELECT
+          irl.id,
+          irl.incident_id,
+          irl.intake_report_id,
+          irl.link_type,
+          irl.linked_by_user_id,
+          irl.linked_at,
+          irl.note,
+          ei.public_uuid AS incident_public_uuid,
+          ei.incident_code AS incident_code
+        FROM incident_report_links irl
+        INNER JOIN emergency_incidents ei ON ei.id = irl.incident_id
+        WHERE irl.id = ?
+        LIMIT 1
+      `,
+      [linkInsert.insertId],
+    );
+    const [updatedIntakeRows] = await conn.execute(
+      `
+        SELECT
+          ir.id,
+          ir.public_uuid,
+          ir.report_code,
+          ir.reporter_user_id,
+          ir.channel_id,
+          ir.category_id,
+          ir.reported_location_id,
+          ir.summary,
+          ir.description,
+          ist2.status_code AS intake_status,
+          ir.final_disposition,
+          ir.received_by_user_id,
+          ir.reported_at,
+          ir.created_at,
+          ir.updated_at
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ist2 ON ist2.id = ir.current_status_id
+        WHERE ir.id = ?
+        LIMIT 1
+      `,
+      [intake.id],
+    );
+
+    await conn.commit();
+    return {
+      emergency_call: callRows[0],
+      incident_report_link: updatedLinkRows[0],
+      intake: updatedIntakeRows[0],
+    };
+  } catch (error) {
+    await conn.rollback();
+    if (
+      error?.code === "ER_DUP_ENTRY" &&
+      (error.message.includes("uq_emergency_calls_intake_report") ||
+        error.message.includes("uq_incident_report_links_one_incident_per_report"))
+    ) {
+      throw new BackendError(
+        409,
+        "INTAKE_ALREADY_LINKED",
+        "Intake report is already linked to an incident",
+      );
+    }
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function ensureEmergencyCallForIntake(params) {
   const conn = await pool.getConnection();
   try {
