@@ -28,6 +28,7 @@ export function AgenciesToolbar({
   onNext,
   onOnboard,
 }: AgenciesToolbarProps) {
+  const showPagination = total > limit;
   const canPrev = offset > 0;
   const canNext = offset + limit < total;
 
@@ -36,24 +37,28 @@ export function AgenciesToolbar({
       className={`flex flex-wrap items-center justify-end gap-2 ${className}`.trim()}
     >
       <p className="text-sm text-slate-600">{resultLabel}</p>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={onPrev}
-        disabled={!canPrev || isLoading}
-      >
-        Previous
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={onNext}
-        disabled={!canNext || isLoading}
-      >
-        Next
-      </Button>
+      {showPagination ? (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onPrev}
+            disabled={!canPrev || isLoading}
+          >
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onNext}
+            disabled={!canNext || isLoading}
+          >
+            Next
+          </Button>
+        </>
+      ) : null}
       <Button
         type="button"
         variant="secondary"

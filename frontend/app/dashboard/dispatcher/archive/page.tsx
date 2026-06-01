@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ArchiveWorkspace, useArchiveList } from "@/components/dispatcher/archive";
@@ -8,8 +8,8 @@ import { DispatcherOpsShell } from "@/components/dispatcher/DispatcherOpsShell";
 import { useActiveIncidentCardLocations } from "@/components/dispatcher/incidents/useActiveIncidentCardLocations";
 import { Button } from "@/components/ui/Button";
 import { PageLoading } from "@/components/ui/StatusState";
-import { ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
@@ -17,7 +17,7 @@ import {
 
 export default function DispatcherArchivePage() {
   const router = useRouter();
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard();
 
   const {
     recordType,
@@ -36,7 +36,7 @@ export default function DispatcherArchivePage() {
     retryPartialStream,
     incidentHasMore,
     serviceCaseHasMore,
-  } = useArchiveList(!isLoadingSession);
+  } = useArchiveList(!isChecking);
 
   const { getCardLocation, resetCardLocations } = useActiveIncidentCardLocations(
     recordType === "incidents" && !(isLoading && incidentItems.length === 0)
@@ -51,40 +51,13 @@ export default function DispatcherArchivePage() {
     refresh();
   };
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const accessToken = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !accessToken) {
-        sessionStorage.removeItem("loggedInUser");
-        clearAuthSession();
-        startTransition(() => {
-          router.replace("/auth/login");
-        });
-        return;
-      }
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
     clearAuthSession();
     router.push("/");
   };
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading archive" />;
   }
 

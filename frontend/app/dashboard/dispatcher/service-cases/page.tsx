@@ -23,7 +23,7 @@ import { isServiceCaseFinal, isServiceCaseOpen } from "@/lib/service-case-status
 import { listOperationsServiceCases } from "@/lib/service-case-api";
 import { sortNewestFirst, sortOldestFirst } from "@/lib/sort";
 import { sortServiceCasesByPriorityThenUpdated } from "@/lib/sort-service-cases";
-import { useAuthGuard } from "@/lib/use-auth-guard";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import type {
   OperationsServiceCase,
 } from "@/types/service-case";
@@ -48,7 +48,7 @@ function sortVisibleServiceCases(
 
 export default function DispatcherServiceCasesPage() {
   const router = useRouter();
-  const isChecking = useAuthGuard(["dispatcher", "system_admin"]);
+  const isChecking = useDispatcherWorkspaceGuard("serviceCases");
   const [serviceCases, setServiceCases] = useState<OperationsServiceCase[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

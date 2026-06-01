@@ -22,6 +22,7 @@ import {
   DISPATCHER_DASHBOARD_TITLE,
 } from "@/lib/dispatcher-dashboard";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   getServiceCaseStatusLabel,
   isServiceCaseOpen,
@@ -196,7 +197,7 @@ function ColumnBody({
 
 export default function DispatcherDashboard() {
   const router = useRouter();
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [counts, setCounts] = useState<OverviewCounts | null>(null);
@@ -397,33 +398,9 @@ export default function DispatcherDashboard() {
   }, [loadCounts, loadTriage, loadIncidents, loadServiceCases]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const accessToken = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !accessToken) {
-        router.push("/auth/login");
-        return;
-      }
-
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (isLoadingSession) return;
+    if (isChecking) return;
     void loadCommandCenter();
-  }, [isLoadingSession, loadCommandCenter]);
+  }, [isChecking, loadCommandCenter]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -451,7 +428,7 @@ export default function DispatcherDashboard() {
     router.push(`/dashboard/dispatcher/service-cases/${publicUuid}`);
   };
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading command center" />;
   }
 

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { AssignParticipatingAgencyDialog } from "@/components/dispatcher/incidents/command/AssignParticipatingAgencyDialog";
@@ -32,6 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ApiError, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
@@ -80,7 +75,7 @@ export default function IncidentCommandPage() {
       ? params.incidentPublicUuid
       : "";
 
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const isChecking = useDispatcherWorkspaceGuard();
   const [detail, setDetail] = useState<IncidentDetailResponse | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -166,36 +161,9 @@ export default function IncidentCommandPage() {
   }, [refreshDetail]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      const accessToken = await ensureAuthSession();
-      const sessionUser = sessionStorage.getItem("loggedInUser");
-
-      if (cancelled) return;
-
-      if (!sessionUser || !accessToken) {
-        sessionStorage.removeItem("loggedInUser");
-        clearAuthSession();
-        startTransition(() => {
-          router.replace("/auth/login");
-        });
-        return;
-      }
-      setIsLoadingSession(false);
-    }
-
-    void checkSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (isLoadingSession) return;
+    if (isChecking) return;
     void loadDetail();
-  }, [isLoadingSession, loadDetail]);
+  }, [isChecking, loadDetail]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -294,7 +262,7 @@ export default function IncidentCommandPage() {
     }
   }, []);
 
-  if (isLoadingSession) {
+  if (isChecking) {
     return <PageLoading label="Loading incident command" />;
   }
 

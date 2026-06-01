@@ -136,6 +136,38 @@ export type PendingIntakeListParams = {
   offset?: number;
 };
 
+export type OperationsIntakeListQuery = {
+  intake_status?: string;
+  categoryCode?: string;
+  sortOrder?: TriageSortOrder;
+  limit?: number;
+  offset?: number;
+};
+
+const OVERSIGHT_INTAKE_DEFAULT_LIMIT = 100;
+
+export async function listOperationsIntakeReports(
+  query: OperationsIntakeListQuery = {},
+): Promise<OperationsIntakeReportsResponse> {
+  const sortOrder = query.sortOrder ?? "newest";
+  const search = new URLSearchParams({
+    limit: String(query.limit ?? OVERSIGHT_INTAKE_DEFAULT_LIMIT),
+    offset: String(query.offset ?? DEFAULT_OFFSET),
+    sort: toSortParam(sortOrder),
+  });
+
+  if (query.intake_status?.trim()) {
+    search.set("intake_status", query.intake_status.trim());
+  }
+  if (query.categoryCode?.trim()) {
+    search.set("categoryCode", query.categoryCode.trim());
+  }
+
+  return apiGet<OperationsIntakeReportsResponse>(
+    `/operations/intake-reports?${search.toString()}`,
+  );
+}
+
 function dedupeByPublicUuid<T extends { public_uuid: string }>(items: T[]): T[] {
   const seen = new Set<string>();
   const result: T[] = [];

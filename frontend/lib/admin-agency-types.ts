@@ -25,11 +25,59 @@ export const ADMIN_AGENCY_TYPE_SORT_ORDER: readonly string[] = [
   "local_government",
 ];
 
+/** Normal agency network types shown on the admin Agencies page. */
+export const ADMIN_AGENCY_NETWORK_TYPE_CODES = [
+  "medical_service",
+  "fire_service",
+  "police",
+  "infrastructure_emergency",
+  "utility_provider",
+  "local_government",
+] as const;
+
+/** Agency types available in the onboard-agency modal (network types only). */
+export const ADMIN_AGENCY_ONBOARD_TYPE_OPTIONS =
+  ADMIN_AGENCY_NETWORK_TYPE_CODES.map((value) => ({
+    value,
+    label: formatAdminAgencyTypeLabel(value),
+  }));
+
+/** Excluded from the normal Agencies page — future Disaster Protocol workflow. */
+export const ADMIN_AGENCY_DISASTER_PROTOCOL_TYPE_CODES = [
+  "disaster_management",
+  "army",
+  "ngo",
+] as const;
+
+const disasterProtocolTypeSet = new Set<string>(
+  ADMIN_AGENCY_DISASTER_PROTOCOL_TYPE_CODES,
+);
+
+const networkTypeSet = new Set<string>(ADMIN_AGENCY_NETWORK_TYPE_CODES);
+
 export type AgencyCategoryOption = {
   code: string;
   label: string;
   count: number;
 };
+
+export function isAdminAgencyNetworkType(typeCode: string): boolean {
+  return networkTypeSet.has(typeCode);
+}
+
+export function isAdminAgencyNetworkCategoryCode(code: string): boolean {
+  return code === "all" || isAdminAgencyNetworkType(code);
+}
+
+export function filterAdminAgencyNetworkAgencies(
+  agencies: AdminAgencyListItem[],
+): AdminAgencyListItem[] {
+  return agencies.filter(
+    (agency) =>
+      isAdminAgencyNetworkType(agency.agency_type_code) &&
+      !disasterProtocolTypeSet.has(agency.agency_type_code),
+  );
+}
 
 export function formatAdminAgencyTypeLabel(typeCode: string): string {
   switch (typeCode) {
@@ -42,7 +90,7 @@ export function formatAdminAgencyTypeLabel(typeCode: string): string {
     case "disaster_management":
       return "Disaster Management";
     case "infrastructure_emergency":
-      return "Infrastructure";
+      return "Infrastructure Emergency";
     case "army":
       return "Army";
     case "ngo":
@@ -59,38 +107,26 @@ export function formatAdminAgencyTypeLabel(typeCode: string): string {
   }
 }
 
-function sortAgencyTypeCodes(codes: string[]): string[] {
-  const known = new Set(ADMIN_AGENCY_TYPE_SORT_ORDER);
-  const knownCodes = ADMIN_AGENCY_TYPE_SORT_ORDER.filter((code) =>
-    codes.includes(code),
-  );
-  const unknownCodes = codes
-    .filter((code) => !known.has(code))
-    .sort((a, b) => a.localeCompare(b));
-  return [...knownCodes, ...unknownCodes];
-}
-
 export function buildAgencyCategoryOptions(
   agencies: AdminAgencyListItem[],
 ): AgencyCategoryOption[] {
+  const networkAgencies = filterAdminAgencyNetworkAgencies(agencies);
   const counts = new Map<string, number>();
-  for (const agency of agencies) {
+
+  for (const agency of networkAgencies) {
     const code = agency.agency_type_code;
     counts.set(code, (counts.get(code) ?? 0) + 1);
   }
 
-  const typeCodes = sortAgencyTypeCodes([...counts.keys()]);
-
-  const typeOptions: AgencyCategoryOption[] = typeCodes
-    .map((code) => ({
+  const typeOptions: AgencyCategoryOption[] =
+    ADMIN_AGENCY_NETWORK_TYPE_CODES.map((code) => ({
       code,
       label: formatAdminAgencyTypeLabel(code),
       count: counts.get(code) ?? 0,
-    }))
-    .filter((option) => option.count > 0);
+    }));
 
   return [
-    { code: "all", label: "All", count: agencies.length },
+    { code: "all", label: "All", count: networkAgencies.length },
     ...typeOptions,
   ];
 }

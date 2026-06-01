@@ -10,11 +10,11 @@ import {
   DISPATCHER_DASHBOARD_SUBTITLE,
   DISPATCHER_DASHBOARD_TITLE,
 } from "@/lib/dispatcher-dashboard";
-import { useAuthGuard } from "@/lib/use-auth-guard";
+import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 
 export default function Gateway999Page() {
   const router = useRouter();
-  const isChecking = useAuthGuard(["dispatcher", "system_admin"]);
+  const isChecking = useDispatcherWorkspaceGuard();
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
