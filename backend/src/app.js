@@ -13,7 +13,7 @@ async function startServer() {
     console.error("Bootstrap failed:", error);
   }
 
- //startEmailQueueWorker();
+ startEmailQueueWorker();
 
   app.listen(PORT, () => {
     console.log(`Server is running on port http://localhost:${PORT}`);

@@ -63,6 +63,11 @@ describe("operations integration", { skip: !dbUp }, () => {
 
     assert.equal(res.status, 200);
     assert.equal(res.body.incident.public_uuid, SEED.demoIncidentPublicUuid);
+    if (res.body.incident.location) {
+      assert.ok(res.body.incident.location.public_uuid);
+      assert.equal(typeof res.body.incident.location.latitude, "number");
+      assert.equal(typeof res.body.incident.location.longitude, "number");
+    }
     assert.ok(Array.isArray(res.body.linked_intake_reports));
     assert.ok(Array.isArray(res.body.timeline_preview));
     assert.ok(Array.isArray(res.body.participating_agencies));

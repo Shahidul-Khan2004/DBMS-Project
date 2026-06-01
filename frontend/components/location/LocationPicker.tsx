@@ -73,6 +73,8 @@ type BackendLocationSearchResult = {
   placeName?: string;
 };
 
+const DEFAULT_MAP_CLASS_NAME = "h-[320px] w-full sm:h-[380px]";
+
 type LocationPickerProps = {
   value: LocationPickerValue | null;
   onChange: (
@@ -83,9 +85,29 @@ type LocationPickerProps = {
   selectedPlaceName?: string;
   syncSearchQueryToSelectedLabel?: boolean;
   showCurrentLocation?: boolean;
+  showSelectionSummary?: boolean;
+  scrollWheelZoom?: boolean;
+  searchPlaceholder?: string;
+  sectionTitle?: string;
+  sectionDescription?: string;
   disabled?: boolean;
   className?: string;
+  /** When true, omits the inner section title card wrapper for panel embedding. */
+  embedded?: boolean;
+  /** Custom map container height classes; defaults to responsive fixed height. */
+  mapClassName?: string;
+  /** Wrapper class for the map container when embedded in a flex panel. */
+  mapWrapperClassName?: string;
+  /** Class for the embedded map section wrapper; defaults to flex-fill behaviour. */
+  embeddedMapSectionClassName?: string;
+  /** Tighter embedded search row and control spacing for compact panels. */
+  embeddedCompact?: boolean;
+  /** When the search input is empty or too short, use this text for the search query. */
+  fallbackSearchQuery?: string;
 };
+
+const DEFAULT_EMBEDDED_MAP_SECTION_CLASS_NAME =
+  "mt-2 flex min-h-0 min-w-0 flex-1 flex-col";
 
 
 function getSearchResultSignature(result: SearchResult) {
@@ -156,10 +178,14 @@ function MapRecenter({ value }: { value: LocationPickerValue | null }) {
     if (lastCenteredLocationRef.current === locationKey) return;
 
     lastCenteredLocationRef.current = locationKey;
-    map.setView(
-      [value.latitude, value.longitude],
-      Math.max(map.getZoom(), SELECTED_ZOOM),
-    );
+    try {
+      map.setView(
+        [value.latitude, value.longitude],
+        Math.max(map.getZoom(), SELECTED_ZOOM),
+      );
+    } catch {
+      // Map may be tearing down during route or panel transitions.
+    }
   }, [map, value]);
 
   return null;
@@ -169,8 +195,17 @@ function MapResizeHandler() {
   const map = useMap();
 
   useEffect(() => {
+    let cancelled = false;
+
     const handleResize = () => {
-      map.invalidateSize();
+      if (cancelled) return;
+      const container = map.getContainer();
+      if (!container?.isConnected) return;
+      try {
+        map.invalidateSize();
+      } catch {
+        // Ignore races while Leaflet unmounts.
+      }
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
@@ -180,17 +215,26 @@ function MapResizeHandler() {
     }
 
     window.addEventListener("resize", handleResize);
-
-    // Invalidate size once on mount to ensure proper initialization
-    setTimeout(() => map.invalidateSize(), 100);
+    const timeoutId = window.setTimeout(handleResize, 100);
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
       window.removeEventListener("resize", handleResize);
       resizeObserver.disconnect();
     };
   }, [map]);
 
   return null;
+}
+
+function MapLoadingPlaceholder({ className }: { className: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-2xl bg-slate-100 ${className}`}
+      aria-hidden
+    />
+  );
 }
 
 export function LocationPicker({
@@ -200,9 +244,25 @@ export function LocationPicker({
   selectedPlaceName,
   syncSearchQueryToSelectedLabel = true,
   showCurrentLocation = true,
+  showSelectionSummary = true,
+  scrollWheelZoom = true,
+  searchPlaceholder = "Search for an area, road, landmark, or address",
+  sectionTitle = "Find Location",
+  sectionDescription,
   disabled = false,
   className = "",
+  embedded = false,
+  mapClassName = DEFAULT_MAP_CLASS_NAME,
+  mapWrapperClassName = "",
+  embeddedMapSectionClassName = DEFAULT_EMBEDDED_MAP_SECTION_CLASS_NAME,
+  embeddedCompact = false,
+  fallbackSearchQuery,
 }: LocationPickerProps) {
+  const helperText =
+    sectionDescription ??
+    (showCurrentLocation
+      ? "Search, use live location, or click directly on the map."
+      : "Search or click directly on the map.");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -214,9 +274,17 @@ export function LocationPicker({
   const selectionRequestRef = useRef(0);
   const resolvingRequestRef = useRef(0);
   const lastSyncedSelectedLabelRef = useRef("");
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const mapCenter = value
     ? ([value.latitude, value.longitude] as [number, number])
     : DEFAULT_CENTER;
+
+  useEffect(() => {
+    setMapInstanceKey((currentKey) => currentKey + 1);
+    setIsMapReady(true);
+    return () => setIsMapReady(false);
+  }, []);
 
   const isSearchDisabled = disabled || isSearching;
   const selectedLabel = selectedPlaceName || selectedAddress;
@@ -239,7 +307,8 @@ export function LocationPicker({
   const handleSearch = async () => {
     setLocationError("");
 
-    const trimmedQuery = query.trim();
+    const trimmedQuery =
+      query.trim() || fallbackSearchQuery?.trim() || "";
     if (trimmedQuery.length < 2) {
       setSearchError("Enter at least two characters to search.");
       setResults([]);
@@ -415,38 +484,72 @@ export function LocationPicker({
     );
   };
 
-  return (
-    <div className={`space-y-4 ${className}`}>
-      <div className="rounded-2xl border border-[#002D62]/10 bg-white p-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-semibold text-[#002D62]">
-            Find Location
-          </p>
-          <p className="text-xs leading-5 text-gray-600">
-            {showCurrentLocation
-              ? "Search, use live location, or click directly on the map."
-              : "Search or click directly on the map."}
-          </p>
-        </div>
-
-        <div className="mt-3 space-y-3">
+  const searchControls = (
+    <>
+      {embedded && !showCurrentLocation ? (
+        <div
+          className={
+            embeddedCompact
+              ? "flex flex-col gap-2 sm:flex-row sm:items-center"
+              : "flex flex-col gap-2 sm:flex-row sm:items-stretch"
+          }
+        >
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Search for an area, road, landmark, or address"
+            placeholder={searchPlaceholder}
+            disabled={disabled || isSearching}
+            aria-label="Search for a location"
+            className={
+              embeddedCompact
+                ? "min-w-0 flex-1 rounded-xl px-3 py-2 text-sm leading-tight"
+                : "min-w-0 flex-1"
+            }
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            isLoading={isSearching}
+            disabled={isSearchDisabled}
+            onClick={() => void handleSearch()}
+            className={
+              embeddedCompact
+                ? "h-[44px] shrink-0 whitespace-nowrap px-4 text-sm sm:min-w-[5.5rem]"
+                : "h-auto shrink-0 self-stretch whitespace-nowrap px-4 py-2 text-sm sm:min-w-[5.5rem]"
+            }
+          >
+            <Search className="h-4 w-4" aria-hidden />
+            Search
+          </Button>
+        </div>
+      ) : (
+        <div className={embedded ? "space-y-2" : "mt-3 space-y-3"}>
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder={searchPlaceholder}
             disabled={disabled || isSearching}
             aria-label="Search for a location"
           />
-          <div className={showCurrentLocation ? "grid gap-2 sm:grid-cols-2" : "grid gap-2"}>
+          <div
+            className={
+              showCurrentLocation
+                ? "grid gap-2 sm:grid-cols-2"
+                : embedded
+                  ? "flex gap-2"
+                  : "grid gap-2"
+            }
+          >
             <Button
               type="button"
               variant="secondary"
               isLoading={isSearching}
               disabled={isSearchDisabled}
               onClick={() => void handleSearch()}
-              fullWidth
-              className="h-[46px] whitespace-nowrap text-sm"
+              fullWidth={!embedded}
+              className={`h-[46px] whitespace-nowrap text-sm ${embedded && !showCurrentLocation ? "shrink-0 px-5" : ""}`}
             >
               <Search className="h-4 w-4" aria-hidden />
               Search
@@ -467,99 +570,153 @@ export function LocationPicker({
             ) : null}
           </div>
         </div>
+      )}
 
-
-        {searchError && (
-          <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-700">
-            {searchError}
-          </p>
-        )}
-
-        {locationError && (
-          <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-sm text-red-700">
-            {locationError}
-          </p>
-        )}
-
-        {isResolvingLocation && (
-          <p className="mt-2 rounded-2xl bg-[#EFF6FF] px-3 py-2 text-xs leading-5 text-slate-700">
-            Reading the selected map location...
-          </p>
-        )}
-
-        {!searchError && hasSearched && !isSearching && results.length === 0 && (
-          <p className="mt-2 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-gray-600">
-            No places found. Try a nearby road, area, or landmark.
-          </p>
-        )}
-
-        {results.length > 0 && (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm">
-            {results.map((result) => (
-              <button
-                key={result.id}
-                type="button"
-                onClick={() => handleResultSelect(result)}
-                className="block w-full border-b border-gray-100 px-4 py-3 text-left text-sm text-gray-800 transition-colors last:border-b-0 hover:bg-[#EFF6FF] focus:bg-[#EFF6FF] focus:outline-none"
-              >
-                <span className="block font-medium text-gray-900">
-                  {result.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-[#002D62]/10 bg-slate-100 shadow-sm">
-        <MapContainer
-          center={mapCenter}
-          zoom={value ? SELECTED_ZOOM : DEFAULT_ZOOM}
-          scrollWheelZoom
-          className="h-[320px] w-full sm:h-[380px]"
-          maxBounds={BANGALADESH_BOUNDS}
-          maxBoundsViscosity={1}
+      {searchError ? (
+        <p
+          className={`mt-1.5 rounded-xl bg-red-50 px-3 text-red-700 ${embedded ? "py-1.5 text-xs" : "py-2 text-sm"}`}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={19}
-          />
-          <MapClickHandler disabled={disabled} onPick={handleMapPick} />
-          <MapResizeHandler />
-          <MapRecenter value={value} />
-          {value && (
-            <CircleMarker
-              center={[value.latitude, value.longitude]}
-              radius={9}
-              pathOptions={{
-                color: "#ffffff",
-                fillColor: "#DA291C",
-                fillOpacity: 1,
-                weight: 3,
-              }}
-            />
-          )}
-        </MapContainer>
-      </div>
+          {searchError}
+        </p>
+      ) : null}
 
-      <div className="rounded-2xl border border-[#002D62]/10 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
-        {value ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {selectedLabel && (
-              <p className="sm:col-span-2">
-                <span className="font-medium text-gray-900">Selected place:</span>{" "}
-                {selectedLabel}
-              </p>
-            )}
-            <p className="sm:col-span-2">
-              Map location selected.
-            </p>
-          </div>
+      {locationError ? (
+        <p
+          className={`mt-1.5 rounded-xl bg-red-50 px-3 text-red-700 ${embedded ? "py-1.5 text-xs" : "py-2 text-sm"}`}
+        >
+          {locationError}
+        </p>
+      ) : null}
+
+      {isResolvingLocation ? (
+        <p
+          className={`mt-1.5 rounded-xl bg-[#EFF6FF] px-3 leading-5 text-slate-700 ${embedded ? "py-1.5 text-xs" : "py-2 text-xs"}`}
+        >
+          Reading the selected map location...
+        </p>
+      ) : null}
+
+      {!searchError && hasSearched && !isSearching && results.length === 0 ? (
+        <p
+          className={`mt-1.5 rounded-xl bg-zinc-100 px-3 text-gray-600 ${embedded ? "py-1.5 text-xs" : "py-2 text-sm"}`}
+        >
+          No places found. Try a nearby road, area, or landmark.
+        </p>
+      ) : null}
+
+      {results.length > 0 ? (
+        <div
+          className={`mt-2 overflow-hidden rounded-xl border border-[#002D62]/10 bg-white shadow-sm ${embedded ? "max-h-[7.5rem] overflow-y-auto overscroll-y-contain" : ""}`}
+        >
+          {results.map((result) => (
+            <button
+              key={result.id}
+              type="button"
+              onClick={() => handleResultSelect(result)}
+              className={`block w-full cursor-pointer border-b border-gray-100 px-3 text-left text-gray-800 transition-colors last:border-b-0 hover:bg-[#EFF6FF] focus-visible:bg-[#EFF6FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002D62]/30 ${embedded ? "py-2 text-xs" : "px-4 py-3 text-sm"}`}
+            >
+              <span className="block font-medium text-gray-900">
+                {result.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+
+  const mapBlock = (
+    <>
+      <div
+        className={`relative isolate z-0 overflow-hidden rounded-2xl border border-[#002D62]/10 bg-slate-100 shadow-sm ${mapWrapperClassName}`}
+      >
+        {!isMapReady ? (
+          <MapLoadingPlaceholder className={mapClassName} />
         ) : (
-          <p className="text-gray-500">No map location selected yet.</p>
+          <MapContainer
+            key={mapInstanceKey}
+            center={mapCenter}
+            zoom={value ? SELECTED_ZOOM : DEFAULT_ZOOM}
+            scrollWheelZoom={scrollWheelZoom}
+            className={mapClassName}
+            maxBounds={BANGALADESH_BOUNDS}
+            maxBoundsViscosity={1}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+            <MapClickHandler disabled={disabled} onPick={handleMapPick} />
+            <MapResizeHandler />
+            <MapRecenter value={value} />
+            {value ? (
+              <CircleMarker
+                center={[value.latitude, value.longitude]}
+                radius={9}
+                pathOptions={{
+                  color: "#ffffff",
+                  fillColor: "#DA291C",
+                  fillOpacity: 1,
+                  weight: 3,
+                }}
+              />
+            ) : null}
+          </MapContainer>
         )}
       </div>
+      {!scrollWheelZoom && !embedded ? (
+        <p className="mt-1.5 text-center text-xs text-slate-500">
+          Use + / − to zoom
+        </p>
+      ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className={`flex shrink-0 flex-col ${className}`}>
+        <div
+          className={
+            embeddedCompact ? "shrink-0 space-y-1" : "shrink-0 space-y-2"
+          }
+        >
+          {searchControls}
+        </div>
+        <div className={embeddedMapSectionClassName}>{mapBlock}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-4 ${className}`}>
+      <div className="rounded-2xl border border-[#002D62]/10 bg-white p-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold text-[#002D62]">{sectionTitle}</p>
+          <p className="text-xs leading-5 text-gray-600">{helperText}</p>
+        </div>
+        {searchControls}
+      </div>
+
+      {mapBlock}
+
+      {showSelectionSummary ? (
+        <div className="rounded-2xl border border-[#002D62]/10 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
+          {value ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {selectedLabel ? (
+                <p className="sm:col-span-2">
+                  <span className="font-medium text-gray-900">Selected place:</span>{" "}
+                  {selectedLabel}
+                </p>
+              ) : null}
+              <p className="sm:col-span-2">Map location selected.</p>
+            </div>
+          ) : (
+            <p className="text-gray-500">No map location selected yet.</p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

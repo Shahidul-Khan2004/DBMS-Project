@@ -884,7 +884,28 @@ Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–10
 
 ### GET `/operations/intake-reports/:reportPublicUuid`
 
-Single row, same shape as list elements.
+Same fields as list elements, plus optional read-only reporter/caller detail:
+
+```json
+{
+  "intake_report": {
+    "public_uuid": "…",
+    "report_code": "IR-…",
+    "reporter": {
+      "user_public_uuid": "…",
+      "full_name": "…",
+      "phone_number": "…",
+      "email": null,
+      "is_anonymous": false
+    },
+    "emergency_call": {
+      "caller_phone_number": "+8801700000000"
+    }
+  }
+}
+```
+
+`reporter` and `emergency_call` are omitted or null when not applicable. Anonymous reports set `reporter.is_anonymous` to `true` with contact fields null.
 
 **Response (200):**
 
@@ -1147,10 +1168,12 @@ Distance sort: `sort=distance_asc`, `nearIntakeReportPublicUuid`, optional `incl
     {
       "link_type": "primary_report",
       "linked_at": "2026-05-04T12:05:00.000Z",
+      "link_note": null,
       "intake_public_uuid": "…",
       "intake_report_code": "IR-…",
       "intake_summary": "…",
-      "intake_status": "linked_to_incident"
+      "intake_status": "linked_to_incident",
+      "location": null
     }
   ],
   "timeline_preview": [

@@ -1,0 +1,1 @@
+export { RoleAssignmentWorkspace } from "./RoleAssignmentWorkspace";

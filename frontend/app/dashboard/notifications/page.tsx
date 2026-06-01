@@ -1,52 +1,51 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCircle2, Inbox, RefreshCw } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import {
-  NOTIFICATIONS_UPDATED_EVENT,
-} from "@/components/notifications/NotificationBell";
-import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
+import { DispatcherOpsShell } from "@/components/dispatcher/DispatcherOpsShell";
+import { NotificationsFeedPanel } from "@/components/notifications/NotificationsFeedPanel";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { EmptyState, PageLoading } from "@/components/ui/StatusState";
-import { clearAuthSession } from "@/lib/auth-store";
-import { formatBangladeshTime } from "@/lib/datetime";
+import { PageLoading } from "@/components/ui/StatusState";
+import { clearAuthSession, getAuthSession, type UserRole } from "@/lib/auth-store";
+import {
+  DISPATCHER_DASHBOARD_SUBTITLE,
+  DISPATCHER_DASHBOARD_TITLE,
+} from "@/lib/dispatcher-dashboard";
+import {
+  dispatchNotificationsUpdated,
+  sortNotificationsNewestFirst,
+} from "@/lib/notification-utils";
 import {
   getMyNotifications,
+  getUnreadNotificationCount,
   markNotificationAsRead,
 } from "@/lib/notifications-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { NotificationItem } from "@/types/notifications";
 
-function sortNewestFirst(notifications: NotificationItem[]) {
-  return [...notifications].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-}
+const FULL_LIST_LIMIT = 50;
 
-function dispatchNotificationsUpdated() {
-  window.dispatchEvent(new Event(NOTIFICATIONS_UPDATED_EVENT));
+function useIsDispatcherShellRole(role: UserRole) {
+  return role === "dispatcher" || role === "system_admin";
 }
 
 export default function NotificationsPage() {
   const router = useRouter();
   const isChecking = useAuthGuard();
+  const [role, setRole] = useState<UserRole>("citizen");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-  const unreadNotifications = useMemo(
-    () => notifications.filter((notification) => !notification.read_at),
-    [notifications],
-  );
-  const unreadCount = unreadNotifications.length;
+  const isDispatcherShell = useIsDispatcherShellRole(role);
+
+  useEffect(() => {
+    setRole(getAuthSession().userRole);
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -54,13 +53,19 @@ export default function NotificationsPage() {
     router.push("/");
   };
 
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await getMyNotifications({ limit: 50, offset: 0 });
-      setNotifications(sortNewestFirst(data.notifications ?? []));
+      const [listData, unreadData] = await Promise.all([
+        getMyNotifications({ limit: FULL_LIST_LIMIT, offset: 0 }),
+        getUnreadNotificationCount(),
+      ]);
+      setNotifications(
+        sortNotificationsNewestFirst(listData.notifications ?? []),
+      );
+      setUnreadCount(Number(unreadData.unreadCount ?? 0));
       dispatchNotificationsUpdated();
     } catch (err) {
       setError(
@@ -71,28 +76,30 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (isChecking) return;
     void loadNotifications();
-  }, [isChecking]);
+  }, [isChecking, loadNotifications]);
 
   const handleMarkAsRead = async (notification: NotificationItem) => {
-    if (notification.read_at || isMarkingAllRead) return;
+    if (notification.read_at) return;
 
     setMarkingReadId(notification.notification_recipient_id);
     setError(null);
 
     try {
       await markNotificationAsRead(notification.notification_recipient_id);
+      const readAt = new Date().toISOString();
       setNotifications((current) =>
         current.map((item) =>
           item.notification_recipient_id === notification.notification_recipient_id
-            ? { ...item, read_at: new Date().toISOString() }
+            ? { ...item, read_at: readAt }
             : item,
         ),
       );
+      setUnreadCount((count) => Math.max(0, count - 1));
       dispatchNotificationsUpdated();
     } catch (err) {
       setError(
@@ -105,188 +112,73 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleMarkAllAsRead = async () => {
-    if (unreadNotifications.length === 0) return;
-
-    setIsMarkingAllRead(true);
-    setError(null);
-
-    const readAt = new Date().toISOString();
-    const results = await Promise.allSettled(
-      unreadNotifications.map((notification) =>
-        markNotificationAsRead(notification.notification_recipient_id).then(
-          () => notification.notification_recipient_id,
-        ),
-      ),
-    );
-
-    const markedIds = new Set(
-      results
-        .filter((result): result is PromiseFulfilledResult<number> =>
-          result.status === "fulfilled",
-        )
-        .map((result) => result.value),
-    );
-
-    if (markedIds.size > 0) {
-      setNotifications((current) =>
-        current.map((item) =>
-          markedIds.has(item.notification_recipient_id)
-            ? { ...item, read_at: readAt }
-            : item,
-        ),
-      );
-      dispatchNotificationsUpdated();
-    }
-
-    if (markedIds.size < unreadNotifications.length) {
-      setError("Some notifications could not be marked as read. Please try again.");
-    }
-
-    setIsMarkingAllRead(false);
-  };
-
   if (isChecking) {
     return <PageLoading label="Loading notifications" />;
+  }
+
+  const pageBody = (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-hidden">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Notifications</h2>
+          <p className="mt-0.5 text-sm text-slate-600">
+            Updates related to your reports, cases and incident activity.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => void loadNotifications()}
+          disabled={isLoading}
+          isLoading={isLoading}
+        >
+          {isLoading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </header>
+
+      {error ? <ErrorAlert message={error} /> : null}
+
+      <NotificationsFeedPanel
+        className="min-h-0 flex-1"
+        title="All Notifications"
+        unreadCount={unreadCount}
+        items={notifications}
+        variant="page"
+        isLoading={isLoading}
+        error={null}
+        markingReadId={markingReadId}
+        onMarkRead={(item) => void handleMarkAsRead(item)}
+      />
+    </div>
+  );
+
+  if (isDispatcherShell) {
+    return (
+      <DashboardLayout
+        title={DISPATCHER_DASHBOARD_TITLE}
+        subtitle={DISPATCHER_DASHBOARD_SUBTITLE}
+        onLogout={handleLogout}
+        hideSidebar
+        showHealthBadge={false}
+        contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      >
+        <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
+          {pageBody}
+        </DispatcherOpsShell>
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout
       title="Notifications"
-      subtitle="Recent NIERS updates for your account"
+      subtitle="Updates related to your reports, cases and incident activity."
       onLogout={handleLogout}
+      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
     >
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <Badge tone={unreadCount > 0 ? "urgent" : "resolved"}>
-              {unreadCount} unread
-            </Badge>
-            <Badge tone="active">{notifications.length} total</Badge>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void handleMarkAllAsRead()}
-              isLoading={isMarkingAllRead}
-              disabled={unreadCount === 0 || isLoading}
-            >
-              <CheckCircle2 className="h-4 w-4" aria-hidden />
-              Mark all read
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void loadNotifications()}
-              isLoading={isLoading}
-              disabled={isMarkingAllRead}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden />
-              Refresh
-            </Button>
-          </div>
-        </div>
-
-        {error ? <ErrorAlert message={error} /> : null}
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
-                <Bell className="h-5 w-5" aria-hidden />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#002D62]">
-                  Notification Center
-                </h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  Newest notifications appear first.
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <LoadingSkeleton lines={5} /> : null}
-
-            {!isLoading && !error && notifications.length === 0 ? (
-              <EmptyState
-                title="No notifications yet"
-                description="Account updates, case changes, and incident alerts will appear here."
-                icon={<Inbox className="h-6 w-6" aria-hidden />}
-              />
-            ) : null}
-
-            {!isLoading && notifications.length > 0 ? (
-              <div className="grid gap-4">
-                {notifications.map((notification) => {
-                  const isUnread = !notification.read_at;
-
-                  return (
-                    <article
-                      key={notification.notification_recipient_id}
-                      className={`rounded-2xl border p-5 shadow-sm ${
-                        isUnread
-                          ? "border-[#006747]/25 bg-white"
-                          : "border-[#002D62]/10 bg-white/75"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={notification.notification_type}>
-                              {formatBadgeLabel(notification.notification_type)}
-                            </Badge>
-                            <Badge tone={isUnread ? "urgent" : "resolved"}>
-                              {isUnread ? "Unread" : "Read"}
-                            </Badge>
-                          </div>
-                          <h3 className="mt-3 text-lg font-semibold text-gray-900">
-                            {notification.title || "NIERS notification"}
-                          </h3>
-                          <p className="mt-2 text-sm leading-6 text-gray-700">
-                            {notification.body || "-"}
-                          </p>
-                        </div>
-                        {isUnread ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            isLoading={
-                              markingReadId ===
-                              notification.notification_recipient_id
-                            }
-                            disabled={isMarkingAllRead}
-                            onClick={() => void handleMarkAsRead(notification)}
-                            className="shrink-0"
-                          >
-                            <CheckCircle2 className="h-4 w-4" aria-hidden />
-                            Mark read
-                          </Button>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-600">
-                        <span>
-                          Received {formatBangladeshTime(notification.created_at)}
-                        </span>
-                        {notification.read_at ? (
-                          <span>
-                            Read {formatBangladeshTime(notification.read_at)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+      {pageBody}
     </DashboardLayout>
   );
 }
