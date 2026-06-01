@@ -38,6 +38,8 @@ export const ROUTE_MANIFEST = [
   { method: "GET", path: "/locations/my", validationPersona: "citizen" },
   { method: "GET", path: "/locations/search", validationPersona: "citizen" },
   { method: "GET", path: "/locations/reverse", validationPersona: "citizen" },
+  { method: "POST", path: `/locations/${U}/save`, validationPersona: "citizen" },
+  { method: "DELETE", path: `/locations/${U}/save`, validationPersona: "citizen" },
   { method: "GET", path: `/locations/${U}`, validationPersona: "citizen" },
 
   { method: "GET", path: "/notifications/my", validationPersona: "citizen" },
