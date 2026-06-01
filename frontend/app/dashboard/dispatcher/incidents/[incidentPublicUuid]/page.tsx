@@ -308,7 +308,7 @@ export default function IncidentCommandPage() {
       contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
-        <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-2 py-2 sm:py-4 lg:min-h-0 lg:flex-1 lg:gap-3 lg:overflow-hidden lg:py-2">
+        <div className="flex w-full flex-col gap-2 py-2 sm:py-4 lg:min-h-0 lg:flex-1 lg:gap-3 lg:overflow-hidden lg:py-2">
           {isLoadingDetail ? (
             <IncidentCommandSkeleton />
           ) : loadError ? (

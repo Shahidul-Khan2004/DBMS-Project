@@ -40,7 +40,7 @@ export function Gateway999Workspace() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1680px] min-h-0 flex-1 flex-col gap-2.5 pb-2 pt-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-2 lg:pt-0">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-2.5 pb-2 pt-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-2 lg:pt-0">
       {handoff ? (
         <>
           <header className="shrink-0 space-y-0.5">

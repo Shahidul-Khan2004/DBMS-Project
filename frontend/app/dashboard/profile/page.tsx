@@ -76,7 +76,7 @@ export default function ProfilePage() {
   const isDispatcherShell = isDispatcherShellRole(resolvedRole);
 
   const pageBody = (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="w-full space-y-6">
       {error && <ErrorAlert message={error} />}
 
       <Card className="shadow-md">

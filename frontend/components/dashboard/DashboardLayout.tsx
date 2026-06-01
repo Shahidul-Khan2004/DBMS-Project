@@ -54,11 +54,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   ];
 
   const showLegacySidebar = role === "citizen" && !hideSidebar;
-  const isAdminConsole =
-    pathname?.startsWith("/dashboard/admin") ?? false;
-  const shellWidthClass = isAdminConsole
-    ? "w-full"
-    : "mx-auto max-w-screen-2xl";
+  const shellWidthClass = "w-full";
 
   const accountActions = (
     <>
