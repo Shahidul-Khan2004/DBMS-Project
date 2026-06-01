@@ -146,7 +146,7 @@ export async function classifyIntakeAsServiceCase(actorPublicUuid, reportPublicU
       title,
       description: body.description ?? intake.description ?? null,
       priorityLevel: body.priorityLevel ?? "medium",
-      initialCaseStatusCode: "submitted",
+      initialCaseStatusCode: "under_review",
     },
   });
 

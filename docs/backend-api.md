@@ -1892,9 +1892,9 @@ Promotes an intake that is already on the **service case** path (`intake_status`
   "status_history": [
     {
       "id": "1",
-      "status_code": "submitted",
+      "status_code": "under_review",
       "changed_at": "2026-05-06T10:00:00.000Z",
-      "note": null,
+      "note": "Created from intake …",
       "changed_by": null
     }
   ],
@@ -1950,6 +1950,8 @@ For status history, assignments, and resolution without re-fetching the full pay
 ```
 
 **Transitions (non-terminal →):**
+
+New service cases are created in **`under_review`** (intake classification). The `submitted` transition remains for legacy rows.
 
 - `submitted` → `under_review` \| `cancelled`
 - `under_review` → `awaiting_user_response` \| `closed` \| `cancelled`
