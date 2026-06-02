@@ -14,7 +14,8 @@ const userSelect = `
     u.created_at,
     u.updated_at,
     up.full_name,
-    up.phone_number
+    up.phone_number,
+    up.secondary_phone_number
   FROM users u
   LEFT JOIN user_profiles up ON up.user_id = u.id
 `;
@@ -29,6 +30,46 @@ export async function findUserByPublicUuid(publicUuid) {
     publicUuid,
   ]);
   return result.rows[0] || null;
+}
+
+export async function findUserById(userId) {
+  const result = await query(`${userSelect} WHERE u.id = ?`, [userId]);
+  return result.rows[0] || null;
+}
+
+export async function updateUserProfile(userId, { fullName, phoneNumber, secondaryPhoneNumber }) {
+  const setClauses = [];
+  const values = [];
+
+  if (fullName !== undefined) {
+    setClauses.push("full_name = ?");
+    values.push(fullName);
+  }
+  if (phoneNumber !== undefined) {
+    setClauses.push("phone_number = ?");
+    values.push(phoneNumber);
+  }
+  if (secondaryPhoneNumber !== undefined) {
+    setClauses.push("secondary_phone_number = ?");
+    values.push(secondaryPhoneNumber); // null is allowed
+  }
+
+  if (setClauses.length === 0) {
+    throw new Error("updateUserProfile: no fields to update");
+  }
+
+  values.push(userId);
+
+  const [result] = await pool.execute(
+    `UPDATE user_profiles SET ${setClauses.join(", ")} WHERE user_id = ?`,
+    values,
+  );
+
+  if (result.affectedRows === 0) {
+    return null; // profile row missing
+  }
+
+  return findUserById(userId);
 }
 
 export async function createUser({ publicUuid, email, fullName, phoneNumber, passwordHash }) {

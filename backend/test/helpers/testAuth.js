@@ -73,6 +73,7 @@ function baseUser() {
     email: "test.user@niers.test",
     full_name: "Test User",
     phone_number: "01700000000",
+    secondary_phone_number: null,
     account_status: "active",
     is_active: true,
     created_at: new Date().toISOString(),
