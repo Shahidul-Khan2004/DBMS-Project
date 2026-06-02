@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { formatFacilityLocationSummary } from "@/lib/admin-facility-format";
 import type { FacilityLocation } from "@/types/admin-facility";
 
-const MAP_HEIGHT_CLASS = "h-[180px] w-full min-h-[160px]";
+const MAP_HEIGHT_CLASS = "h-44 w-full";
 
 const ReportedLocationMapPreview = dynamic(
   () =>
@@ -24,12 +25,16 @@ const ReportedLocationMapPreview = dynamic(
 type DisasterLocationDisplayProps = {
   location?: FacilityLocation | null;
   className?: string;
+  /** When true (default), map is hidden until user expands. */
+  compact?: boolean;
 };
 
 export function DisasterLocationDisplay({
   location,
   className = "",
+  compact = true,
 }: DisasterLocationDisplayProps) {
+  const [mapOpen, setMapOpen] = useState(false);
   const summary = formatFacilityLocationSummary(location);
   const lat = location?.latitude;
   const lng = location?.longitude;
@@ -43,20 +48,47 @@ export function DisasterLocationDisplay({
     return <p className="text-xs text-slate-500">No location recorded</p>;
   }
 
-  return (
-    <div className={`space-y-2 ${className}`}>
-      {summary ? (
-        <p className="text-xs text-slate-600">{summary}</p>
-      ) : null}
-      {hasCoords ? (
-        <div className="hidden lg:block">
+  if (!compact) {
+    return (
+      <div className={`space-y-2 ${className}`}>
+        {summary ? (
+          <p className="text-xs text-slate-600">{summary}</p>
+        ) : null}
+        {hasCoords ? (
           <ReportedLocationMapPreview
             latitude={lat}
             longitude={lng}
             heightClassName={MAP_HEIGHT_CLASS}
             className={MAP_HEIGHT_CLASS}
           />
-        </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-1 ${className}`}>
+      {summary ? (
+        <p className="text-xs text-slate-600">{summary}</p>
+      ) : null}
+      {hasCoords ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setMapOpen((open) => !open)}
+            className="text-xs font-medium text-[#002D62] hover:underline"
+          >
+            {mapOpen ? "Hide map" : "View map"}
+          </button>
+          {mapOpen ? (
+            <ReportedLocationMapPreview
+              latitude={lat}
+              longitude={lng}
+              heightClassName={MAP_HEIGHT_CLASS}
+              className={`${MAP_HEIGHT_CLASS} rounded-lg overflow-hidden`}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );

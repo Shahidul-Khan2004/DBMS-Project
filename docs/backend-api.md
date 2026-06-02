@@ -2858,6 +2858,8 @@ Optional query: `sort=distance_asc`, `nearDisasterAffectedAreaPublicUuid`, `incl
 }
 ```
 
+Each **`shelters[]`** row is a shelter activation for this disaster (from `vw_disaster_shelter_capacity`). Key fields include `shelter_activation_public_uuid`, `facility_name`, `activation_status` (`active` | `finalized`, etc.), and capacity/occupancy metrics. UIs that create relief requests (POST `.../relief-requests`) must only offer rows with `activation_status === "active"`; the API returns `409` `SHELTER_NOT_ACTIVE` otherwise.
+
 ### POST `/operations/disasters/:disasterPublicUuid/status`
 
 **Body:**
@@ -2918,9 +2920,53 @@ Optional query: `sort=distance_asc`, `nearDisasterAffectedAreaPublicUuid`, `incl
 
 **Response (201):** dashboard payload.
 
-### POST `/operations/disasters/:disasterPublicUuid/shelters` · `.../relief-hubs`
+### POST `/operations/disasters/:disasterPublicUuid/shelters`
 
-**Body:** `{ "facilityPublicUuid": "f6000001-0000-4000-8000-000000000001" }` — manual activation on the disaster.
+Manual activation of a shelter facility for the disaster.
+
+**Body:**
+
+```json
+{
+  "facilityPublicUuid": "f6000001-0000-4000-8000-000000000001",
+  "usableCapacityOverride": 500,
+  "manualOverrideNote": "Required when facility is outside affected/nearby areas"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `facilityPublicUuid` | yes | Registry facility with shelter capability |
+| `usableCapacityOverride` | no | Positive integer; overrides default usable capacity for this activation |
+| `manualOverrideNote` | conditional | Required (non-empty, max 1000) when the facility is **not** in an affected upazila or the same district as an affected upazila; otherwise omitted |
+
+**Errors:** `422` `MANUAL_ACTIVATION_NOTE_REQUIRED` if override note missing when required; `409` `SHELTER_ALREADY_ACTIVATED` if an **active** activation already exists for this facility; `422` `FACILITY_MISSING_CAPABILITY`.
+
+If a prior activation for the same facility was **deactivated** (`activation_status` `finalized`), the same POST **reactivates** that row instead of inserting a duplicate.
+
+**Response (201):** `{ "activation": { "public_uuid", "activation_status", "facility_public_uuid", … } }`.
+
+### POST `/operations/disasters/:disasterPublicUuid/relief-hubs`
+
+Manual activation of a relief hub facility for the disaster.
+
+**Body:**
+
+```json
+{
+  "facilityPublicUuid": "f6000001-0000-4000-8000-000000000005",
+  "manualOverrideNote": "Required when facility is outside affected/nearby areas"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `facilityPublicUuid` | yes | Registry facility with relief hub capability |
+| `manualOverrideNote` | conditional | Same nearby-area rule as shelter activation |
+
+**Errors:** `422` `MANUAL_ACTIVATION_NOTE_REQUIRED`; `409` `RELIEF_HUB_ALREADY_ACTIVATED` if an **active** activation already exists; `422` `FACILITY_MISSING_CAPABILITY`.
+
+Deactivated (`finalized`) hub activations are **reactivated** on a new POST for the same facility, same as shelters.
 
 **Response (201):** `{ "activation": { "public_uuid", "activation_status", "facility_public_uuid", … } }`.
 

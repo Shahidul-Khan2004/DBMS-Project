@@ -234,7 +234,8 @@ export async function postStockReceipt(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
   const receipt = await disasterService.recordStockReceipt({
-    hubActivationPublicUuid: params.hubActivationPublicUuid,
+    disasterPublicUuid: params.disasterPublicUuid,
+    reliefHubActivationPublicUuid: params.hubActivationPublicUuid,
     reliefItemCode: body.reliefItemCode,
     quantityReceived: body.quantityReceived,
     note: body.note,

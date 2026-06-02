@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { DisasterAffectedAreasTab } from "@/components/admin/disasters/detail/DisasterAffectedAreasTab";
-import { DisasterDeclarationsTab } from "@/components/admin/disasters/detail/DisasterDeclarationsTab";
 import { DisasterIncidentsTab } from "@/components/admin/disasters/detail/DisasterIncidentsTab";
 import { DisasterOverviewTab } from "@/components/admin/disasters/detail/DisasterOverviewTab";
-import { DisasterReliefDistributionsTab } from "@/components/admin/disasters/detail/DisasterReliefDistributionsTab";
-import { DisasterReliefHubsTab } from "@/components/admin/disasters/detail/DisasterReliefHubsTab";
-import { DisasterReliefRequestsTab } from "@/components/admin/disasters/detail/DisasterReliefRequestsTab";
+import { DisasterReliefHubsNetworkTab } from "@/components/admin/disasters/detail/DisasterReliefHubsNetworkTab";
+import { DisasterReliefTab } from "@/components/admin/disasters/detail/DisasterReliefTab";
 import { DisasterResponsibilitiesTab } from "@/components/admin/disasters/detail/DisasterResponsibilitiesTab";
-import { DisasterSheltersTab } from "@/components/admin/disasters/detail/DisasterSheltersTab";
+import { DisasterShelterNetworkTab } from "@/components/admin/disasters/detail/DisasterShelterNetworkTab";
 import { DisasterStatusActionDialog } from "@/components/admin/disasters/detail/DisasterStatusActionDialog";
+import { DisasterSupportFacilitiesTab } from "@/components/admin/disasters/detail/DisasterSupportFacilitiesTab";
+import { DisasterTimelineTab } from "@/components/admin/disasters/detail/DisasterTimelineTab";
 import { DeclarationAmendmentModal } from "@/components/admin/disasters/detail/DeclarationAmendmentModal";
 import {
   DISASTER_DETAIL_TABS,
@@ -23,7 +23,10 @@ import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { nationalDisasterLandingPath } from "@/lib/admin-national-disaster-routes";
 import {
+  formatDisasterEventTypeLabel,
+  formatDisasterSeverityLabel,
   formatDisasterStatusLabel,
   getAvailableLifecycleActions,
   hasInitialDeclaration,
@@ -61,10 +64,10 @@ export function DisasterDetailWorkspace({
     return (
       <div className="space-y-4">
         <Link
-          href="/dashboard/admin/disasters"
+          href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← Natural Disasters
+          ← National Disaster Management
         </Link>
         <ErrorAlert message={error} />
       </div>
@@ -84,16 +87,16 @@ export function DisasterDetailWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden lg:overflow-hidden">
-      <div className="mb-4 shrink-0 space-y-3">
+      <div className="mb-3 shrink-0 space-y-1">
         <Link
-          href="/dashboard/admin/disasters"
+          href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← Natural Disasters
+          ← National Disaster Management
         </Link>
 
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-semibold text-slate-900">
                 {disaster.title}
@@ -105,70 +108,78 @@ export function DisasterDetailWorkspace({
                 <span className="text-xs text-slate-500">Read-only</span>
               ) : null}
             </div>
-            <p className="mt-0.5 text-sm text-slate-600">{disaster.event_code}</p>
+            <p className="mt-0.5 text-sm text-slate-600">
+              {disaster.event_code}
+              {" · "}
+              {formatDisasterEventTypeLabel(
+                disaster.event_type_code,
+                disaster.event_type_name,
+              )}
+              {disaster.severity_level
+                ? ` · ${formatDisasterSeverityLabel(disaster.severity_level)}`
+                : ""}
+            </p>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => void handleRefresh()}
-            disabled={isRefreshing}
-            aria-label="Refresh disaster dashboard"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              aria-hidden
-            />
-            Refresh
-          </Button>
-        </div>
-
-        {!isReadOnly && (lifecycleActions.length > 0 || canAmend) ? (
-          <div className="flex flex-wrap gap-2">
-            {lifecycleActions.includes("resolve") ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setLifecycleAction("resolve")}
-              >
-                Resolve disaster
-              </Button>
-            ) : null}
-            {lifecycleActions.includes("close") ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setLifecycleAction("close")}
-              >
-                Close disaster
-              </Button>
-            ) : null}
-            {lifecycleActions.includes("cancel") ? (
-              <Button
-                type="button"
-                variant="danger"
-                size="sm"
-                onClick={() => setLifecycleAction("cancel")}
-              >
-                Cancel disaster
-              </Button>
-            ) : null}
-            {canAmend ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing}
+              aria-label="Refresh disaster dashboard"
+              className="px-2 sm:px-3"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                aria-hidden
+              />
+              <span className="sr-only sm:not-sr-only sm:ml-1.5">Refresh</span>
+            </Button>
+            {!isReadOnly && canAmend ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setAmendOpen(true)}
               >
-                Amend declaration
+                Amend Declaration
+              </Button>
+            ) : null}
+            {!isReadOnly && lifecycleActions.includes("resolve") ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setLifecycleAction("resolve")}
+              >
+                Resolve
+              </Button>
+            ) : null}
+            {!isReadOnly && lifecycleActions.includes("close") ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setLifecycleAction("close")}
+              >
+                Close
+              </Button>
+            ) : null}
+            {!isReadOnly && lifecycleActions.includes("cancel") ? (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={() => setLifecycleAction("cancel")}
+              >
+                Cancel
               </Button>
             ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
 
       <div
-        className="mb-4 flex shrink-0 flex-wrap gap-2"
+        className="mb-3 flex shrink-0 flex-wrap gap-2"
         role="tablist"
         aria-label="Disaster dashboard sections"
       >
@@ -193,13 +204,15 @@ export function DisasterDetailWorkspace({
         })}
       </div>
 
-      <div
-        className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:overflow-y-auto lg:overscroll-y-contain"
-        role="tabpanel"
-      >
-        {activeTab === "overview" ? (
-          <DisasterOverviewTab dashboard={dashboard} />
-        ) : null}
+      {activeTab === "overview" ? (
+        <DisasterOverviewTab dashboard={dashboard} />
+      ) : null}
+
+      {activeTab !== "overview" ? (
+        <div
+          className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
+          role="tabpanel"
+        >
         {activeTab === "affected-areas" ? (
           <DisasterAffectedAreasTab
             disasterPublicUuid={disasterPublicUuid}
@@ -208,16 +221,34 @@ export function DisasterDetailWorkspace({
             onRefresh={handleRefresh}
           />
         ) : null}
-        {activeTab === "responsibilities" ? (
-          <DisasterResponsibilitiesTab
+        {activeTab === "shelter-network" ? (
+          <DisasterShelterNetworkTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
+            facilities={facilities}
+            facilityLocations={facilityLocations}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}
           />
         ) : null}
-        {activeTab === "declarations" ? (
-          <DisasterDeclarationsTab
+        {activeTab === "relief-hubs" ? (
+          <DisasterReliefHubsNetworkTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            facilities={facilities}
+            facilityLocations={facilityLocations}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "support-facilities" ? (
+          <DisasterSupportFacilitiesTab
+            dashboard={dashboard}
+            facilities={facilities}
+          />
+        ) : null}
+        {activeTab === "agencies" ? (
+          <DisasterResponsibilitiesTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
             isReadOnly={isReadOnly}
@@ -232,43 +263,24 @@ export function DisasterDetailWorkspace({
             onRefresh={handleRefresh}
           />
         ) : null}
-        {activeTab === "shelters" ? (
-          <DisasterSheltersTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            facilities={facilities}
-            facilityLocations={facilityLocations}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "relief-hubs" ? (
-          <DisasterReliefHubsTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            facilities={facilities}
-            facilityLocations={facilityLocations}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "relief-requests" ? (
-          <DisasterReliefRequestsTab
+        {activeTab === "relief" ? (
+          <DisasterReliefTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}
           />
         ) : null}
-        {activeTab === "relief-distributions" ? (
-          <DisasterReliefDistributionsTab
+        {activeTab === "timeline" ? (
+          <DisasterTimelineTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}
           />
         ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {lifecycleAction ? (
         <DisasterStatusActionDialog

@@ -7,6 +7,7 @@ import {
   formatFacilityTypeLabel,
 } from "@/lib/admin-facility-format";
 import {
+  filterFacilitiesByAllowList,
   filterFacilitiesForSearch,
   isFacilityInAffectedArea,
   isReliefHubEligibleFacility,
@@ -21,7 +22,18 @@ type DisasterFacilityPickerProps = {
   selectedFacilityPublicUuid: string;
   onSelect: (facilityPublicUuid: string) => void;
   disabled?: boolean;
+  /** Deactivated-only panel: search within allow-list, no in-area preferred list. */
+  overrideOnly?: boolean;
+  /** When set, only these facility public UUIDs appear in the list. */
+  allowedFacilityPublicUuids?: ReadonlySet<string>;
 };
+
+function applyAllowList(
+  facilities: AdminFacilityListItem[],
+  allowedFacilityPublicUuids?: ReadonlySet<string>,
+) {
+  return filterFacilitiesByAllowList(facilities, allowedFacilityPublicUuids);
+}
 
 export function DisasterFacilityPicker({
   mode,
@@ -30,44 +42,74 @@ export function DisasterFacilityPicker({
   selectedFacilityPublicUuid,
   onSelect,
   disabled = false,
+  overrideOnly = false,
+  allowedFacilityPublicUuids,
 }: DisasterFacilityPickerProps) {
   const [query, setQuery] = useState("");
   const eligibilityFn =
     mode === "shelter" ? isShelterEligibleFacility : isReliefHubEligibleFacility;
+  const reactivateOnly = overrideOnly && allowedFacilityPublicUuids != null;
 
   const preferredFacilities = useMemo(
     () =>
-      facilities.filter(
-        (facility) =>
-          facility.isActive &&
-          eligibilityFn(facility) &&
-          isFacilityInAffectedArea(facility, affectedAdminAreaIds),
+      applyAllowList(
+        facilities.filter(
+          (facility) =>
+            facility.isActive &&
+            eligibilityFn(facility) &&
+            isFacilityInAffectedArea(facility, affectedAdminAreaIds),
+        ),
+        allowedFacilityPublicUuids,
       ),
-    [facilities, affectedAdminAreaIds, eligibilityFn],
+    [facilities, affectedAdminAreaIds, eligibilityFn, allowedFacilityPublicUuids],
   );
 
   const searchResults = useMemo(
-    () => filterFacilitiesForSearch(facilities, query, eligibilityFn),
-    [facilities, query, eligibilityFn],
+    () =>
+      applyAllowList(
+        filterFacilitiesForSearch(facilities, query, eligibilityFn),
+        allowedFacilityPublicUuids,
+      ),
+    [facilities, query, eligibilityFn, allowedFacilityPublicUuids],
   );
 
   const isSearchMode = query.trim().length > 0;
-  const displayedFacilities = isSearchMode ? searchResults : preferredFacilities;
+  const displayedFacilities = overrideOnly
+    ? searchResults
+    : isSearchMode
+      ? searchResults
+      : preferredFacilities;
+
+  const facilityKind = mode === "shelter" ? "shelter" : "relief hub";
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500">
-        {mode === "shelter"
-          ? "Showing shelter facilities inside the affected areas first. Use search for manual override."
-          : "Showing relief facilities inside the affected areas first. Use search for manual override."}
-      </p>
+      {!overrideOnly ? (
+        <p className="text-xs text-slate-500">
+          {mode === "shelter"
+            ? "Showing shelter facilities inside the affected areas first. Use search for manual override."
+            : "Showing relief facilities inside the affected areas first. Use search for manual override."}
+        </p>
+      ) : reactivateOnly ? (
+        <p className="text-xs text-slate-500">
+          Select a deactivated {facilityKind} to restore it to the active list. Search filters
+          within deactivated facilities only.
+        </p>
+      ) : (
+        <p className="text-xs text-slate-500">
+          Search eligible facilities by name, code, type, or area. Results outside
+          affected areas can still be activated.
+        </p>
+      )}
       <label
         htmlFor={mode === "shelter" ? "shelter-facility-search" : "hub-facility-search"}
         className="text-xs font-medium text-slate-700"
       >
-        {mode === "shelter"
-          ? "Search all shelter facilities"
-          : "Search all relief hub facilities"}
+        {reactivateOnly
+          ? `Search deactivated ${facilityKind}s`
+          : mode === "shelter"
+            ? "Search all shelter facilities"
+            : "Search all relief hub facilities"}
       </label>
       <input
         id={mode === "shelter" ? "shelter-facility-search" : "hub-facility-search"}
@@ -81,7 +123,19 @@ export function DisasterFacilityPicker({
 
       <ul className="max-h-56 space-y-1 overflow-y-auto overscroll-y-contain rounded-lg border border-slate-200 p-1">
         {displayedFacilities.length === 0 ? (
-          isSearchMode ? (
+          reactivateOnly ? (
+            <li className="px-2 py-2 text-sm text-slate-600">
+              {isSearchMode
+                ? `No deactivated ${facilityKind}s match your search.`
+                : `No deactivated ${facilityKind}s for this disaster.`}
+            </li>
+          ) : overrideOnly ? (
+            <li className="px-2 py-2 text-sm text-slate-600">
+              {isSearchMode
+                ? "No eligible facilities match your search."
+                : "Type to search eligible facilities for manual override."}
+            </li>
+          ) : isSearchMode ? (
             <li className="px-2 py-2 text-sm text-slate-600">
               No eligible facilities match your search.
             </li>
@@ -112,17 +166,19 @@ export function DisasterFacilityPicker({
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-medium">{facility.name}</span>
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                        selected
-                          ? "bg-white/20 text-white"
-                          : isInArea
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {isInArea ? "Affected area match" : "Outside affected area"}
-                    </span>
+                    {!reactivateOnly ? (
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                          selected
+                            ? "bg-white/20 text-white"
+                            : isInArea
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {isInArea ? "Affected area match" : "Outside affected area"}
+                      </span>
+                    ) : null}
                   </span>
                   <span className={selected ? "text-white/80" : "text-slate-500"}>
                     {facility.facilityCode} ·{" "}

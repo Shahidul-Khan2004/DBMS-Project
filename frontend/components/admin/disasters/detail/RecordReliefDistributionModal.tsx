@@ -6,6 +6,7 @@ import { FieldLabel } from "@/components/dispatcher/FieldLabel";
 import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
   ReliefLineItemsEditor,
   parseReliefLineItems,
@@ -13,7 +14,11 @@ import {
 } from "@/components/admin/disasters/detail/ReliefLineItemsEditor";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postDisasterReliefDistribution } from "@/lib/disaster-operations-api";
-import { RELIEF_ITEM_OPTIONS } from "@/lib/disaster-operations-format";
+import {
+  formatReliefRequestSelectLabel,
+  isDistributableReliefRequest,
+  RELIEF_ITEM_OPTIONS,
+} from "@/lib/disaster-operations-format";
 import type {
   DisasterReliefHubActivation,
   DisasterReliefRequest,
@@ -36,8 +41,8 @@ export function RecordReliefDistributionModal({
   onClose,
   onSuccess,
 }: RecordReliefDistributionModalProps) {
-  const approvedRequests = reliefRequests.filter(
-    (r) => r.status_code === "approved" || r.status_code === "partially_fulfilled",
+  const distributableRequests = reliefRequests.filter((r) =>
+    isDistributableReliefRequest(r.status_code),
   );
   const activeHubs = reliefHubs.filter((h) => h.relief_hub_public_uuid);
 
@@ -52,9 +57,8 @@ export function RecordReliefDistributionModal({
 
   useEffect(() => {
     if (!open) return;
-    const firstRequest = reliefRequests.find(
-      (r) =>
-        r.status_code === "approved" || r.status_code === "partially_fulfilled",
+    const firstRequest = reliefRequests.find((r) =>
+      isDistributableReliefRequest(r.status_code),
     );
     const firstHub = reliefHubs.find((h) => h.relief_hub_public_uuid);
     setRequestUuid(firstRequest?.relief_request_public_uuid ?? "");
@@ -106,7 +110,7 @@ export function RecordReliefDistributionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <ModalPortal open={open}>
       <form
         onSubmit={(e) => void handleSubmit(e)}
         className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
@@ -126,15 +130,15 @@ export function RecordReliefDistributionModal({
               className={triageFieldClassName}
               disabled={isSubmitting}
             >
-              {approvedRequests.length === 0 ? (
-                <option value="">No approved requests</option>
+              {distributableRequests.length === 0 ? (
+                <option value="">No open relief requests</option>
               ) : (
-                approvedRequests.map((r) => (
+                distributableRequests.map((r) => (
                   <option
                     key={r.relief_request_public_uuid}
                     value={r.relief_request_public_uuid}
                   >
-                    {r.request_code ?? "Request"} · {r.shelter_facility_name}
+                    {formatReliefRequestSelectLabel(r)}
                   </option>
                 ))
               )}
@@ -190,7 +194,7 @@ export function RecordReliefDistributionModal({
             isLoading={isSubmitting}
             disabled={
               isSubmitting ||
-              approvedRequests.length === 0 ||
+              distributableRequests.length === 0 ||
               activeHubs.length === 0
             }
           >
@@ -198,6 +202,6 @@ export function RecordReliefDistributionModal({
           </Button>
         </div>
       </form>
-    </div>
+    </ModalPortal>
   );
 }

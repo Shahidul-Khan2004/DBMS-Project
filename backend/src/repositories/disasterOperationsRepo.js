@@ -814,6 +814,17 @@ async function listReliefHubsForDashboard(conn, disasterEventId, geoSort = null)
   return rows.map((row) => mapRowWithOptionalDistance({ ...row }, row, geoSort));
 }
 
+function mapReliefShortageForDashboard(row) {
+  const quantityShort = Number(row.shortage_quantity ?? row.quantity_short ?? 0);
+  return {
+    relief_request_id: row.relief_request_id,
+    relief_item_code: row.item_code ?? row.relief_item_code ?? null,
+    quantity_requested: row.quantity_requested,
+    quantity_delivered: row.total_delivered ?? row.quantity_delivered,
+    quantity_short: quantityShort,
+  };
+}
+
 export async function getDisasterDashboard(publicUuid, options = {}) {
   const conn = await pool.getConnection();
   try {
@@ -997,7 +1008,10 @@ export async function getDisasterDashboard(publicUuid, options = {}) {
       inventory_by_hub: inventory,
       relief_requests: reliefRequests.map((rr) => ({
         ...rr,
-        shortages: shortages.filter((s) => s.relief_request_id === rr.relief_request_id),
+        shortages: shortages
+          .filter((s) => s.relief_request_id === rr.relief_request_id)
+          .map(mapReliefShortageForDashboard)
+          .filter((s) => s.quantity_short > 0),
       })),
       recent_audit_logs: auditLogs,
     };
@@ -1530,9 +1544,11 @@ export async function manualActivateShelter(params) {
     await assertFacilityHasCapability(conn, facility.id, SHELTER_CAPABILITY);
 
     const nearby = await isFacilityNearby(conn, disaster.id, facility.id);
+    const overrideNote = nearby
+      ? null
+      : (params.manualOverrideNote ?? params.manual_override_note);
     if (!nearby) {
-      const note = params.manualOverrideNote ?? params.manual_override_note;
-      if (!note || !String(note).trim()) {
+      if (!overrideNote || !String(overrideNote).trim()) {
         throw new BackendError(
           422,
           "MANUAL_ACTIVATION_NOTE_REQUIRED",
@@ -1541,48 +1557,92 @@ export async function manualActivateShelter(params) {
       }
     }
 
-    const shelterUuid = randomUUID();
-    let insertId;
-    try {
-      const [result] = await conn.execute(
-        `
-          INSERT INTO shelter_activations (
-            public_uuid,
-            disaster_event_id,
-            facility_id,
-            activated_by_user_id,
-            activation_source,
-            manual_override_note,
-            usable_capacity_override
-          )
-          VALUES (?, ?, ?, ?, 'manual', ?, ?)
-        `,
-        [
-          shelterUuid,
-          disaster.id,
-          facility.id,
-          params.actorUserId,
-          nearby ? null : (params.manualOverrideNote ?? params.manual_override_note),
-          params.usableCapacityOverride ?? params.usable_capacity_override ?? null,
-        ],
-      );
-      insertId = result.insertId;
-    } catch (err) {
-      if (err.code === "ER_DUP_ENTRY") {
+    const usableCapacityOverride =
+      params.usableCapacityOverride ?? params.usable_capacity_override ?? null;
+
+    const [existingRows] = await conn.execute(
+      `
+        SELECT id, activation_status
+        FROM shelter_activations
+        WHERE disaster_event_id = ? AND facility_id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [disaster.id, facility.id],
+    );
+
+    let activationId;
+    let auditAction;
+
+    if (existingRows[0]) {
+      if (existingRows[0].activation_status === "active") {
         throw new BackendError(
           409,
           "SHELTER_ALREADY_ACTIVATED",
           "Shelter is already activated for this disaster",
         );
       }
-      throw err;
+
+      activationId = existingRows[0].id;
+      auditAction = "shelter_activation.reactivated";
+      await conn.execute(
+        `
+          UPDATE shelter_activations
+          SET activation_status = 'active',
+              finalized_at = NULL,
+              activated_by_user_id = ?,
+              activation_source = 'manual',
+              manual_override_note = ?,
+              usable_capacity_override = ?,
+              activated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [params.actorUserId, overrideNote, usableCapacityOverride, activationId],
+      );
+    } else {
+      const shelterUuid = randomUUID();
+      auditAction = "shelter_activation.manual_created";
+      try {
+        const [result] = await conn.execute(
+          `
+            INSERT INTO shelter_activations (
+              public_uuid,
+              disaster_event_id,
+              facility_id,
+              activated_by_user_id,
+              activation_source,
+              manual_override_note,
+              usable_capacity_override
+            )
+            VALUES (?, ?, ?, ?, 'manual', ?, ?)
+          `,
+          [
+            shelterUuid,
+            disaster.id,
+            facility.id,
+            params.actorUserId,
+            overrideNote,
+            usableCapacityOverride,
+          ],
+        );
+        activationId = result.insertId;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          throw new BackendError(
+            409,
+            "SHELTER_ALREADY_ACTIVATED",
+            "Shelter is already activated for this disaster",
+          );
+        }
+        throw err;
+      }
     }
 
     await writeAudit(conn, {
       actorUserId: params.actorUserId,
-      action: "shelter_activation.manual_created",
+      action: auditAction,
       entityType: "shelter_activation",
-      entityId: insertId,
+      entityId: activationId,
       relatedDisasterEventId: disaster.id,
       detailsJson: { facility_public_uuid: params.facilityPublicUuid, nearby },
       auditMeta: params.auditMeta,
@@ -1592,7 +1652,7 @@ export async function manualActivateShelter(params) {
 
     const [rows] = await conn.execute(
       `SELECT * FROM vw_disaster_shelter_capacity WHERE shelter_activation_id = ?`,
-      [insertId],
+      [activationId],
     );
     return rows[0];
   } catch (error) {
@@ -1619,9 +1679,11 @@ export async function manualActivateReliefHub(params) {
     await assertFacilityHasCapability(conn, facility.id, HUB_CAPABILITY);
 
     const nearby = await isFacilityNearby(conn, disaster.id, facility.id);
+    const overrideNote = nearby
+      ? null
+      : (params.manualOverrideNote ?? params.manual_override_note);
     if (!nearby) {
-      const note = params.manualOverrideNote ?? params.manual_override_note;
-      if (!note || !String(note).trim()) {
+      if (!overrideNote || !String(overrideNote).trim()) {
         throw new BackendError(
           422,
           "MANUAL_ACTIVATION_NOTE_REQUIRED",
@@ -1630,46 +1692,80 @@ export async function manualActivateReliefHub(params) {
       }
     }
 
-    const hubUuid = randomUUID();
-    let insertId;
-    try {
-      const [result] = await conn.execute(
-        `
-          INSERT INTO relief_hub_activations (
-            public_uuid,
-            disaster_event_id,
-            facility_id,
-            activated_by_user_id,
-            activation_source,
-            manual_override_note
-          )
-          VALUES (?, ?, ?, ?, 'manual', ?)
-        `,
-        [
-          hubUuid,
-          disaster.id,
-          facility.id,
-          params.actorUserId,
-          nearby ? null : (params.manualOverrideNote ?? params.manual_override_note),
-        ],
-      );
-      insertId = result.insertId;
-    } catch (err) {
-      if (err.code === "ER_DUP_ENTRY") {
+    const [existingRows] = await conn.execute(
+      `
+        SELECT id, activation_status
+        FROM relief_hub_activations
+        WHERE disaster_event_id = ? AND facility_id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [disaster.id, facility.id],
+    );
+
+    let activationId;
+    let auditAction;
+
+    if (existingRows[0]) {
+      if (existingRows[0].activation_status === "active") {
         throw new BackendError(
           409,
           "RELIEF_HUB_ALREADY_ACTIVATED",
           "Relief hub is already activated for this disaster",
         );
       }
-      throw err;
+
+      activationId = existingRows[0].id;
+      auditAction = "relief_hub_activation.reactivated";
+      await conn.execute(
+        `
+          UPDATE relief_hub_activations
+          SET activation_status = 'active',
+              finalized_at = NULL,
+              activated_by_user_id = ?,
+              activation_source = 'manual',
+              manual_override_note = ?,
+              activated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [params.actorUserId, overrideNote, activationId],
+      );
+    } else {
+      const hubUuid = randomUUID();
+      auditAction = "relief_hub_activation.manual_created";
+      try {
+        const [result] = await conn.execute(
+          `
+            INSERT INTO relief_hub_activations (
+              public_uuid,
+              disaster_event_id,
+              facility_id,
+              activated_by_user_id,
+              activation_source,
+              manual_override_note
+            )
+            VALUES (?, ?, ?, ?, 'manual', ?)
+          `,
+          [hubUuid, disaster.id, facility.id, params.actorUserId, overrideNote],
+        );
+        activationId = result.insertId;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          throw new BackendError(
+            409,
+            "RELIEF_HUB_ALREADY_ACTIVATED",
+            "Relief hub is already activated for this disaster",
+          );
+        }
+        throw err;
+      }
     }
 
     await writeAudit(conn, {
       actorUserId: params.actorUserId,
-      action: "relief_hub_activation.manual_created",
+      action: auditAction,
       entityType: "relief_hub_activation",
-      entityId: insertId,
+      entityId: activationId,
       relatedDisasterEventId: disaster.id,
       detailsJson: { facility_public_uuid: params.facilityPublicUuid, nearby },
       auditMeta: params.auditMeta,
@@ -1684,7 +1780,7 @@ export async function manualActivateReliefHub(params) {
         INNER JOIN facilities f ON f.id = rha.facility_id
         WHERE rha.id = ?
       `,
-      [insertId],
+      [activationId],
     );
     return rows[0];
   } catch (error) {
@@ -2231,7 +2327,12 @@ export async function recordStockReceipt(params) {
         WHERE item_code = ? AND is_active = TRUE
         LIMIT 1
       `,
-      [params.itemCode ?? params.item_code],
+      [
+        params.itemCode ??
+          params.item_code ??
+          params.reliefItemCode ??
+          params.relief_item_code,
+      ],
     );
     if (!itemRows[0]) {
       throw new BackendError(404, "RELief_ITEM_NOT_FOUND", "Relief item not found");
@@ -2272,7 +2373,11 @@ export async function recordStockReceipt(params) {
       entityId: receiptResult.insertId,
       relatedDisasterEventId: disaster.id,
       detailsJson: {
-        item_code: params.itemCode ?? params.item_code,
+        item_code:
+          params.itemCode ??
+          params.item_code ??
+          params.reliefItemCode ??
+          params.relief_item_code,
         quantity_received: qty,
       },
       auditMeta: params.auditMeta,
@@ -2295,6 +2400,12 @@ export async function recordStockReceipt(params) {
 }
 
 async function loadReliefRequest(conn, publicUuid, disasterEventId) {
+  const binds = [publicUuid];
+  let disasterFilter = "";
+  if (disasterEventId != null) {
+    disasterFilter = " AND rr.disaster_event_id = ?";
+    binds.push(disasterEventId);
+  }
   const [rows] = await conn.execute(
     `
       SELECT
@@ -2306,12 +2417,11 @@ async function loadReliefRequest(conn, publicUuid, disasterEventId) {
         rrs.status_code AS status_code
       FROM relief_requests rr
       INNER JOIN relief_request_statuses rrs ON rrs.id = rr.current_status_id
-      WHERE rr.public_uuid = ?
-        AND rr.disaster_event_id = ?
+      WHERE rr.public_uuid = ?${disasterFilter}
       LIMIT 1
       FOR UPDATE
     `,
-    [publicUuid, disasterEventId],
+    binds,
   );
   return rows[0] || null;
 }
@@ -2500,7 +2610,11 @@ export async function createReliefRequest(params) {
 
     const items = params.items ?? [];
     for (const item of items) {
-      const itemCode = item.itemCode ?? item.item_code;
+      const itemCode =
+        item.itemCode ??
+        item.item_code ??
+        item.reliefItemCode ??
+        item.relief_item_code;
       const qty = Number(item.quantityRequested ?? item.quantity_requested);
       if (!itemCode || !Number.isFinite(qty) || qty <= 0) {
         throw new BackendError(422, "INVALID_REQUEST_ITEM", "Each item requires itemCode and positive quantityRequested");
@@ -2551,12 +2665,7 @@ export async function approveReliefRequest(params) {
   try {
     await conn.beginTransaction();
 
-    const disaster = await requireDisaster(conn, params.disasterPublicUuid);
-    const request = await loadReliefRequest(
-      conn,
-      params.reliefRequestPublicUuid,
-      disaster.id,
-    );
+    const request = await loadReliefRequest(conn, params.reliefRequestPublicUuid);
     if (!request) {
       throw new BackendError(404, "RELief_REQUEST_NOT_FOUND", "Relief request not found");
     }
@@ -2581,7 +2690,7 @@ export async function approveReliefRequest(params) {
       action: "relief.request.approved",
       entityType: "relief_request",
       entityId: request.id,
-      relatedDisasterEventId: disaster.id,
+      relatedDisasterEventId: request.disaster_event_id,
       auditMeta: params.auditMeta,
     });
 
@@ -2600,12 +2709,7 @@ export async function rejectReliefRequest(params) {
   try {
     await conn.beginTransaction();
 
-    const disaster = await requireDisaster(conn, params.disasterPublicUuid);
-    const request = await loadReliefRequest(
-      conn,
-      params.reliefRequestPublicUuid,
-      disaster.id,
-    );
+    const request = await loadReliefRequest(conn, params.reliefRequestPublicUuid);
     if (!request) {
       throw new BackendError(404, "RELief_REQUEST_NOT_FOUND", "Relief request not found");
     }
@@ -2630,7 +2734,7 @@ export async function rejectReliefRequest(params) {
       action: "relief.request.rejected",
       entityType: "relief_request",
       entityId: request.id,
-      relatedDisasterEventId: disaster.id,
+      relatedDisasterEventId: request.disaster_event_id,
       auditMeta: params.auditMeta,
     });
 
@@ -2749,7 +2853,11 @@ export async function createReliefDistribution(params) {
     const items = params.items ?? [];
 
     for (const item of items) {
-      const itemCode = item.itemCode ?? item.item_code;
+      const itemCode =
+        item.itemCode ??
+        item.item_code ??
+        item.reliefItemCode ??
+        item.relief_item_code;
       const qty = Number(item.quantityDelivered ?? item.quantity_delivered);
       if (!itemCode || !Number.isFinite(qty) || qty <= 0) {
         throw new BackendError(
