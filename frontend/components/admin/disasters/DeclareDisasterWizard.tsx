@@ -35,6 +35,16 @@ const STEPS = ["Event", "Affected Areas", "Declaration"] as const;
 
 type AreaMode = "upazila" | "district";
 
+function getStepPillClasses(active: boolean, clickable: boolean) {
+  if (active) {
+    return "border border-[#002D62] bg-[#002D62] text-white";
+  }
+  if (clickable) {
+    return "border border-[#B7D4F5] bg-[#E8F2FF] text-[#002D62] hover:border-[#8DBEEF] hover:bg-[#D8EAFF]";
+  }
+  return "border border-slate-200 bg-slate-100 text-slate-500";
+}
+
 function buildAssessment(
   estimatedAffectedPeople: string,
   assessmentNote: string,
@@ -106,6 +116,22 @@ export function DeclareDisasterWizard() {
   const [legalReference, setLegalReference] = useState("");
 
   const [isComplete, setIsComplete] = useState(false);
+  const [areasCompleted, setAreasCompleted] = useState(false);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+
+  const eventCompleted = disasterPublicUuid !== null;
+
+  const invalidateAreasCompletion = useCallback(() => {
+    setAreasCompleted(false);
+    setMaxStepReached((prev) => Math.min(prev, 1));
+  }, []);
+
+  const invalidateAreasOnEventEdit = useCallback(() => {
+    if (areasCompleted) {
+      setAreasCompleted(false);
+      setMaxStepReached((prev) => Math.min(prev, 1));
+    }
+  }, [areasCompleted]);
 
   const resetWizard = useCallback(() => {
     setStep(0);
@@ -130,6 +156,8 @@ export function DeclareDisasterWizard() {
     setReason("");
     setLegalReference("");
     setIsComplete(false);
+    setAreasCompleted(false);
+    setMaxStepReached(0);
   }, []);
 
   useEffect(() => {
@@ -160,9 +188,43 @@ export function DeclareDisasterWizard() {
     return () => window.clearTimeout(timer);
   }, [areaQuery, areaMode]);
 
-  const stepLabel = useMemo(
-    () => STEPS.map((label, i) => ({ label, active: i === step, done: i < step })),
-    [step],
+  useEffect(() => {
+    if (step === 2 && !areasCompleted) {
+      setStep(1);
+    }
+  }, [step, areasCompleted]);
+
+  useEffect(() => {
+    setMaxStepReached((prev) => Math.max(prev, step));
+  }, [step]);
+
+  const stepNav = useMemo(
+    () =>
+      STEPS.map((label, index) => {
+        const active = step === index;
+        const completed =
+          index === 0
+            ? eventCompleted
+            : index === 1
+              ? areasCompleted
+              : false;
+        const clickable =
+          active ||
+          completed ||
+          (index <= maxStepReached && !(index === 2 && !areasCompleted));
+        return { label, index, active, completed, clickable };
+      }),
+    [step, eventCompleted, areasCompleted, maxStepReached],
+  );
+
+  const handleStepNavigate = useCallback(
+    (targetStep: number) => {
+      const target = stepNav[targetStep];
+      if (!target?.clickable || target.active) return;
+      setError(null);
+      setStep(targetStep);
+    },
+    [stepNav],
   );
 
   const handleCreateEvent = async (event: FormEvent) => {
@@ -189,6 +251,9 @@ export function DeclareDisasterWizard() {
       const response = await createDisaster(body);
       setDisasterPublicUuid(response.disaster.public_uuid);
       setDeclarationTitle(response.disaster.title);
+      setAreasCompleted(false);
+      setDashboard(null);
+      setMaxStepReached(1);
       setStep(1);
       toast.success("Disaster event created.");
     } catch (err) {
@@ -205,6 +270,7 @@ export function DeclareDisasterWizard() {
   };
 
   const addUpazila = (area: AdministrativeAreaSearchResult) => {
+    invalidateAreasCompletion();
     setSelectedUpazilas((prev) =>
       prev.some((a) => a.id === area.id) ? prev : [...prev, area],
     );
@@ -251,6 +317,7 @@ export function DeclareDisasterWizard() {
         body,
       );
       setDashboard(response);
+      setAreasCompleted(true);
       setStep(2);
       toast.success("Affected areas recorded.");
     } catch (err) {
@@ -361,19 +428,25 @@ export function DeclareDisasterWizard() {
         aria-label="Declaration progress"
         className="flex flex-wrap gap-2"
       >
-        {stepLabel.map(({ label, active, done }, index) => (
-          <span
+        {stepNav.map(({ label, index, active, completed, clickable }) => (
+          <button
             key={label}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              active
-                ? "bg-[#002D62] text-white"
-                : done
-                  ? "bg-[#E8F2FF] text-[#002D62]"
-                  : "bg-slate-100 text-slate-500"
-            }`}
+            type="button"
+            aria-current={active ? "step" : undefined}
+            disabled={!clickable}
+            onClick={() => handleStepNavigate(index)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${getStepPillClasses(
+              active,
+              clickable,
+            )} ${clickable ? "cursor-pointer" : "cursor-not-allowed"}`}
           >
+            {completed && !active ? (
+              <span className="mr-1 inline-block text-[10px] opacity-80" aria-hidden>
+                ✓
+              </span>
+            ) : null}
             {index + 1}. {label}
-          </span>
+          </button>
         ))}
       </nav>
 
@@ -393,7 +466,10 @@ export function DeclareDisasterWizard() {
               <select
                 id="event-type"
                 value={eventTypeCode}
-                onChange={(e) => setEventTypeCode(e.target.value)}
+                onChange={(e) => {
+                  invalidateAreasOnEventEdit();
+                  setEventTypeCode(e.target.value);
+                }}
                 className={triageFieldClassName}
                 disabled={isSubmitting}
               >
@@ -412,7 +488,10 @@ export function DeclareDisasterWizard() {
                 id="disaster-title"
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  invalidateAreasOnEventEdit();
+                  setTitle(e.target.value);
+                }}
                 className={triageFieldClassName}
                 disabled={isSubmitting}
               />
@@ -424,7 +503,10 @@ export function DeclareDisasterWizard() {
               <select
                 id="severity"
                 value={severityLevel}
-                onChange={(e) => setSeverityLevel(e.target.value)}
+                onChange={(e) => {
+                  invalidateAreasOnEventEdit();
+                  setSeverityLevel(e.target.value);
+                }}
                 className={triageFieldClassName}
                 disabled={isSubmitting}
               >
@@ -440,7 +522,10 @@ export function DeclareDisasterWizard() {
               <textarea
                 id="description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  invalidateAreasOnEventEdit();
+                  setDescription(e.target.value);
+                }}
                 className={`${triageFieldClassName} min-h-[72px] resize-y`}
                 rows={2}
                 disabled={isSubmitting}
@@ -452,7 +537,10 @@ export function DeclareDisasterWizard() {
                 id="started-at"
                 type="datetime-local"
                 value={startedAt}
-                onChange={(e) => setStartedAt(e.target.value)}
+                onChange={(e) => {
+                  invalidateAreasOnEventEdit();
+                  setStartedAt(e.target.value);
+                }}
                 className={triageFieldClassName}
                 disabled={isSubmitting}
               />
@@ -475,33 +563,49 @@ export function DeclareDisasterWizard() {
                 Area selection mode
               </legend>
               <div className="flex flex-wrap gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <label
+                  className={`flex cursor-pointer items-center gap-2 text-sm transition-colors hover:text-[#002D62] ${
+                    areaMode === "upazila"
+                      ? "font-medium text-[#002D62]"
+                      : "text-slate-600"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="area-mode"
                     checked={areaMode === "upazila"}
                     onChange={() => {
+                      invalidateAreasCompletion();
                       setAreaMode("upazila");
                       setSelectedDistrict(null);
                       setAreaQuery("");
                       setSearchResults([]);
                     }}
                     disabled={isSubmitting}
+                    className="size-3.5 accent-[#002D62]"
                   />
                   Specific Upazilas
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <label
+                  className={`flex cursor-pointer items-center gap-2 text-sm transition-colors hover:text-[#002D62] ${
+                    areaMode === "district"
+                      ? "font-medium text-[#002D62]"
+                      : "text-slate-600"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="area-mode"
                     checked={areaMode === "district"}
                     onChange={() => {
+                      invalidateAreasCompletion();
                       setAreaMode("district");
                       setSelectedUpazilas([]);
                       setAreaQuery("");
                       setSearchResults([]);
                     }}
                     disabled={isSubmitting}
+                    className="size-3.5 accent-[#002D62]"
                   />
                   Whole District
                 </label>
@@ -533,6 +637,7 @@ export function DeclareDisasterWizard() {
                         className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
                         onClick={() => {
                           if (areaMode === "district") {
+                            invalidateAreasCompletion();
                             setSelectedDistrict(area);
                             setAreaQuery("");
                             setSearchResults([]);
@@ -576,11 +681,12 @@ export function DeclareDisasterWizard() {
                       <button
                         type="button"
                         className="ml-1 text-slate-500 hover:text-red-600"
-                        onClick={() =>
+                        onClick={() => {
+                          invalidateAreasCompletion();
                           setSelectedUpazilas((prev) =>
                             prev.filter((a) => a.id !== area.id),
-                          )
-                        }
+                          );
+                        }}
                         aria-label={`Remove ${area.name}`}
                         disabled={isSubmitting}
                       >
@@ -624,7 +730,10 @@ export function DeclareDisasterWizard() {
                     type="number"
                     min={0}
                     value={estimatedAffectedPeople}
-                    onChange={(e) => setEstimatedAffectedPeople(e.target.value)}
+                    onChange={(e) => {
+                      invalidateAreasCompletion();
+                      setEstimatedAffectedPeople(e.target.value);
+                    }}
                     className={triageFieldClassName}
                     disabled={isSubmitting}
                   />
@@ -634,7 +743,10 @@ export function DeclareDisasterWizard() {
                   <select
                     id="impact-level"
                     value={impactLevel}
-                    onChange={(e) => setImpactLevel(e.target.value)}
+                    onChange={(e) => {
+                      invalidateAreasCompletion();
+                      setImpactLevel(e.target.value);
+                    }}
                     className={triageFieldClassName}
                     disabled={isSubmitting}
                   >
@@ -650,7 +762,10 @@ export function DeclareDisasterWizard() {
                   <textarea
                     id="assessment-note"
                     value={assessmentNote}
-                    onChange={(e) => setAssessmentNote(e.target.value)}
+                    onChange={(e) => {
+                      invalidateAreasCompletion();
+                      setAssessmentNote(e.target.value);
+                    }}
                     className={`${triageFieldClassName} min-h-[72px] resize-y`}
                     rows={2}
                     disabled={isSubmitting}
@@ -663,7 +778,7 @@ export function DeclareDisasterWizard() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setStep(0)}
+                onClick={() => handleStepNavigate(0)}
                 disabled={isSubmitting}
               >
                 Back
@@ -731,7 +846,7 @@ export function DeclareDisasterWizard() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setStep(1)}
+                onClick={() => handleStepNavigate(1)}
                 disabled={isSubmitting}
               >
                 Back
