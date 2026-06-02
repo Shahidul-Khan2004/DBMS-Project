@@ -41,6 +41,18 @@ export function isReliefHubEligibleFacility(facility: AdminFacilityListItem): bo
   return RELIEF_HUB_ELIGIBLE_TYPES.has(facility.facilityTypeCode);
 }
 
+export function filterFacilitiesByAllowList(
+  facilities: AdminFacilityListItem[],
+  allowedFacilityPublicUuids?: ReadonlySet<string>,
+): AdminFacilityListItem[] {
+  if (!allowedFacilityPublicUuids || allowedFacilityPublicUuids.size === 0) {
+    return facilities;
+  }
+  return facilities.filter((facility) =>
+    allowedFacilityPublicUuids.has(facility.publicUuid),
+  );
+}
+
 export function filterFacilitiesForSearch(
   facilities: AdminFacilityListItem[],
   query: string,

@@ -6,8 +6,8 @@ import {
   Eye,
   Radio,
   Shield,
-  Warehouse,
 } from "lucide-react";
+import { nationalDisasterLandingPath } from "@/lib/admin-national-disaster-routes";
 
 export type WorkflowAvailability = "available" | "coming_later";
 
@@ -75,22 +75,13 @@ export const ADMIN_WORKFLOW_AREAS: readonly AdminWorkflowArea[] = [
     primaryActionLabel: "Open Dispatcher Oversight",
   },
   {
-    id: "facilities",
-    title: "Facilities",
+    id: "national-disaster",
+    title: "National Disaster",
     description:
-      "Manage shelters, hospitals, relief hubs, warehouses, and support facilities.",
-    icon: Warehouse,
-    availability: "available",
-    href: "/dashboard/admin/facilities",
-    primaryActionLabel: "Manage Facilities",
-  },
-  {
-    id: "natural-disasters",
-    title: "Natural Disasters",
-    description: "Create, declare, and monitor disaster events.",
+      "Declare disasters, manage affected areas, facility registry, shelters, relief, and agency responsibilities.",
     icon: AlertTriangle,
     availability: "available",
-    href: "/dashboard/admin/disasters",
-    primaryActionLabel: "Open Disasters",
+    href: nationalDisasterLandingPath(),
+    primaryActionLabel: "Open National Disaster",
   },
 ];

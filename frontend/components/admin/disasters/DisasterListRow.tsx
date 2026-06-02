@@ -9,6 +9,7 @@ import {
   formatDisasterSeverityLabel,
   formatDisasterStatusLabel,
 } from "@/lib/disaster-operations-format";
+import { nationalDisasterDetailPath } from "@/lib/admin-national-disaster-routes";
 import type { DisasterListItem } from "@/types/disaster-operations";
 
 type DisasterListRowProps = {
@@ -19,7 +20,7 @@ export function DisasterListRow({ disaster }: DisasterListRowProps) {
   return (
     <li>
       <Link
-        href={`/dashboard/admin/disasters/${encodeURIComponent(disaster.public_uuid)}`}
+        href={nationalDisasterDetailPath(disaster.public_uuid)}
         className={`group flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#002D62] ${getDispatcherClickableCardRowClasses()}`}
       >
         <div className="min-w-0 flex-1">
@@ -46,7 +47,7 @@ export function DisasterListRow({ disaster }: DisasterListRowProps) {
             {formatBadgeLabel(formatDisasterStatusLabel(disaster.status_code))}
           </Badge>
           <span className="flex items-center gap-0.5 text-xs font-medium text-[#002D62]">
-            Open Dashboard
+            Open Command
             <ChevronRight
               className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
               aria-hidden

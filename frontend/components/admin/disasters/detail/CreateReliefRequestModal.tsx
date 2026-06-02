@@ -6,6 +6,7 @@ import { FieldLabel } from "@/components/dispatcher/FieldLabel";
 import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
   ReliefLineItemsEditor,
   parseReliefLineItems,
@@ -13,16 +14,13 @@ import {
 } from "@/components/admin/disasters/detail/ReliefLineItemsEditor";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postDisasterReliefRequest } from "@/lib/disaster-operations-api";
-import {
-  isActiveDisasterActivation,
-  RELIEF_ITEM_OPTIONS,
-} from "@/lib/disaster-operations-format";
+import { RELIEF_ITEM_OPTIONS } from "@/lib/disaster-operations-format";
 import type { DisasterShelterActivation } from "@/types/disaster-operations";
 
 type CreateReliefRequestModalProps = {
   open: boolean;
   disasterPublicUuid: string;
-  shelters: DisasterShelterActivation[];
+  activeShelters: DisasterShelterActivation[];
   onClose: () => void;
   onSuccess: () => Promise<void>;
 };
@@ -30,7 +28,7 @@ type CreateReliefRequestModalProps = {
 export function CreateReliefRequestModal({
   open,
   disasterPublicUuid,
-  shelters,
+  activeShelters,
   onClose,
   onSuccess,
 }: CreateReliefRequestModalProps) {
@@ -42,24 +40,13 @@ export function CreateReliefRequestModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const activeShelters = shelters.filter(
-    (s) =>
-      s.shelter_activation_public_uuid &&
-      isActiveDisasterActivation(s.activation_status),
-  );
-
   useEffect(() => {
     if (!open) return;
-    const firstActive = shelters.find(
-      (s) =>
-        s.shelter_activation_public_uuid &&
-        isActiveDisasterActivation(s.activation_status),
-    );
-    setShelterUuid(firstActive?.shelter_activation_public_uuid ?? "");
+    setShelterUuid(activeShelters[0]?.shelter_activation_public_uuid ?? "");
     setRequestNote("");
     setItems([{ reliefItemCode: RELIEF_ITEM_OPTIONS[0].value, quantity: "" }]);
     setSubmitError(null);
-  }, [open, shelters]);
+  }, [open, activeShelters]);
 
   if (!open) return null;
 
@@ -100,7 +87,7 @@ export function CreateReliefRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <ModalPortal open={open}>
       <form
         onSubmit={(e) => void handleSubmit(e)}
         className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
@@ -121,7 +108,10 @@ export function CreateReliefRequestModal({
               disabled={isSubmitting}
             >
               {activeShelters.length === 0 ? (
-                <option value="">No active shelters</option>
+                <option value="">
+                  No active shelters for this disaster. Activate shelters on the Shelter
+                  Network tab.
+                </option>
               ) : (
                 activeShelters.map((s) => (
                   <option
@@ -166,6 +156,6 @@ export function CreateReliefRequestModal({
           </Button>
         </div>
       </form>
-    </div>
+    </ModalPortal>
   );
 }

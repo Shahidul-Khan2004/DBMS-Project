@@ -1,7 +1,8 @@
+import { isNationalDisasterRoute } from "@/lib/admin-national-disaster-routes";
+
 export const ADMIN_OPS_TABS = [
   { label: "Command Center", href: "/dashboard/admin" },
   { label: "Agencies", href: "/dashboard/admin/agencies" },
-  { label: "Facilities", href: "/dashboard/admin/facilities" },
   { label: "Role Assignment", href: "/dashboard/admin/role-assignment" },
   { label: "Reports", href: "/dashboard/admin/reports" },
   {
@@ -9,6 +10,8 @@ export const ADMIN_OPS_TABS = [
     href: "/dashboard/admin/dispatcher-oversight",
   },
 ] as const;
+
+export { isNationalDisasterRoute };
 
 export function isAdminOpsTabActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/admin") {
@@ -18,6 +21,9 @@ export function isAdminOpsTabActive(pathname: string, href: string): boolean {
 }
 
 export function getAdminOpsSectionLabel(pathname: string): string {
+  if (isNationalDisasterRoute(pathname)) {
+    return "National Disaster";
+  }
   if (pathname.startsWith("/dashboard/admin/agencies")) {
     return "Agencies";
   }
@@ -29,12 +35,6 @@ export function getAdminOpsSectionLabel(pathname: string): string {
   }
   if (pathname.startsWith("/dashboard/admin/dispatcher-oversight")) {
     return "Dispatcher Oversight";
-  }
-  if (pathname.startsWith("/dashboard/admin/facilities")) {
-    return "Facilities";
-  }
-  if (pathname.startsWith("/dashboard/admin/disasters")) {
-    return "Natural Disasters";
   }
   if (pathname === "/dashboard/admin") {
     return "Command Center";

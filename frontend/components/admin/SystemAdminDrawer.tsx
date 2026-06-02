@@ -8,7 +8,10 @@ import { useSystemAdminNav } from "@/components/admin/SystemAdminNavContext";
 import {
   ADMIN_OPS_TABS,
   isAdminOpsTabActive,
+  isNationalDisasterRoute,
 } from "@/components/admin/adminOpsSection";
+import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
+import { nationalDisasterLandingPath } from "@/lib/admin-national-disaster-routes";
 
 const linkClass = (active: boolean) =>
   `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -17,9 +20,17 @@ const linkClass = (active: boolean) =>
       : "text-slate-700 hover:bg-[#EFF6FF] hover:text-[#006747]"
   }`;
 
+const nationalDisasterLinkClass = (active: boolean) =>
+  `flex w-full items-center justify-between rounded-lg border border-[#991B1B] px-3 py-2.5 text-sm font-medium shadow-sm transition-colors ${
+    active
+      ? `bg-[#B91C1C] text-white ${DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES}`
+      : "bg-[#B91C1C] text-white hover:bg-[#991B1B]"
+  }`;
+
 export function SystemAdminDrawer() {
   const pathname = usePathname();
   const { menuOpen, closeMenu } = useSystemAdminNav();
+  const isNationalDisasterActive = isNationalDisasterRoute(pathname);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -72,7 +83,7 @@ export function SystemAdminDrawer() {
         </div>
 
         <nav
-          className="flex-1 overflow-y-auto px-4 py-4"
+          className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
           aria-label="System admin"
         >
           <ul className="space-y-1">
@@ -96,6 +107,22 @@ export function SystemAdminDrawer() {
               );
             })}
           </ul>
+
+          <div className="mt-6 border-t border-[#002D62]/10 pt-6">
+            <Link
+              href={nationalDisasterLandingPath()}
+              className={nationalDisasterLinkClass(isNationalDisasterActive)}
+              onClick={closeMenu}
+              aria-current={isNationalDisasterActive ? "page" : undefined}
+            >
+              <span>National Disaster</span>
+              {isNationalDisasterActive ? (
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  Active
+                </span>
+              ) : null}
+            </Link>
+          </div>
         </nav>
       </aside>
     </div>

@@ -23,6 +23,11 @@ import {
   DISASTER_EVENT_TYPE_OPTIONS,
   DISASTER_SEVERITY_OPTIONS,
 } from "@/lib/disaster-operations-format";
+import { NationalDisasterSubnav } from "@/components/admin/national-disaster/NationalDisasterSubnav";
+import {
+  nationalDisasterDetailPath,
+  nationalDisasterLandingPath,
+} from "@/lib/admin-national-disaster-routes";
 import { searchAdministrativeAreas } from "@/lib/reference-api";
 import type {
   DisasterAssessmentInput,
@@ -388,11 +393,11 @@ export function DeclareDisasterWizard() {
             type="button"
             onClick={() =>
               router.push(
-                `/dashboard/admin/disasters/${encodeURIComponent(disasterPublicUuid)}`,
+                nationalDisasterDetailPath(disasterPublicUuid),
               )
             }
           >
-            Open Disaster Dashboard
+            Open Command
           </Button>
           <Button type="button" variant="secondary" onClick={resetWizard}>
             Declare Another Disaster
@@ -406,11 +411,12 @@ export function DeclareDisasterWizard() {
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="shrink-0">
         <Link
-          href="/dashboard/admin/disasters"
+          href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← Natural Disasters
+          ← National Disaster Management
         </Link>
+        <NationalDisasterSubnav />
         <h2 className="mt-2 text-xl font-semibold text-slate-900">
           Declare disaster
         </h2>

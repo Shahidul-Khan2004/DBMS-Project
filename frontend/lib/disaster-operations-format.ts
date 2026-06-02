@@ -1,5 +1,9 @@
 import { formatBadgeLabel } from "@/components/ui/Badge";
-import type { DisasterDetail, DisasterListItem } from "@/types/disaster-operations";
+import type {
+  DisasterDetail,
+  DisasterListItem,
+  DisasterShelterActivation,
+} from "@/types/disaster-operations";
 
 export const DISASTER_EVENT_TYPE_OPTIONS = [
   { value: "flood", label: "Flood" },
@@ -159,6 +163,20 @@ export function getAvailableLifecycleActions(
 
 export function isActiveDisasterActivation(activationStatus?: string) {
   return (activationStatus ?? "active") === "active";
+}
+
+export function getActiveDisasterShelters(shelters: DisasterShelterActivation[]) {
+  return shelters
+    .filter(
+      (s) =>
+        s.shelter_activation_public_uuid &&
+        isActiveDisasterActivation(s.activation_status),
+    )
+    .sort((a, b) => (a.facility_name ?? "").localeCompare(b.facility_name ?? ""));
+}
+
+export function isFinalizedDisasterActivation(activationStatus?: string) {
+  return activationStatus === "finalized";
 }
 
 export function getShelterActivationPublicUuid(shelter: {

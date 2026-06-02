@@ -6,6 +6,7 @@ import { FieldLabel } from "@/components/dispatcher/FieldLabel";
 import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
   ReliefLineItemsEditor,
   parseReliefLineItems,
@@ -106,7 +107,7 @@ export function RecordReliefDistributionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <ModalPortal open={open}>
       <form
         onSubmit={(e) => void handleSubmit(e)}
         className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
@@ -198,6 +199,6 @@ export function RecordReliefDistributionModal({
           </Button>
         </div>
       </form>
-    </div>
+    </ModalPortal>
   );
 }
