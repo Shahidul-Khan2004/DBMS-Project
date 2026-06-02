@@ -1,21 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
+import { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { DisasterAffectedAreasTab } from "@/components/admin/disasters/detail/DisasterAffectedAreasTab";
+import { DisasterDeclarationsTab } from "@/components/admin/disasters/detail/DisasterDeclarationsTab";
+import { DisasterIncidentsTab } from "@/components/admin/disasters/detail/DisasterIncidentsTab";
+import { DisasterOverviewTab } from "@/components/admin/disasters/detail/DisasterOverviewTab";
+import { DisasterReliefDistributionsTab } from "@/components/admin/disasters/detail/DisasterReliefDistributionsTab";
+import { DisasterReliefHubsTab } from "@/components/admin/disasters/detail/DisasterReliefHubsTab";
+import { DisasterReliefRequestsTab } from "@/components/admin/disasters/detail/DisasterReliefRequestsTab";
+import { DisasterResponsibilitiesTab } from "@/components/admin/disasters/detail/DisasterResponsibilitiesTab";
+import { DisasterSheltersTab } from "@/components/admin/disasters/detail/DisasterSheltersTab";
+import { DisasterStatusActionDialog } from "@/components/admin/disasters/detail/DisasterStatusActionDialog";
+import { DeclarationAmendmentModal } from "@/components/admin/disasters/detail/DeclarationAmendmentModal";
+import {
+  DISASTER_DETAIL_TABS,
+  type DisasterDetailTab,
+} from "@/components/admin/disasters/detail/disasterDetailTabs";
+import { useDisasterDashboard } from "@/components/admin/disasters/detail/useDisasterDashboard";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { getDisasterDashboard } from "@/lib/disaster-operations-api";
 import {
-  formatAffectedAreaLabel,
-  formatDisasterEventTypeLabel,
-  formatDisasterSeverityLabel,
   formatDisasterStatusLabel,
-  getDeclarationStatusSummary,
+  getAvailableLifecycleActions,
+  hasInitialDeclaration,
+  type DisasterLifecycleAction,
 } from "@/lib/disaster-operations-format";
-import type { DisasterDashboardResponse } from "@/types/disaster-operations";
-import { formatBangladeshTime } from "@/lib/datetime";
 
 type DisasterDetailWorkspaceProps = {
   disasterPublicUuid: string;
@@ -24,31 +37,20 @@ type DisasterDetailWorkspaceProps = {
 export function DisasterDetailWorkspace({
   disasterPublicUuid,
 }: DisasterDetailWorkspaceProps) {
-  const [dashboard, setDashboard] = useState<DisasterDashboardResponse | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    dashboard,
+    facilityLocations,
+    isLoading,
+    isRefreshing,
+    error,
+    isReadOnly,
+    refresh,
+  } = useDisasterDashboard(disasterPublicUuid);
 
-  const loadDashboard = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getDisasterDashboard(disasterPublicUuid);
-      setDashboard(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load disaster dashboard.",
-      );
-      setDashboard(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [disasterPublicUuid]);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+  const [activeTab, setActiveTab] = useState<DisasterDetailTab>("overview");
+  const [lifecycleAction, setLifecycleAction] =
+    useState<DisasterLifecycleAction | null>(null);
+  const [amendOpen, setAmendOpen] = useState(false);
 
   if (isLoading && !dashboard) {
     return <LoadingSkeleton lines={10} />;
@@ -71,228 +73,216 @@ export function DisasterDetailWorkspace({
   if (!dashboard) return null;
 
   const { disaster } = dashboard;
-  const affectedAreas = dashboard.affected_areas ?? [];
-  const declarations = dashboard.declarations ?? [];
-  const responsibilities = dashboard.responsibilities ?? [];
-  const linkedIncidents = dashboard.linked_incidents ?? [];
-  const shelters = dashboard.shelters ?? [];
-  const reliefHubs = dashboard.relief_hubs ?? [];
+  const lifecycleActions = getAvailableLifecycleActions(disaster.status_code);
+  const canAmend =
+    !isReadOnly && hasInitialDeclaration(dashboard.declarations ?? []);
+
+  const handleRefresh = async () => {
+    await refresh();
+  };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-y-auto">
-      <div className="shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden lg:overflow-hidden">
+      <div className="mb-4 shrink-0 space-y-3">
         <Link
           href="/dashboard/admin/disasters"
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
           ← Natural Disasters
         </Link>
-        <h2 className="mt-2 text-xl font-semibold text-slate-900">
-          {disaster.title}
-        </h2>
-        <p className="mt-0.5 text-sm text-slate-600">{disaster.event_code}</p>
-      </div>
 
-      <CommandSectionCard title="Summary">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <dt className="text-xs font-medium text-slate-500">Status</dt>
-            <dd className="mt-0.5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {disaster.title}
+              </h2>
               <Badge size="compact" tone="active">
                 {formatBadgeLabel(formatDisasterStatusLabel(disaster.status_code))}
               </Badge>
-            </dd>
+              {isReadOnly ? (
+                <span className="text-xs text-slate-500">Read-only</span>
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-sm text-slate-600">{disaster.event_code}</p>
           </div>
-          <div>
-            <dt className="text-xs font-medium text-slate-500">Severity</dt>
-            <dd className="mt-0.5 text-slate-900">
-              {formatDisasterSeverityLabel(disaster.severity_level)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-slate-500">Event type</dt>
-            <dd className="mt-0.5 text-slate-900">
-              {formatDisasterEventTypeLabel(
-                disaster.event_type_code,
-                disaster.event_type_name,
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-slate-500">
-              Affected areas
-            </dt>
-            <dd className="mt-0.5 text-slate-900">{affectedAreas.length}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-medium text-slate-500">Declarations</dt>
-            <dd className="mt-0.5 text-slate-900">
-              {getDeclarationStatusSummary(
-                disaster.status_code,
-                declarations.length,
-              )}
-            </dd>
-          </div>
-        </dl>
-      </CommandSectionCard>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleRefresh()}
+            disabled={isRefreshing}
+            aria-label="Refresh disaster dashboard"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            Refresh
+          </Button>
+        </div>
 
-      <CommandSectionCard
-        title="Affected Areas"
-        subtitle={`${affectedAreas.length} upazila record(s)`}
-        scrollableBody={affectedAreas.length > 6}
-        fillHeight={false}
+        {!isReadOnly && (lifecycleActions.length > 0 || canAmend) ? (
+          <div className="flex flex-wrap gap-2">
+            {lifecycleActions.includes("resolve") ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setLifecycleAction("resolve")}
+              >
+                Resolve disaster
+              </Button>
+            ) : null}
+            {lifecycleActions.includes("close") ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setLifecycleAction("close")}
+              >
+                Close disaster
+              </Button>
+            ) : null}
+            {lifecycleActions.includes("cancel") ? (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={() => setLifecycleAction("cancel")}
+              >
+                Cancel disaster
+              </Button>
+            ) : null}
+            {canAmend ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAmendOpen(true)}
+              >
+                Amend declaration
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className="mb-4 flex shrink-0 flex-wrap gap-2"
+        role="tablist"
+        aria-label="Disaster dashboard sections"
       >
-        {affectedAreas.length === 0 ? (
-          <p className="text-sm text-slate-600">No affected areas recorded.</p>
-        ) : (
-          <ul className="space-y-2">
-            {affectedAreas.map((area) => (
-              <li
-                key={area.affected_area_public_uuid}
-                className="rounded-lg border border-slate-100 px-3 py-2 text-sm"
-              >
-                <p className="font-medium text-slate-900">
-                  {formatAffectedAreaLabel(area)}
-                </p>
-                {area.impact_level ? (
-                  <p className="mt-0.5 text-xs text-slate-600">
-                    Impact: {formatBadgeLabel(area.impact_level)}
-                  </p>
-                ) : null}
-                {area.estimated_affected_people != null ? (
-                  <p className="mt-0.5 text-xs text-slate-600">
-                    Est. affected: {area.estimated_affected_people.toLocaleString()}
-                  </p>
-                ) : null}
-                {area.assessment_note ? (
-                  <p className="mt-1 text-xs text-slate-500">{area.assessment_note}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </CommandSectionCard>
+        {DISASTER_DETAIL_TABS.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-[#002D62] text-white shadow-sm"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <CommandSectionCard title="Declarations">
-        {declarations.length === 0 ? (
-          <p className="text-sm text-slate-600">No declarations on record.</p>
-        ) : (
-          <ul className="space-y-3">
-            {declarations.map((decl) => (
-              <li
-                key={decl.public_uuid}
-                className="rounded-lg border border-slate-100 px-3 py-2 text-sm"
-              >
-                <p className="font-medium text-slate-900">{decl.title}</p>
-                {decl.issued_at ? (
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Issued {formatBangladeshTime(decl.issued_at)}
-                  </p>
-                ) : null}
-                {decl.public_guidance ? (
-                  <p className="mt-2 text-xs text-slate-700">
-                    {decl.public_guidance}
-                  </p>
-                ) : null}
-                {decl.reason ? (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Reason: {decl.reason}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </CommandSectionCard>
+      <div
+        className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:overflow-y-auto lg:overscroll-y-contain"
+        role="tabpanel"
+      >
+        {activeTab === "overview" ? (
+          <DisasterOverviewTab dashboard={dashboard} />
+        ) : null}
+        {activeTab === "affected-areas" ? (
+          <DisasterAffectedAreasTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "responsibilities" ? (
+          <DisasterResponsibilitiesTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "declarations" ? (
+          <DisasterDeclarationsTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "incidents" ? (
+          <DisasterIncidentsTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "shelters" ? (
+          <DisasterSheltersTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            facilityLocations={facilityLocations}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "relief-hubs" ? (
+          <DisasterReliefHubsTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            facilityLocations={facilityLocations}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "relief-requests" ? (
+          <DisasterReliefRequestsTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+        {activeTab === "relief-distributions" ? (
+          <DisasterReliefDistributionsTab
+            disasterPublicUuid={disasterPublicUuid}
+            dashboard={dashboard}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+          />
+        ) : null}
+      </div>
 
-      {responsibilities.length > 0 ? (
-        <CommandSectionCard title="Responsibilities">
-          <ul className="space-y-2 text-sm">
-            {responsibilities.map((r) => (
-              <li
-                key={`${r.agency_public_uuid}-${r.responsibility_type}`}
-                className="rounded-lg border border-slate-100 px-3 py-2"
-              >
-                <span className="font-medium text-slate-900">
-                  {r.agency_name ?? "Agency"}
-                </span>
-                <span className="text-slate-600">
-                  {" "}
-                  · {formatBadgeLabel(r.responsibility_type)}
-                  {r.is_lead ? " (lead)" : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </CommandSectionCard>
+      {lifecycleAction ? (
+        <DisasterStatusActionDialog
+          open
+          action={lifecycleAction}
+          disasterPublicUuid={disasterPublicUuid}
+          onClose={() => setLifecycleAction(null)}
+          onSuccess={handleRefresh}
+        />
       ) : null}
 
-      {linkedIncidents.length > 0 ? (
-        <CommandSectionCard title="Linked Incidents">
-          <ul className="space-y-2 text-sm">
-            {linkedIncidents.map((inc) => (
-              <li
-                key={inc.incident_public_uuid}
-                className="rounded-lg border border-slate-100 px-3 py-2"
-              >
-                <p className="font-medium text-slate-900">
-                  {inc.title ?? "Incident"}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {inc.incident_code}
-                  {inc.incident_status
-                    ? ` · ${formatBadgeLabel(inc.incident_status)}`
-                    : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </CommandSectionCard>
-      ) : null}
-
-      {shelters.length > 0 ? (
-        <CommandSectionCard title="Shelters" subtitle="Read-only preview">
-          <ul className="space-y-2 text-sm">
-            {shelters.map((s) => (
-              <li
-                key={s.public_uuid ?? s.facility_public_uuid}
-                className="rounded-lg border border-slate-100 px-3 py-2"
-              >
-                <p className="font-medium text-slate-900">
-                  {s.facility_name ?? "Shelter facility"}
-                </p>
-                {s.activation_status ? (
-                  <p className="text-xs text-slate-600">
-                    {formatBadgeLabel(s.activation_status)}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </CommandSectionCard>
-      ) : null}
-
-      {reliefHubs.length > 0 ? (
-        <CommandSectionCard title="Relief Hubs" subtitle="Read-only preview">
-          <ul className="space-y-2 text-sm">
-            {reliefHubs.map((h) => (
-              <li
-                key={h.public_uuid ?? h.facility_public_uuid}
-                className="rounded-lg border border-slate-100 px-3 py-2"
-              >
-                <p className="font-medium text-slate-900">
-                  {h.facility_name ?? "Relief hub"}
-                </p>
-                {h.activation_status ? (
-                  <p className="text-xs text-slate-600">
-                    {formatBadgeLabel(h.activation_status)}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </CommandSectionCard>
-      ) : null}
+      <DeclarationAmendmentModal
+        open={amendOpen}
+        disasterPublicUuid={disasterPublicUuid}
+        onClose={() => setAmendOpen(false)}
+        onSuccess={handleRefresh}
+      />
     </div>
   );
 }
