@@ -10,6 +10,8 @@ import {
   postAffectedAreas,
   postApproveReliefRequest,
   postDeclarationAmendment,
+  postDeactivateReliefHub,
+  postDeactivateShelter,
   postDisaster,
   postInitialDeclaration,
   postLinkIncident,
@@ -30,6 +32,7 @@ import {
 } from "../middlewares/auth.js";
 import {
   validateAddAffectedAreas,
+  validateActivationDeactivation,
   validateAffectedAreaAssessment,
   validateAssignResponsibility,
   validateCreateDisaster,
@@ -204,6 +207,13 @@ export function createDisastersRouter({ requireAuth = defaultRequireAuth } = {})
     validateOccupancySnapshot,
     postShelterOccupancy,
   );
+  router.post(
+    "/:disasterPublicUuid/shelters/:shelterActivationPublicUuid/deactivate",
+    requirePermission("shelter.manage"),
+    validateShelterActivationParam,
+    validateActivationDeactivation,
+    postDeactivateShelter,
+  );
 
   router.post(
     "/:disasterPublicUuid/relief-hubs",
@@ -218,6 +228,13 @@ export function createDisastersRouter({ requireAuth = defaultRequireAuth } = {})
     validateHubActivationParam,
     validateStockReceipt,
     postStockReceipt,
+  );
+  router.post(
+    "/:disasterPublicUuid/relief-hubs/:hubActivationPublicUuid/deactivate",
+    requirePermission("shelter.manage"),
+    validateHubActivationParam,
+    validateActivationDeactivation,
+    postDeactivateReliefHub,
   );
 
   router.post(

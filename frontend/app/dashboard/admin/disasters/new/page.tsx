@@ -38,7 +38,7 @@ function DeclareDisasterPageContent() {
     >
       <SystemAdminShell
         fillViewport
-        className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:min-h-0 lg:py-2"
       >
         <DeclareDisasterWizard />
       </SystemAdminShell>

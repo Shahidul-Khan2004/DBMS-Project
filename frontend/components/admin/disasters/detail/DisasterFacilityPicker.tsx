@@ -1,24 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
-import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
-import { listAdminFacilities } from "@/lib/admin-facility-api";
-import { formatFacilityTypeLabel } from "@/lib/admin-facility-format";
+import {
+  formatFacilityLocationSummary,
+  formatFacilityTypeLabel,
+} from "@/lib/admin-facility-format";
+import {
+  filterFacilitiesForSearch,
+  isFacilityInAffectedArea,
+  isReliefHubEligibleFacility,
+  isShelterEligibleFacility,
+} from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
 import type { AdminFacilityListItem } from "@/types/admin-facility";
-
-const SHELTER_TYPE_CODES = new Set([
-  "shelter",
-  "school_shelter_capable",
-  "community_center",
-  "hospital",
-  "clinic",
-]);
-
-const HUB_TYPE_CODES = new Set(["warehouse", "relief_center"]);
 
 type DisasterFacilityPickerProps = {
   mode: "shelter" | "hub";
+  facilities: AdminFacilityListItem[];
+  affectedAdminAreaIds: Set<number>;
   selectedFacilityPublicUuid: string;
   onSelect: (facilityPublicUuid: string) => void;
   disabled?: boolean;
@@ -26,69 +25,79 @@ type DisasterFacilityPickerProps = {
 
 export function DisasterFacilityPicker({
   mode,
+  facilities,
+  affectedAdminAreaIds,
   selectedFacilityPublicUuid,
   onSelect,
   disabled = false,
 }: DisasterFacilityPickerProps) {
-  const [facilities, setFacilities] = useState<AdminFacilityListItem[]>([]);
   const [query, setQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const eligibilityFn =
+    mode === "shelter" ? isShelterEligibleFacility : isReliefHubEligibleFacility;
 
-  const loadFacilities = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await listAdminFacilities();
-      const allowedTypes = mode === "shelter" ? SHELTER_TYPE_CODES : HUB_TYPE_CODES;
-      setFacilities(
-        (data.facilities ?? []).filter(
-          (f) => f.isActive && allowedTypes.has(f.facilityTypeCode),
-        ),
-      );
-    } catch {
-      setFacilities([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [mode]);
+  const preferredFacilities = useMemo(
+    () =>
+      facilities.filter(
+        (facility) =>
+          facility.isActive &&
+          eligibilityFn(facility) &&
+          isFacilityInAffectedArea(facility, affectedAdminAreaIds),
+      ),
+    [facilities, affectedAdminAreaIds, eligibilityFn],
+  );
 
-  useEffect(() => {
-    void loadFacilities();
-  }, [loadFacilities]);
+  const searchResults = useMemo(
+    () => filterFacilitiesForSearch(facilities, query, eligibilityFn),
+    [facilities, query, eligibilityFn],
+  );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return facilities;
-    return facilities.filter(
-      (f) =>
-        f.name.toLowerCase().includes(q) ||
-        f.facilityCode.toLowerCase().includes(q),
-    );
-  }, [facilities, query]);
-
-  if (isLoading) {
-    return <LoadingSkeleton lines={4} />;
-  }
+  const isSearchMode = query.trim().length > 0;
+  const displayedFacilities = isSearchMode ? searchResults : preferredFacilities;
 
   return (
     <div className="space-y-2">
+      <p className="text-xs text-slate-500">
+        {mode === "shelter"
+          ? "Showing shelter facilities inside the affected areas first. Use search for manual override."
+          : "Showing relief facilities inside the affected areas first. Use search for manual override."}
+      </p>
+      <label
+        htmlFor={mode === "shelter" ? "shelter-facility-search" : "hub-facility-search"}
+        className="text-xs font-medium text-slate-700"
+      >
+        {mode === "shelter"
+          ? "Search all shelter facilities"
+          : "Search all relief hub facilities"}
+      </label>
       <input
+        id={mode === "shelter" ? "shelter-facility-search" : "hub-facility-search"}
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search facilities by name or code"
+        placeholder="Type facility name, code, type, or area"
         className={triageFieldClassName}
         disabled={disabled}
       />
-      <p className="text-xs text-slate-500">
-        Showing {mode === "shelter" ? "shelter-capable" : "warehouse/relief"}{" "}
-        facility types. Backend validates capabilities on activation.
-      </p>
-      <ul className="max-h-48 space-y-1 overflow-y-auto overscroll-y-contain rounded-lg border border-slate-200 p-1">
-        {filtered.length === 0 ? (
-          <li className="px-2 py-2 text-sm text-slate-600">No facilities found.</li>
+
+      <ul className="max-h-56 space-y-1 overflow-y-auto overscroll-y-contain rounded-lg border border-slate-200 p-1">
+        {displayedFacilities.length === 0 ? (
+          isSearchMode ? (
+            <li className="px-2 py-2 text-sm text-slate-600">
+              No eligible facilities match your search.
+            </li>
+          ) : (
+            <li className="space-y-1 px-2 py-2 text-sm text-slate-600">
+              <p>No matching facilities found inside the affected areas.</p>
+              <p className="text-xs text-slate-500">
+                Search all eligible facilities for manual override.
+              </p>
+            </li>
+          )
         ) : (
-          filtered.map((facility) => {
+          displayedFacilities.map((facility) => {
             const selected = facility.publicUuid === selectedFacilityPublicUuid;
+            const isInArea = isFacilityInAffectedArea(facility, affectedAdminAreaIds);
+            const locationSummary = formatFacilityLocationSummary(facility.location);
             return (
               <li key={facility.publicUuid}>
                 <button
@@ -101,15 +110,29 @@ export function DisasterFacilityPicker({
                       : "text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <span className="font-medium">{facility.name}</span>
-                  <span
-                    className={
-                      selected ? "text-white/80" : "text-slate-500"
-                    }
-                  >
-                    {" "}
-                    · {formatFacilityTypeLabel(facility.facilityTypeCode)}
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{facility.name}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        selected
+                          ? "bg-white/20 text-white"
+                          : isInArea
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {isInArea ? "Affected area match" : "Outside affected area"}
+                    </span>
                   </span>
+                  <span className={selected ? "text-white/80" : "text-slate-500"}>
+                    {facility.facilityCode} ·{" "}
+                    {formatFacilityTypeLabel(facility.facilityTypeCode)}
+                  </span>
+                  {locationSummary ? (
+                    <span className={selected ? "block text-white/80" : "block text-slate-500"}>
+                      {locationSummary}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             );

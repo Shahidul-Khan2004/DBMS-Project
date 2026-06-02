@@ -4,7 +4,6 @@ import { useState } from "react";
 import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { LinkIncidentModal } from "@/components/admin/disasters/detail/LinkIncidentModal";
 import { UnlinkIncidentModal } from "@/components/admin/disasters/detail/UnlinkIncidentModal";
 import type {
   DisasterDashboardResponse,
@@ -25,7 +24,6 @@ export function DisasterIncidentsTab({
   isReadOnly,
   onRefresh,
 }: DisasterIncidentsTabProps) {
-  const [linkOpen, setLinkOpen] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<DisasterLinkedIncident | null>(
     null,
   );
@@ -33,16 +31,7 @@ export function DisasterIncidentsTab({
 
   return (
     <>
-      <CommandSectionCard
-        title="Linked Incidents"
-        headerAction={
-          !isReadOnly ? (
-            <Button type="button" size="sm" onClick={() => setLinkOpen(true)}>
-              Link incident
-            </Button>
-          ) : undefined
-        }
-      >
+      <CommandSectionCard title="Linked Incidents">
         {incidents.length === 0 ? (
           <p className="text-sm text-slate-600">No incidents linked to this disaster.</p>
         ) : (
@@ -91,13 +80,6 @@ export function DisasterIncidentsTab({
           </ul>
         )}
       </CommandSectionCard>
-
-      <LinkIncidentModal
-        open={linkOpen}
-        disasterPublicUuid={disasterPublicUuid}
-        onClose={() => setLinkOpen(false)}
-        onSuccess={onRefresh}
-      />
 
       <UnlinkIncidentModal
         open={unlinkTarget != null}

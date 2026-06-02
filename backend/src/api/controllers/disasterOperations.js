@@ -217,6 +217,19 @@ export async function postShelterOccupancy(req, res) {
   res.status(201).json({ snapshot });
 }
 
+export async function postDeactivateShelter(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const activation = await disasterService.deactivateShelterActivation({
+    disasterPublicUuid: params.disasterPublicUuid,
+    shelterActivationPublicUuid: params.shelterActivationPublicUuid,
+    note: body.note,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json({ activation });
+}
+
 export async function postStockReceipt(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
@@ -229,6 +242,19 @@ export async function postStockReceipt(req, res) {
     auditMeta: audit(req),
   });
   res.status(201).json({ receipt });
+}
+
+export async function postDeactivateReliefHub(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const activation = await disasterService.deactivateReliefHubActivation({
+    disasterPublicUuid: params.disasterPublicUuid,
+    hubActivationPublicUuid: params.hubActivationPublicUuid,
+    note: body.note,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json({ activation });
 }
 
 export async function postReliefRequest(req, res) {

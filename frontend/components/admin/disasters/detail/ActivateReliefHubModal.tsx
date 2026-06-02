@@ -7,12 +7,17 @@ import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormS
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { DisasterFacilityPicker } from "@/components/admin/disasters/detail/DisasterFacilityPicker";
+import { getAffectedAdminAreaIds } from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postActivateDisasterReliefHub } from "@/lib/disaster-operations-api";
+import type { AdminFacilityListItem } from "@/types/admin-facility";
+import type { DisasterDashboardResponse } from "@/types/disaster-operations";
 
 type ActivateReliefHubModalProps = {
   open: boolean;
   disasterPublicUuid: string;
+  dashboard: DisasterDashboardResponse;
+  facilities: AdminFacilityListItem[];
   onClose: () => void;
   onSuccess: () => Promise<void>;
 };
@@ -20,6 +25,8 @@ type ActivateReliefHubModalProps = {
 export function ActivateReliefHubModal({
   open,
   disasterPublicUuid,
+  dashboard,
+  facilities,
   onClose,
   onSuccess,
 }: ActivateReliefHubModalProps) {
@@ -34,6 +41,8 @@ export function ActivateReliefHubModal({
     setManualOverrideNote("");
     setSubmitError(null);
   }, [open]);
+
+  const affectedAdminAreaIds = getAffectedAdminAreaIds(dashboard);
 
   if (!open) return null;
 
@@ -76,6 +85,8 @@ export function ActivateReliefHubModal({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <DisasterFacilityPicker
             mode="hub"
+            facilities={facilities}
+            affectedAdminAreaIds={affectedAdminAreaIds}
             selectedFacilityPublicUuid={facilityPublicUuid}
             onSelect={setFacilityPublicUuid}
             disabled={isSubmitting}
@@ -97,7 +108,11 @@ export function ActivateReliefHubModal({
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
+          <Button
+            type="submit"
+            isLoading={isSubmitting}
+            disabled={isSubmitting || !facilityPublicUuid}
+          >
             Activate
           </Button>
         </div>
