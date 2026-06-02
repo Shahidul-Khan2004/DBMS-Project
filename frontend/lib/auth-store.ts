@@ -1,7 +1,11 @@
 import type { AuthzInfo } from '@/types/auth';
 
 // Role determination from backend authz.roleCodes
-export type UserRole = 'citizen' | 'dispatcher' | 'system_admin';
+export type UserRole =
+  | 'citizen'
+  | 'dispatcher'
+  | 'system_admin'
+  | 'agency_representative';
 
 const AUTHZ_STORAGE_KEY = 'authz';
 
@@ -18,6 +22,10 @@ export function determineRole(roleCodes: string[] = []): UserRole {
 
   if (roleCodes.includes('dispatcher')) {
     return 'dispatcher';
+  }
+
+  if (roleCodes.includes('agency_representative')) {
+    return 'agency_representative';
   }
 
   return 'citizen';
@@ -120,6 +128,10 @@ export function getDashboardUrl(role: UserRole): string {
 
   if (role === 'dispatcher') {
     return '/dashboard/dispatcher';
+  }
+
+  if (role === 'agency_representative') {
+    return '/dashboard/agency';
   }
 
   return '/dashboard/citizen';
