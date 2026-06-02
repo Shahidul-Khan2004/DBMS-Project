@@ -53,6 +53,18 @@ export function filterFacilitiesByAllowList(
   );
 }
 
+export function excludeFacilitiesByPublicUuid(
+  facilities: AdminFacilityListItem[],
+  excludePublicUuids: ReadonlySet<string>,
+): AdminFacilityListItem[] {
+  if (excludePublicUuids.size === 0) {
+    return facilities;
+  }
+  return facilities.filter(
+    (facility) => !excludePublicUuids.has(facility.publicUuid),
+  );
+}
+
 export function filterFacilitiesForSearch(
   facilities: AdminFacilityListItem[],
   query: string,

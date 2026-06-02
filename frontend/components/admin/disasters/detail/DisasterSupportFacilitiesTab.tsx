@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
 import {
+  excludeFacilitiesByPublicUuid,
   getAffectedAdminAreaIds,
   isFacilityInAffectedArea,
 } from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
@@ -16,6 +17,10 @@ import {
   formatFacilityTypeLabel,
 } from "@/lib/admin-facility-format";
 import { nationalDisasterFacilityDetailPath } from "@/lib/admin-national-disaster-routes";
+import {
+  getActiveDisasterReliefHubFacilityUuids,
+  getActiveDisasterShelterFacilityUuids,
+} from "@/lib/disaster-operations-format";
 import type { AdminFacilityListItem } from "@/types/admin-facility";
 import type { DisasterDashboardResponse } from "@/types/disaster-operations";
 
@@ -33,17 +38,28 @@ export function DisasterSupportFacilitiesTab({
     [dashboard],
   );
 
+  const activatedResourceFacilityUuids = useMemo(() => {
+    const uuids = getActiveDisasterShelterFacilityUuids(dashboard.shelters);
+    for (const uuid of getActiveDisasterReliefHubFacilityUuids(dashboard.relief_hubs)) {
+      uuids.add(uuid);
+    }
+    return uuids;
+  }, [dashboard.shelters, dashboard.relief_hubs]);
+
   const supportFacilities = useMemo(
     () =>
       sortFacilitiesByName(
-        facilities.filter(
-          (f) =>
-            f.isActive &&
-            SUPPORT_FACILITY_TYPES.has(f.facilityTypeCode) &&
-            isFacilityInAffectedArea(f, affectedAdminAreaIds),
+        excludeFacilitiesByPublicUuid(
+          facilities.filter(
+            (f) =>
+              f.isActive &&
+              SUPPORT_FACILITY_TYPES.has(f.facilityTypeCode) &&
+              isFacilityInAffectedArea(f, affectedAdminAreaIds),
+          ),
+          activatedResourceFacilityUuids,
         ),
       ),
-    [facilities, affectedAdminAreaIds],
+    [facilities, affectedAdminAreaIds, activatedResourceFacilityUuids],
   );
 
   return (

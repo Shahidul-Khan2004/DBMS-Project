@@ -5,9 +5,9 @@ const RELIEF_HUB_TYPES = new Set(["relief_center", "warehouse"]);
 const HOSPITAL_SUPPORT_TYPES = new Set([
   "hospital",
   "clinic",
-  "blood_bank",
   "community_center",
 ]);
+const BLOOD_BANK_TYPES = new Set(["blood_bank"]);
 
 export type FacilityReadinessStats = {
   total: number;
@@ -61,6 +61,8 @@ export function filterFacilitiesByRegistryTab(
       return active.filter((f) => RELIEF_HUB_TYPES.has(f.facilityTypeCode));
     case "hospitals":
       return active.filter((f) => HOSPITAL_SUPPORT_TYPES.has(f.facilityTypeCode));
+    case "blood-banks":
+      return active.filter((f) => BLOOD_BANK_TYPES.has(f.facilityTypeCode));
     case "warehouses":
       return active.filter((f) => f.facilityTypeCode === "warehouse");
     default:
@@ -73,6 +75,7 @@ export type FacilityRegistryTab =
   | "shelters"
   | "relief-hubs"
   | "hospitals"
+  | "blood-banks"
   | "warehouses"
   | "inactive";
 
@@ -82,6 +85,7 @@ export const FACILITY_REGISTRY_TABS: { id: FacilityRegistryTab; label: string }[
     { id: "shelters", label: "Shelters" },
     { id: "relief-hubs", label: "Relief Hubs" },
     { id: "hospitals", label: "Hospitals" },
+    { id: "blood-banks", label: "Blood Banks" },
     { id: "warehouses", label: "Warehouses" },
     { id: "inactive", label: "Inactive" },
   ];

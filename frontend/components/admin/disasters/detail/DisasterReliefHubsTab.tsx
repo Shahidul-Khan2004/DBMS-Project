@@ -12,7 +12,8 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postDeactivateDisasterReliefHub } from "@/lib/disaster-operations-api";
 import {
-  formatReliefItemLabel,
+  formatReliefHubInventorySummary,
+  getReliefHubInventoryRowsForActivation,
   isActiveDisasterActivation,
 } from "@/lib/disaster-operations-format";
 import type {
@@ -32,6 +33,8 @@ type DisasterReliefHubsTabProps = {
   hideListActivateAction?: boolean;
   suppressActivateModal?: boolean;
   emptyMessage?: string;
+  /** Render list in parent tab panel without a nested section card. */
+  embeddedInPanel?: boolean;
 };
 
 export function DisasterReliefHubsTab({
@@ -45,6 +48,7 @@ export function DisasterReliefHubsTab({
   hideListActivateAction = false,
   suppressActivateModal = false,
   emptyMessage,
+  embeddedInPanel = false,
 }: DisasterReliefHubsTabProps) {
   const [activateOpen, setActivateOpen] = useState(false);
   const [stockHub, setStockHub] = useState<DisasterReliefHubActivation | null>(null);
@@ -58,7 +62,7 @@ export function DisasterReliefHubsTab({
 
   const resolvedEmptyMessage =
     emptyMessage ??
-    "No active relief hubs. Reactivate a deactivated hub above, or use Activate relief hubs to add one.";
+    "No active relief hubs. Reactivate a deactivated hub below, or use Activate relief hubs to add one.";
 
   const handleDeactivateHub = async () => {
     if (!deactivateHub?.relief_hub_public_uuid) return;
@@ -86,7 +90,8 @@ export function DisasterReliefHubsTab({
     const location = h.facility_public_uuid
       ? facilityLocations.get(h.facility_public_uuid)
       : undefined;
-    const hubInventory = inventory.filter((row) => row.facility_name === h.facility_name);
+    const hubInventory = getReliefHubInventoryRowsForActivation(inventory, h);
+    const inventorySummary = formatReliefHubInventorySummary(hubInventory);
 
     return (
       <li
@@ -101,15 +106,8 @@ export function DisasterReliefHubsTab({
                 {formatBadgeLabel(h.activation_status)}
               </p>
             ) : null}
-            {hubInventory.length > 0 ? (
-              <p className="text-xs text-slate-600">
-                {hubInventory
-                  .map(
-                    (row) =>
-                      `${formatReliefItemLabel(row.item_code)}: ${row.quantity_on_hand?.toLocaleString() ?? "—"}`,
-                  )
-                  .join(" · ")}
-              </p>
+            {inventorySummary ? (
+              <p className="text-xs text-slate-600">{inventorySummary}</p>
             ) : null}
             <DisasterLocationDisplay location={location} className="mt-1" compact />
           </div>
@@ -138,26 +136,37 @@ export function DisasterReliefHubsTab({
     );
   };
 
+  const activateAction =
+    !isReadOnly && !hideListActivateAction ? (
+      <Button type="button" size="sm" onClick={() => setActivateOpen(true)}>
+        Activate relief hubs
+      </Button>
+    ) : null;
+
+  const listBody =
+    activeHubs.length === 0 ? (
+      <p className="text-sm text-slate-600">{resolvedEmptyMessage}</p>
+    ) : (
+      <ul className="space-y-2 text-sm">
+        {activeHubs.map((h) => renderHubRow(h))}
+      </ul>
+    );
+
   return (
     <>
-      <CommandSectionCard
-        title={sectionTitle}
-        headerAction={
-          !isReadOnly && !hideListActivateAction ? (
-            <Button type="button" size="sm" onClick={() => setActivateOpen(true)}>
-              Activate relief hubs
-            </Button>
-          ) : undefined
-        }
-      >
-        {activeHubs.length === 0 ? (
-          <p className="text-sm text-slate-600">{resolvedEmptyMessage}</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {activeHubs.map((h) => renderHubRow(h))}
-          </ul>
-        )}
-      </CommandSectionCard>
+      {embeddedInPanel ? (
+        <div className="min-h-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-900">{sectionTitle}</h3>
+            {activateAction ? <div className="shrink-0">{activateAction}</div> : null}
+          </div>
+          <div className="mt-3">{listBody}</div>
+        </div>
+      ) : (
+        <CommandSectionCard title={sectionTitle} headerAction={activateAction}>
+          {listBody}
+        </CommandSectionCard>
+      )}
 
       {!suppressActivateModal ? (
         <DisasterActivateFacilityDialog

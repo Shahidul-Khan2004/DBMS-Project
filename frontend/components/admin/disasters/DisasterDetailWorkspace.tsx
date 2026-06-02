@@ -204,13 +204,15 @@ export function DisasterDetailWorkspace({
         })}
       </div>
 
-      <div
-        className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
-        role="tabpanel"
-      >
-        {activeTab === "overview" ? (
-          <DisasterOverviewTab dashboard={dashboard} />
-        ) : null}
+      {activeTab === "overview" ? (
+        <DisasterOverviewTab dashboard={dashboard} />
+      ) : null}
+
+      {activeTab !== "overview" ? (
+        <div
+          className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
+          role="tabpanel"
+        >
         {activeTab === "affected-areas" ? (
           <DisasterAffectedAreasTab
             disasterPublicUuid={disasterPublicUuid}
@@ -277,7 +279,8 @@ export function DisasterDetailWorkspace({
             onRefresh={handleRefresh}
           />
         ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {lifecycleAction ? (
         <DisasterStatusActionDialog

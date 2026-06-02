@@ -3,17 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivateShelterModal } from "@/components/admin/disasters/detail/ActivateShelterModal";
 import { DisasterManualOverridePanel } from "@/components/admin/disasters/detail/DisasterManualOverridePanel";
-import { DisasterPotentialFacilitiesPanel } from "@/components/admin/disasters/detail/DisasterPotentialFacilitiesPanel";
 import { DisasterSheltersTab } from "@/components/admin/disasters/detail/DisasterSheltersTab";
-import {
-  activateDisasterShelter,
-} from "@/components/admin/disasters/detail/disasterFacilityActivation";
-import {
-  getAffectedAdminAreaIds,
-  isFacilityInAffectedArea,
-  isShelterEligibleFacility,
-} from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
-import { sortFacilitiesByName } from "@/components/admin/disasters/detail/disasterResourceHelpers";
+import { getAffectedAdminAreaIds } from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
 import { isFinalizedDisasterActivation } from "@/lib/disaster-operations-format";
 import type { AdminFacilityListItem, FacilityLocation } from "@/types/admin-facility";
 import type { DisasterDashboardResponse } from "@/types/disaster-operations";
@@ -47,7 +38,6 @@ export function DisasterShelterNetworkTab({
   const [overrideModalOpen, setOverrideModalOpen] = useState(false);
   const [overrideFacilityUuid, setOverrideFacilityUuid] = useState("");
   const [overrideShelterUuid, setOverrideShelterUuid] = useState("");
-  const [activatingFacilityUuid, setActivatingFacilityUuid] = useState<string | null>(null);
 
   const affectedAdminAreaIds = useMemo(
     () => getAffectedAdminAreaIds(dashboard),
@@ -57,18 +47,6 @@ export function DisasterShelterNetworkTab({
   const activeFacilities = useMemo(
     () => facilities.filter((f) => f.isActive),
     [facilities],
-  );
-
-  const potentialShelters = useMemo(
-    () =>
-      sortFacilitiesByName(
-        activeFacilities.filter(
-          (f) =>
-            isShelterEligibleFacility(f) &&
-            isFacilityInAffectedArea(f, affectedAdminAreaIds),
-        ),
-      ),
-    [activeFacilities, affectedAdminAreaIds],
   );
 
   const deactivatedShelterFacilityUuids = useMemo(() => {
@@ -94,54 +72,17 @@ export function DisasterShelterNetworkTab({
     setOverrideFacilityUuid("");
   }, []);
 
-  const activateInAreaShelter = useCallback(
-    async (facilityPublicUuid: string) => {
-      const facility = activeFacilities.find((f) => f.publicUuid === facilityPublicUuid);
-      if (!facility) return;
-      if (!isFacilityInAffectedArea(facility, affectedAdminAreaIds)) {
-        openOverrideModal(facilityPublicUuid);
-        return;
-      }
-      setActivatingFacilityUuid(facilityPublicUuid);
-      try {
-        const result = await activateDisasterShelter(disasterPublicUuid, {
-          facilityPublicUuid,
-        });
-        if (!result.ok) {
-          if (result.needsOverrideNote) {
-            openOverrideModal(facilityPublicUuid);
-            return;
-          }
-          if (result.alreadyActive) {
-            await onRefresh();
-          }
-          return;
-        }
-        await onRefresh();
-      } finally {
-        setActivatingFacilityUuid(null);
-      }
-    },
-    [
-      activeFacilities,
-      affectedAdminAreaIds,
-      disasterPublicUuid,
-      onRefresh,
-      openOverrideModal,
-    ],
-  );
-
   return (
-    <div className="grid min-h-0 gap-4 lg:grid-cols-1">
-      <DisasterPotentialFacilitiesPanel
-        title="Potential Shelters in affected areas"
-        facilities={potentialShelters}
-        emptyPrimary="No shelter facilities found inside affected areas."
-        emptySecondary="Use Deactivated shelters to reactivate, or Activate shelters to add another facility."
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <DisasterSheltersTab
+        disasterPublicUuid={disasterPublicUuid}
+        dashboard={dashboard}
+        facilities={facilities}
+        facilityLocations={facilityLocations}
         isReadOnly={isReadOnly}
-        activateLabel="Activate as Shelter"
-        onActivate={(uuid) => void activateInAreaShelter(uuid)}
-        isActivatingFacilityPublicUuid={activatingFacilityUuid}
+        onRefresh={onRefresh}
+        sectionTitle="Activated Shelters"
+        embeddedInPanel
       />
 
       <DisasterManualOverridePanel
@@ -155,16 +96,6 @@ export function DisasterShelterNetworkTab({
         onRequestOverrideModal={openOverrideModal}
         onSuccess={onRefresh}
         isReadOnly={isReadOnly}
-      />
-
-      <DisasterSheltersTab
-        disasterPublicUuid={disasterPublicUuid}
-        dashboard={dashboard}
-        facilities={facilities}
-        facilityLocations={facilityLocations}
-        isReadOnly={isReadOnly}
-        onRefresh={onRefresh}
-        sectionTitle="Activated Shelters"
       />
 
       <ActivateShelterModal

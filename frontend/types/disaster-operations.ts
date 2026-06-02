@@ -117,9 +117,11 @@ export type DisasterReliefHubActivation = {
 
 export type DisasterReliefInventoryRow = {
   relief_hub_activation_id?: number;
+  relief_hub_public_uuid?: string;
   facility_name?: string;
   item_code?: string;
-  quantity_on_hand?: number;
+  item_name?: string;
+  quantity_on_hand?: number | string;
 };
 
 export type DisasterReliefRequestShortage = {

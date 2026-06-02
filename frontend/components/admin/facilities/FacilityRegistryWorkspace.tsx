@@ -71,7 +71,7 @@ export function FacilityRegistryWorkspace() {
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:overflow-hidden">
       <AdminPageHeader
         title="Facility Registry"
-        subtitle="Manage shelters, hospitals, relief hubs, warehouses, and support facilities for disaster response. This is the permanent facility database; shelters and relief hubs activated for a specific disaster are managed from Disaster Command."
+        subtitle="Manage shelters, hospitals, blood banks, relief hubs, warehouses, and support facilities for disaster response. This is the permanent facility database; shelters and relief hubs activated for a specific disaster are managed from Disaster Command."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm text-slate-600">{resultLabel}</p>

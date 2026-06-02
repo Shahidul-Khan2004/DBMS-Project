@@ -3,15 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivateReliefHubModal } from "@/components/admin/disasters/detail/ActivateReliefHubModal";
 import { DisasterManualOverridePanel } from "@/components/admin/disasters/detail/DisasterManualOverridePanel";
-import { DisasterPotentialFacilitiesPanel } from "@/components/admin/disasters/detail/DisasterPotentialFacilitiesPanel";
 import { DisasterReliefHubsTab } from "@/components/admin/disasters/detail/DisasterReliefHubsTab";
-import { activateDisasterReliefHub } from "@/components/admin/disasters/detail/disasterFacilityActivation";
-import {
-  getAffectedAdminAreaIds,
-  isFacilityInAffectedArea,
-  isReliefHubEligibleFacility,
-} from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
-import { sortFacilitiesByName } from "@/components/admin/disasters/detail/disasterResourceHelpers";
+import { getAffectedAdminAreaIds } from "@/components/admin/disasters/detail/disasterFacilityPickerHelpers";
 import { isFinalizedDisasterActivation } from "@/lib/disaster-operations-format";
 import type { AdminFacilityListItem, FacilityLocation } from "@/types/admin-facility";
 import type { DisasterDashboardResponse } from "@/types/disaster-operations";
@@ -45,7 +38,6 @@ export function DisasterReliefHubsNetworkTab({
   const [overrideModalOpen, setOverrideModalOpen] = useState(false);
   const [overrideFacilityUuid, setOverrideFacilityUuid] = useState("");
   const [overrideHubUuid, setOverrideHubUuid] = useState("");
-  const [activatingFacilityUuid, setActivatingFacilityUuid] = useState<string | null>(null);
 
   const affectedAdminAreaIds = useMemo(
     () => getAffectedAdminAreaIds(dashboard),
@@ -55,18 +47,6 @@ export function DisasterReliefHubsNetworkTab({
   const activeFacilities = useMemo(
     () => facilities.filter((f) => f.isActive),
     [facilities],
-  );
-
-  const potentialHubs = useMemo(
-    () =>
-      sortFacilitiesByName(
-        activeFacilities.filter(
-          (f) =>
-            isReliefHubEligibleFacility(f) &&
-            isFacilityInAffectedArea(f, affectedAdminAreaIds),
-        ),
-      ),
-    [activeFacilities, affectedAdminAreaIds],
   );
 
   const deactivatedHubFacilityUuids = useMemo(() => {
@@ -92,54 +72,17 @@ export function DisasterReliefHubsNetworkTab({
     setOverrideFacilityUuid("");
   }, []);
 
-  const activateInAreaHub = useCallback(
-    async (facilityPublicUuid: string) => {
-      const facility = activeFacilities.find((f) => f.publicUuid === facilityPublicUuid);
-      if (!facility) return;
-      if (!isFacilityInAffectedArea(facility, affectedAdminAreaIds)) {
-        openOverrideModal(facilityPublicUuid);
-        return;
-      }
-      setActivatingFacilityUuid(facilityPublicUuid);
-      try {
-        const result = await activateDisasterReliefHub(disasterPublicUuid, {
-          facilityPublicUuid,
-        });
-        if (!result.ok) {
-          if (result.needsOverrideNote) {
-            openOverrideModal(facilityPublicUuid);
-            return;
-          }
-          if (result.alreadyActive) {
-            await onRefresh();
-          }
-          return;
-        }
-        await onRefresh();
-      } finally {
-        setActivatingFacilityUuid(null);
-      }
-    },
-    [
-      activeFacilities,
-      affectedAdminAreaIds,
-      disasterPublicUuid,
-      onRefresh,
-      openOverrideModal,
-    ],
-  );
-
   return (
-    <div className="grid min-h-0 gap-4 lg:grid-cols-1">
-      <DisasterPotentialFacilitiesPanel
-        title="Potential Relief Hubs in affected areas"
-        facilities={potentialHubs}
-        emptyPrimary="No relief hub facilities found inside affected areas."
-        emptySecondary="Use Deactivated relief hubs to reactivate, or Activate relief hubs to add another facility."
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <DisasterReliefHubsTab
+        disasterPublicUuid={disasterPublicUuid}
+        dashboard={dashboard}
+        facilities={facilities}
+        facilityLocations={facilityLocations}
         isReadOnly={isReadOnly}
-        activateLabel="Activate as Relief Hub"
-        onActivate={(uuid) => void activateInAreaHub(uuid)}
-        isActivatingFacilityPublicUuid={activatingFacilityUuid}
+        onRefresh={onRefresh}
+        sectionTitle="Activated Relief Hubs"
+        embeddedInPanel
       />
 
       <DisasterManualOverridePanel
@@ -153,16 +96,6 @@ export function DisasterReliefHubsNetworkTab({
         onRequestOverrideModal={openOverrideModal}
         onSuccess={onRefresh}
         isReadOnly={isReadOnly}
-      />
-
-      <DisasterReliefHubsTab
-        disasterPublicUuid={disasterPublicUuid}
-        dashboard={dashboard}
-        facilities={facilities}
-        facilityLocations={facilityLocations}
-        isReadOnly={isReadOnly}
-        onRefresh={onRefresh}
-        sectionTitle="Activated Relief Hubs"
       />
 
       <ActivateReliefHubModal

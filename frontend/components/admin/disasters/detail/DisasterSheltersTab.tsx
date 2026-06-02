@@ -27,6 +27,8 @@ type DisasterSheltersTabProps = {
   hideListActivateAction?: boolean;
   suppressActivateModal?: boolean;
   emptyMessage?: string;
+  /** Render list in parent tab panel without a nested section card. */
+  embeddedInPanel?: boolean;
 };
 
 export function DisasterSheltersTab({
@@ -40,6 +42,7 @@ export function DisasterSheltersTab({
   hideListActivateAction = false,
   suppressActivateModal = false,
   emptyMessage,
+  embeddedInPanel = false,
 }: DisasterSheltersTabProps) {
   const [activateOpen, setActivateOpen] = useState(false);
   const [managingShelter, setManagingShelter] =
@@ -54,7 +57,7 @@ export function DisasterSheltersTab({
 
   const resolvedEmptyMessage =
     emptyMessage ??
-    "No active shelters. Reactivate a deactivated shelter above, or use Activate shelters to add one.";
+    "No active shelters. Reactivate a deactivated shelter below, or use Activate shelters to add one.";
 
   const handleDeactivateShelter = async () => {
     if (!deactivateShelter?.shelter_activation_public_uuid) return;
@@ -151,26 +154,37 @@ export function DisasterSheltersTab({
     );
   };
 
+  const activateAction =
+    !isReadOnly && !hideListActivateAction ? (
+      <Button type="button" size="sm" onClick={() => setActivateOpen(true)}>
+        Activate shelters
+      </Button>
+    ) : null;
+
+  const listBody =
+    activeShelters.length === 0 ? (
+      <p className="text-sm text-slate-600">{resolvedEmptyMessage}</p>
+    ) : (
+      <ul className="space-y-2 text-sm">
+        {activeShelters.map((s) => renderShelterRow(s))}
+      </ul>
+    );
+
   return (
     <>
-      <CommandSectionCard
-        title={sectionTitle}
-        headerAction={
-          !isReadOnly && !hideListActivateAction ? (
-            <Button type="button" size="sm" onClick={() => setActivateOpen(true)}>
-              Activate shelters
-            </Button>
-          ) : undefined
-        }
-      >
-        {activeShelters.length === 0 ? (
-          <p className="text-sm text-slate-600">{resolvedEmptyMessage}</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {activeShelters.map((s) => renderShelterRow(s))}
-          </ul>
-        )}
-      </CommandSectionCard>
+      {embeddedInPanel ? (
+        <div className="min-h-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-900">{sectionTitle}</h3>
+            {activateAction ? <div className="shrink-0">{activateAction}</div> : null}
+          </div>
+          <div className="mt-3">{listBody}</div>
+        </div>
+      ) : (
+        <CommandSectionCard title={sectionTitle} headerAction={activateAction}>
+          {listBody}
+        </CommandSectionCard>
+      )}
 
       {!suppressActivateModal ? (
         <DisasterActivateFacilityDialog
