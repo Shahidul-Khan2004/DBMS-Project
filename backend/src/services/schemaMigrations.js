@@ -297,9 +297,8 @@ export async function ensureIntakeStatusUnlinkTransition() {
       [linkedToIncidentId, underReviewId],
     );
   }
-
-  console.log("Applied schema migration: intake status unlink transition");
 }
+/**
  * Databases initialized before incident status `reported` was removed from seed
  * (21_seed_reference_data.sql) may still have reference data and incidents on
  * `reported`. Re-home those incidents to `classified` via status history (trigger
