@@ -309,11 +309,7 @@ export default function IncidentCommandPage() {
           ) : detail ? (
             <div className="flex min-h-0 flex-1 flex-col gap-2 lg:gap-3 lg:overflow-hidden">
               <IncidentCommandHeader
-                detail={detail}
-                canEditLocation={canEditLocation}
                 isTerminalIncident={isTerminalIncident(detail.status)}
-                onOpenDetails={() => setDetailsDrawerOpen(true)}
-                onEditLocation={handleEditLocation}
                 onResolve={() => setResolveDialogOpen(true)}
                 onClose={() => setCloseDialogOpen(true)}
                 onCancel={() => setCancelDialogOpen(true)}
@@ -322,6 +318,9 @@ export default function IncidentCommandPage() {
                 detail={detail}
                 incidentPublicUuid={incidentPublicUuid}
                 opsMutationGeneration={opsMutationGeneration}
+                canEditLocation={canEditLocation}
+                onOpenDetails={() => setDetailsDrawerOpen(true)}
+                onEditLocation={handleEditLocation}
                 onAssignAgency={() => setAssignAgencyOpen(true)}
                 onDispatchUnit={() => setDispatchUnitOpen(true)}
                 onDispatchStatusAction={(dispatch, targetStatus) =>
