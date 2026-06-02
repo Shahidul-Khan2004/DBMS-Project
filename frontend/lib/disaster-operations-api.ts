@@ -10,9 +10,10 @@ import type {
 
 export async function listDisasters(): Promise<DisasterListResponse> {
   const data = await apiGet<DisasterListResponse>("/operations/disasters");
+  const disasters = data.disasters;
   return {
     ...data,
-    disasters: data.disasters ?? [],
+    disasters: Array.isArray(disasters) ? disasters : [],
   };
 }
 

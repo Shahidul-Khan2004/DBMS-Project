@@ -22,12 +22,12 @@ export async function postDisaster(req, res) {
 
 export async function getDisasters(req, res) {
   const query = req.validated?.query ?? req.query;
-  const disasters = await disasterService.listDisasters({
+  const result = await disasterService.listDisasters({
     statusCode: query.statusCode,
     limit: query.limit,
     offset: query.offset,
   });
-  res.status(200).json({ disasters });
+  res.status(200).json(result);
 }
 
 export async function getDisaster(req, res) {
