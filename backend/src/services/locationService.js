@@ -1,10 +1,7 @@
 import pool from "../config/db.js";
 import { requireAdministrativeAreaInTransaction } from "../domain/locationAccess.js";
-import {
-  getLocationRowByPublicUuid,
-  insertLocationInTransaction,
-  listLocationRowsByCreatorUserId,
-} from "../repositories/locationRepo.js";
+import { getLocationRowByPublicUuid, insertLocationInTransaction } from "../repositories/locationRepo.js";
+import { findActiveSavedLocationRow } from "../repositories/savedLocationRepo.js";
 import { resolveAdminAreaIdForLocationPayload } from "./adminAreaFromGpsService.js";
 import { deriveAddressAndSourceForLocation } from "./locationAddressService.js";
 import { distanceKmFromRow } from "../lib/geoDistance.js";
@@ -37,14 +34,27 @@ export function mapRowToLocationResponse(row, resolutionMeta = null) {
   return base;
 }
 
-function canAccessLocation(actorUserId, actorPermissions, locationRow) {
+function isOperator(actorPermissions) {
+  return (
+    actorPermissions.includes("incident.classify") ||
+    actorPermissions.includes("incident.create")
+  );
+}
+
+async function canAccessLocation(conn, actorUserId, actorPermissions, locationRow) {
   const isOwner =
     locationRow.created_by_user_id != null &&
     Number(locationRow.created_by_user_id) === Number(actorUserId);
-  const isOperator =
-    actorPermissions.includes("incident.classify") ||
-    actorPermissions.includes("incident.create");
-  return isOwner || isOperator;
+  if (isOwner || isOperator(actorPermissions)) {
+    return true;
+  }
+
+  if (actorUserId == null) {
+    return false;
+  }
+
+  const savedRow = await findActiveSavedLocationRow(conn, actorUserId, locationRow.id);
+  return Boolean(savedRow);
 }
 
 /**
@@ -121,7 +131,7 @@ export async function getLocationForActor(publicUuid, actorUserId, actorPermissi
   try {
     const row = await getLocationRowByPublicUuid(conn, publicUuid);
     if (!row) return null;
-    if (!canAccessLocation(actorUserId, actorPermissions, row)) return null;
+    if (!(await canAccessLocation(conn, actorUserId, actorPermissions, row))) return null;
     return mapRowToLocationResponse(row);
   } finally {
     conn.release();

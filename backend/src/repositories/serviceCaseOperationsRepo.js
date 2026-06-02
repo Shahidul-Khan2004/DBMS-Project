@@ -1207,7 +1207,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
     }
 
     const [linkDup] = await conn.execute(
-      `SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1`,
+      `SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1`,
       [intakeRow.id],
     );
     if (linkDup[0]) {

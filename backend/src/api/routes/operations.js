@@ -12,6 +12,7 @@ import {
   patchOperationsIncidentStatus,
   postGateway999IntakeAndIncident,
   postLinkIntakeReportToIncident,
+  deleteOperationsIncidentIntakeReportLink,
   postOperationsIncidentNote,
   promoteIntakeToEmergency,
 } from "../controllers/operationsIncidents.js";
@@ -28,6 +29,7 @@ import {
   validateOperationsListIncidentsQuery,
   validateOperationsListIncidentNotesQuery,
   validateOperationsLinkIntakeToIncident,
+  validateOperationsUnlinkIntakeFromIncident,
   validateOperationsListIntakeQuery,
   validateOperationsPatchIncidentStatus,
   validateOperationsPromoteEmergency,
@@ -167,6 +169,13 @@ router.post(
   validateOperationsIncidentUuidParam,
   validateOperationsLinkIntakeToIncident,
   postLinkIntakeReportToIncident,
+);
+
+router.delete(
+  "/incidents/:incidentPublicUuid/intake-reports/:reportPublicUuid",
+  requirePermission("incident.update_status"),
+  validateOperationsUnlinkIntakeFromIncident,
+  deleteOperationsIncidentIntakeReportLink,
 );
 
 router.post(

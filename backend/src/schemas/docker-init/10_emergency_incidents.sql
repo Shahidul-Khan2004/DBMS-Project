@@ -118,13 +118,24 @@ CREATE TABLE incident_report_links (
     linked_by_user_id BIGINT UNSIGNED NULL,
     linked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     note VARCHAR(500) NULL,
+    unlinked_at TIMESTAMP NULL,
+    unlinked_by_user_id BIGINT UNSIGNED NULL,
+    unlink_reason VARCHAR(500) NULL,
+    active_incident_report_incident_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN unlinked_at IS NULL THEN incident_id ELSE NULL END) STORED,
+    active_incident_report_intake_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN unlinked_at IS NULL THEN intake_report_id ELSE NULL END) STORED,
+    active_intake_report_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN unlinked_at IS NULL THEN intake_report_id ELSE NULL END) STORED,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_incident_report_links_incident_report (incident_id, intake_report_id),
-    UNIQUE KEY uq_incident_report_links_one_incident_per_report (intake_report_id),
+    UNIQUE KEY uq_incident_report_links_active_incident_report (active_incident_report_incident_id, active_incident_report_intake_id),
+    UNIQUE KEY uq_incident_report_links_active_one_incident_per_report (active_intake_report_id),
     KEY idx_incident_report_links_user (linked_by_user_id),
+    KEY idx_incident_report_links_unlinked_by_user (unlinked_by_user_id),
     CONSTRAINT fk_incident_report_links_incident FOREIGN KEY (incident_id) REFERENCES emergency_incidents(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_incident_report_links_report FOREIGN KEY (intake_report_id) REFERENCES intake_reports(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT fk_incident_report_links_user FOREIGN KEY (linked_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+    CONSTRAINT fk_incident_report_links_user FOREIGN KEY (linked_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_incident_report_links_unlinked_by_user FOREIGN KEY (unlinked_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_incident_report_links_unlink_reason_when_unlinked CHECK (
+        unlinked_at IS NULL OR (unlink_reason IS NOT NULL AND CHAR_LENGTH(TRIM(unlink_reason)) > 0)
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE incident_agency_participation (

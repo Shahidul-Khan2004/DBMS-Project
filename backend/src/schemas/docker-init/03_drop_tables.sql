@@ -94,6 +94,7 @@ DROP TABLE IF EXISTS intake_statuses;
 DROP TABLE IF EXISTS report_categories;
 DROP TABLE IF EXISTS report_channels;
 DROP TABLE IF EXISTS reporter_contacts;
+DROP TABLE IF EXISTS saved_locations;
 DROP TABLE IF EXISTS service_zone_areas;
 DROP TABLE IF EXISTS service_zones;
 DROP TABLE IF EXISTS auth_tokens;

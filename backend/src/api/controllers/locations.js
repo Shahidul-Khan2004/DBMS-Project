@@ -1,4 +1,5 @@
 import * as locationService from "../../services/locationService.js";
+import * as savedLocationService from "../../services/savedLocationService.js";
 import { reverseGeocodeBarikoi, searchPlacesBarikoi } from "../../integrations/barikoiReverseGeocoder.js";
 import BackendError from "../../lib/BackendError.js";
 import pool from "../../config/db.js";
@@ -145,4 +146,21 @@ export async function getLocationByPublicUuid(req, res) {
     throw new BackendError(404, "LOCATION_NOT_FOUND", "Location not found");
   }
   res.status(200).json({ location });
+}
+
+export async function saveLocation(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const label = req.validated?.body?.label ?? null;
+  const result = await savedLocationService.saveLocationForActor(req.actorUserId, params.publicUuid, { label });
+  res.status(200).json({
+    message: "Location saved",
+    savedLocationPublicUuid: result.savedLocationPublicUuid,
+    label: result.label,
+  });
+}
+
+export async function unsaveLocation(req, res) {
+  const params = req.validated?.params ?? req.params;
+  await savedLocationService.unsaveLocationForActor(req.actorUserId, params.publicUuid);
+  res.status(200).json({ message: "Location removed from saved" });
 }

@@ -14,6 +14,8 @@ import { ROLE_CODES } from "./rbacService.js";
 import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js";
 import {
   ensureAgencyMembershipsPublicUuid,
+  ensureIncidentReportLinksSoftUnlink,
+  ensureIntakeStatusUnlinkTransition,
   migrateLegacyReportedIncidentStatus,
 } from "./schemaMigrations.js";
 
@@ -275,6 +277,8 @@ async function ensureRolesAndPermissions() {
 export async function bootstrapDevelopmentSystemAdmin() {
   await ensureRolesAndPermissions();
   await ensureAgencyMembershipsPublicUuid();
+  await ensureIncidentReportLinksSoftUnlink();
+  await ensureIntakeStatusUnlinkTransition();
   await migrateLegacyReportedIncidentStatus();
   await bootstrapDemoAgencyRepresentatives();
 

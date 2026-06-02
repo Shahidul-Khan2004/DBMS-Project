@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
+import { insertAuditLog } from "../lib/auditLog.js";
 import pool from "../config/db.js";
 import { query } from "../config/db.js";
 import { buildDistanceSortClause } from "../lib/geoListSql.js";
@@ -194,7 +195,7 @@ export async function createIncidentAdminStandalone(params) {
       }
       const [linkDup] = await conn.execute(
         `
-          SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1
+          SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1
         `,
         [intakeRow.id],
       );
@@ -386,7 +387,7 @@ export async function promoteIntakeReportToEmergencyIncident(params) {
 
     const [linkDup] = await conn.execute(
       `
-        SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1
+        SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1
       `,
       [intakeRow.id],
     );
@@ -539,7 +540,7 @@ export async function linkIntakeReportToIncident(params) {
 
     const [linkDup] = await conn.execute(
       `
-        SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1
+        SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1
       `,
       [intakeRow.id],
     );
@@ -823,7 +824,7 @@ export async function listMyIncidentsByReporterUserId(reporterUserId, options = 
           ) AS rn
         FROM incident_report_links irl
         INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
-        WHERE ir.reporter_user_id = ?
+        WHERE ir.reporter_user_id = ? AND irl.unlinked_at IS NULL
       ) preferred ON preferred.incident_id = ei.id AND preferred.rn = 1
       LEFT JOIN locations l
         ON l.id = COALESCE(ei.current_location_id, preferred.reported_location_id)
@@ -960,7 +961,7 @@ export async function getIncidentDetailForOperations(publicUuid) {
         INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
         INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
         LEFT JOIN locations l ON l.id = ir.reported_location_id
-        WHERE irl.incident_id = ?
+        WHERE irl.incident_id = ? AND irl.unlinked_at IS NULL
         ORDER BY irl.linked_at ASC
       `,
       [row.id],
@@ -1112,6 +1113,7 @@ export async function getIncidentReporterUserIds(incidentPublicUuid) {
       INNER JOIN incident_report_links irl ON irl.incident_id = ei.id
       INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
       WHERE ei.public_uuid = ?
+        AND irl.unlinked_at IS NULL
         AND ir.reporter_user_id IS NOT NULL
     `,
     [incidentPublicUuid],
@@ -1235,6 +1237,263 @@ export async function insertIncidentOperatorNote(params) {
       event_title: params.title.trim(),
       event_description: params.description ?? null,
     };
+  } finally {
+    conn.release();
+  }
+}
+
+/**
+ * Soft-unlinks an intake report from an incident.
+ * 
+ * Preconditions:
+ * - Incident must exist and not be in a terminal status
+ * - Active link must exist (unlinked_at IS NULL)
+ * - Link cannot be of type 'primary_report'
+ * - Linked intake cannot be from an escalated service case
+ * 
+ * Side effects:
+ * - Updates incident_report_links with soft-delete (unlinked_at, unlinked_by_user_id, unlink_reason)
+ * - Updates intake status from linked_to_incident back to under_review via status history
+ * - Updates emergency_call status from linked_to_incident to triaged if exists
+ * - Inserts incident timeline event
+ * - Inserts audit log entry
+ * 
+ * @param {Object} params
+ * @param {number} params.actorUserId - User performing the unlink
+ * @param {string} params.incidentPublicUuid - Public UUID of the incident
+ * @param {string} params.intakeReportPublicUuid - Public UUID of the intake report to unlink
+ * @param {string} params.reason - Reason for unlinking (required, will be trimmed)
+ * @param {Object} [params.auditMeta] - Optional audit metadata (ipAddress, userAgent)
+ * @returns {Promise<Object>} Unlink result with incident, intake, and link details
+ */
+export async function unlinkIntakeReportFromIncident(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Validate reason
+    const trimmedReason = String(params.reason ?? "").trim();
+    if (!trimmedReason) {
+      throw new BackendError(422, "UNLINK_REASON_REQUIRED", "Reason for unlinking is required");
+    }
+
+    // Step 2: Load and lock the incident
+    const [incidentRows] = await conn.execute(
+      `
+        SELECT
+          ei.id AS id,
+          ei.public_uuid AS public_uuid,
+          ei.incident_code AS incident_code,
+          ist.status_code AS status_code
+        FROM emergency_incidents ei
+        INNER JOIN incident_statuses ist ON ist.id = ei.current_status_id
+        WHERE ei.public_uuid = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.incidentPublicUuid],
+    );
+
+    if (!incidentRows[0]) {
+      throw new BackendError(404, "INCIDENT_NOT_FOUND", "Incident not found");
+    }
+
+    const incidentRow = incidentRows[0];
+    const incidentId = incidentRow.id;
+
+    // Step 3: Reject terminal incident statuses
+    const TERMINAL_STATUSES = new Set(["resolved", "closed", "cancelled"]);
+    if (TERMINAL_STATUSES.has(incidentRow.status_code)) {
+      throw new BackendError(
+        409,
+        "INCIDENT_NOT_UNLINKABLE",
+        "Cannot unlink reports from a terminal incident",
+      );
+    }
+
+    // Step 4: Load and lock the active incident_report_links row
+    const [linkRows] = await conn.execute(
+      `
+        SELECT
+          irl.id AS link_id,
+          irl.link_type AS link_type,
+          irl.incident_id AS incident_id,
+          irl.intake_report_id AS intake_report_id,
+          ir.public_uuid AS intake_report_public_uuid,
+          ir.report_code AS intake_report_code,
+          ints.status_code AS intake_status
+        FROM incident_report_links irl
+        INNER JOIN intake_reports ir ON ir.id = irl.intake_report_id
+        INNER JOIN intake_statuses ints ON ints.id = ir.current_status_id
+        WHERE irl.incident_id = ?
+          AND ir.public_uuid = ?
+          AND irl.unlinked_at IS NULL
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [incidentId, params.intakeReportPublicUuid],
+    );
+
+    if (!linkRows[0]) {
+      throw new BackendError(
+        404,
+        "INCIDENT_REPORT_LINK_NOT_FOUND",
+        "Active incident report link not found",
+      );
+    }
+
+    const linkRow = linkRows[0];
+
+    // Step 6: Reject primary reports
+    if (linkRow.link_type === "primary_report") {
+      throw new BackendError(
+        409,
+        "PRIMARY_REPORT_UNLINK_NOT_ALLOWED",
+        "Primary incident report cannot be unlinked",
+      );
+    }
+
+    // Step 7: Reject service-case escalation links if detectable
+    const [serviceCaseRows] = await conn.execute(
+      `
+        SELECT sc.id AS case_id
+        FROM service_cases sc
+        WHERE sc.intake_report_id = ?
+        LIMIT 1
+      `,
+      [linkRow.intake_report_id],
+    );
+
+    if (serviceCaseRows[0]) {
+      const serviceCaseId = serviceCaseRows[0].case_id;
+      const [escalationRows] = await conn.execute(
+        `
+          SELECT ce.id AS escalation_id
+          FROM case_escalations ce
+          WHERE ce.case_id = ? AND ce.emergency_incident_id = ?
+          LIMIT 1
+        `,
+        [serviceCaseId, incidentId],
+      );
+
+      if (escalationRows[0]) {
+        throw new BackendError(
+          409,
+          "ESCALATION_LINK_UNLINK_NOT_ALLOWED",
+          "Escalated service case report cannot be unlinked from its incident",
+        );
+      }
+    }
+
+    // Step 8: Soft-unlink the row
+    const trimmedReasonDb = trimmedReason.substring(0, 500);
+    const [unlinkResult] = await conn.execute(
+      `
+        UPDATE incident_report_links
+        SET unlinked_at = CURRENT_TIMESTAMP,
+            unlinked_by_user_id = ?,
+            unlink_reason = ?
+        WHERE id = ? AND unlinked_at IS NULL
+      `,
+      [params.actorUserId, trimmedReasonDb, linkRow.link_id],
+    );
+
+    if (unlinkResult.affectedRows !== 1) {
+      throw new BackendError(
+        409,
+        "INCIDENT_REPORT_LINK_ALREADY_UNLINKED",
+        "Incident report link was already unlinked",
+      );
+    }
+
+    // Step 9: Restore intake report status to under_review using existing status workflow
+    await updateIntakeReportStatusInTransaction(
+      conn,
+      linkRow.intake_report_id,
+      "under_review",
+      params.actorUserId,
+      `Unlinked from incident ${incidentRow.incident_code}: ${trimmedReason}`,
+    );
+
+    // Step 10: Update emergency_calls if this intake has one with linked_to_incident status
+    const [emergencyCallRows] = await conn.execute(
+      `
+        SELECT id FROM emergency_calls
+        WHERE intake_report_id = ? AND call_status = 'linked_to_incident'
+        LIMIT 1
+      `,
+      [linkRow.intake_report_id],
+    );
+
+    if (emergencyCallRows[0]) {
+      await conn.execute(
+        `
+          UPDATE emergency_calls
+          SET call_status = 'triaged'
+          WHERE id = ? AND call_status = 'linked_to_incident'
+        `,
+        [emergencyCallRows[0].id],
+      );
+    }
+
+    // Step 11: Insert incident timeline event
+    const [timelineResult] = await conn.execute(
+      `
+        INSERT INTO incident_timeline_events (
+          incident_id,
+          event_type,
+          event_title,
+          event_description,
+          created_by_user_id,
+          event_time
+        )
+        VALUES (?, 'report_unlinked', 'Intake report unlinked', ?, ?, CURRENT_TIMESTAMP)
+      `,
+      [
+        incidentId,
+        `Intake report ${linkRow.intake_report_code} unlinked: ${trimmedReason}`,
+        params.actorUserId,
+      ],
+    );
+
+    // Step 12: Insert audit log
+    await insertAuditLog(conn, {
+      actorUserId: params.actorUserId,
+      action: "incident.report.unlinked",
+      entityType: "incident_report_link",
+      entityId: linkRow.link_id,
+      relatedIncidentId: incidentId,
+      detailsJson: {
+        incident_public_uuid: incidentRow.public_uuid,
+        incident_code: incidentRow.incident_code,
+        intake_report_public_uuid: linkRow.intake_report_public_uuid,
+        intake_report_code: linkRow.intake_report_code,
+        link_type: linkRow.link_type,
+        reason: trimmedReason,
+      },
+      ...(params.auditMeta && {
+        ipAddress: params.auditMeta.ipAddress ?? null,
+        userAgent: params.auditMeta.userAgent ?? null,
+      }),
+    });
+
+    // Step 13: Commit transaction
+    await conn.commit();
+
+    // Step 14: Return compact data
+    return {
+      incident_public_uuid: incidentRow.public_uuid,
+      incident_code: incidentRow.incident_code,
+      intake_report_public_uuid: linkRow.intake_report_public_uuid,
+      intake_report_code: linkRow.intake_report_code,
+      link_type: linkRow.link_type,
+      unlinked_at: new Date().toISOString(),
+      unlink_reason: trimmedReason,
+      intake_status: "under_review",
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
   } finally {
     conn.release();
   }

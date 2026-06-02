@@ -38,6 +38,8 @@ export const ROUTE_MANIFEST = [
   { method: "GET", path: "/locations/my", validationPersona: "citizen" },
   { method: "GET", path: "/locations/search", validationPersona: "citizen" },
   { method: "GET", path: "/locations/reverse", validationPersona: "citizen" },
+  { method: "POST", path: `/locations/${U}/save`, validationPersona: "citizen" },
+  { method: "DELETE", path: `/locations/${U}/save`, validationPersona: "citizen" },
   { method: "GET", path: `/locations/${U}`, validationPersona: "citizen" },
 
   { method: "GET", path: "/notifications/my", validationPersona: "citizen" },
@@ -192,6 +194,14 @@ export const ROUTE_MANIFEST = [
     method: "POST",
     path: `/operations/incidents/${U}/intake-reports`,
     anyPermissions: ["incident.create", "incident.update_status"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "DELETE",
+    path: `/operations/incidents/${U}/intake-reports/${U}`,
+    permissions: ["incident.update_status"],
     denyPersona: "citizen",
     hasBodyValidator: true,
     validationPersona: "dispatcher",

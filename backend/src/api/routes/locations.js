@@ -5,11 +5,14 @@ import {
   getLocationReverse,
   getLocationSearch,
   postLocation,
+  saveLocation,
+  unsaveLocation,
 } from "../controllers/locations.js";
 import { requireAuth as defaultRequireAuth } from "../middlewares/auth.js";
 import {
   validateCreateLocation,
   validateLocationPublicUuidParam,
+  validateSaveLocation,
 } from "../validators/location.js";
 import { validateCitizenGeoListQuery } from "../validators/geoSort.js";
 
@@ -22,6 +25,8 @@ export function createLocationsRouter({ requireAuth = defaultRequireAuth } = {})
   router.get("/my", validateCitizenGeoListQuery, getMyLocations);
   router.get("/search", getLocationSearch);
   router.get("/reverse", getLocationReverse);
+  router.post("/:publicUuid/save", validateLocationPublicUuidParam, validateSaveLocation, saveLocation);
+  router.delete("/:publicUuid/save", validateLocationPublicUuidParam, unsaveLocation);
   router.get("/:publicUuid", validateLocationPublicUuidParam, getLocationByPublicUuid);
 
   return router;

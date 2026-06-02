@@ -4,6 +4,7 @@ import {
   applyIncidentStatusChange,
   insertIncidentOperatorNote,
   linkIntakeReportToIncident,
+  unlinkIntakeReportFromIncident,
   promoteIntakeReportToEmergencyIncident,
   createIncidentAdminStandalone,
   getIncidentDetailForOperations,
@@ -243,5 +244,21 @@ export async function operationsLinkIntakeReport(
     intakeReportPublicUuid: body.intakeReportPublicUuid,
     linkType: body.linkType ?? "supporting_report",
     note: body.note ?? null,
+  });
+}
+
+export async function operationsUnlinkIntakeReport(
+  actorUserId,
+  incidentPublicUuid,
+  intakeReportPublicUuid,
+  reason,
+  auditMeta,
+) {
+  return unlinkIntakeReportFromIncident({
+    actorUserId,
+    incidentPublicUuid,
+    intakeReportPublicUuid,
+    reason,
+    auditMeta,
   });
 }

@@ -3,6 +3,7 @@ import {
   classifyEmergency999Schema,
   gateway999CreateSchema,
   operationsLinkIntakeToIncidentSchema,
+  operationsUnlinkIntakeFromIncidentSchema,
   operationsCreateIncidentSchema,
   operationsIncidentNoteSchema,
   operationsIncidentUuidParamSchema,
@@ -12,6 +13,7 @@ import {
   operationsPatchIncidentStatusSchema,
   operationsReportUuidParamSchema,
 } from "./validationSchemas.js";
+import BackendError from "../../lib/BackendError.js";
 
 export const validateOperationsListIntakeQuery = validate(
   "operations intake list query",
@@ -68,3 +70,44 @@ export const validateOperationsGateway999Create = validate(
   "operations gateway 999 create",
   gateway999CreateSchema,
 );
+
+export function validateOperationsUnlinkIntakeFromIncident(req, res, next) {
+  const schema = operationsUnlinkIntakeFromIncidentSchema;
+  
+  // Validate params
+  const paramsResult = schema.shape.params.safeParse(req.params);
+  if (!paramsResult.success) {
+    return next(
+      new BackendError(
+        422,
+        "VALIDATION_ERROR",
+        "invalid operations unlink intake request params",
+        paramsResult.error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        }))
+      )
+    );
+  }
+
+  // Validate body
+  const bodyResult = schema.shape.body.safeParse(req.body);
+  if (!bodyResult.success) {
+    return next(
+      new BackendError(
+        422,
+        "VALIDATION_ERROR",
+        "invalid operations unlink intake request body",
+        bodyResult.error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        }))
+      )
+    );
+  }
+
+  req.validated ??= {};
+  req.validated.params = paramsResult.data;
+  req.validated.body = bodyResult.data;
+  next();
+}
