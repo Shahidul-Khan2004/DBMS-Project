@@ -167,7 +167,8 @@ next-env.d.ts
 # codex
 .codex
 .cursor
+
 # Editor / AI tool local settings
-.vscode/
-.gemini/
-.zed/
+.vscode
+.gemini
+.zed
