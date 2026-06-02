@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
 import pool from "../../src/config/db.js";
 import { ROLE_CODES } from "../../src/services/rbacService.js";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 import { request, jsonHeaders } from "../helpers/http.js";
 import { createIntegrationApp } from "../helpers/testApp.js";
 import { getAdminToken } from "../helpers/authTokens.js";
@@ -12,7 +12,6 @@ import { registerTestUser } from "../helpers/registerTestUser.js";
 const dbUp = await isDbAvailable();
 
 describe("admin agency deactivate integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 

@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  includeDistanceField,
+  nearUuidFields,
+  withGeoSortRefinements,
+} from "./geoSortQuery.js";
 
 export const registerUserSchema = z
   .object({
@@ -136,13 +141,20 @@ export const operationsCreateIncidentSchema = z
     },
   );
 
-export const operationsListIntakeReportsQuerySchema = z.object({
-  intake_status: z.string().trim().optional(),
-  categoryCode: z.string().trim().optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
-  sort: z.enum(["reported_at_desc", "reported_at_asc"]).optional(),
-});
+export const operationsListIntakeReportsQuerySchema = withGeoSortRefinements(
+  z.object({
+    intake_status: z.string().trim().optional(),
+    categoryCode: z.string().trim().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    sort: z
+      .enum(["reported_at_desc", "reported_at_asc", "distance_asc"])
+      .optional(),
+    ...includeDistanceField,
+    nearIncidentPublicUuid: nearUuidFields.nearIncidentPublicUuid,
+  }),
+  ["nearIncidentPublicUuid"],
+);
 
 export const operationsListIncidentsQuerySchema = z.object({
   status_code: z.string().trim().optional(),
@@ -181,6 +193,10 @@ export const operationsIncidentUuidParamSchema = z.object({
   incidentPublicUuid: z.uuid({ message: "Invalid incident id" }),
 });
 
+export const saveLocationBodySchema = z.object({
+  label: z.string().trim().max(100, "label must be at most 100 characters").nullable().optional(),
+});
+
 export const locationPublicUuidParamSchema = z.object({
   publicUuid: z.uuid({ message: "Invalid location id" }),
 });
@@ -210,6 +226,16 @@ export const operationsLinkIntakeToIncidentSchema = z.object({
     .optional()
     .default("supporting_report"),
   note: z.string().trim().max(500).optional(),
+});
+
+export const operationsUnlinkIntakeFromIncidentSchema = z.object({
+  params: z.object({
+    incidentPublicUuid: z.uuid({ message: "Invalid incident id" }),
+    reportPublicUuid: z.uuid({ message: "Invalid report id" }),
+  }),
+  body: z.object({
+    reason: z.string().trim().min(1, "reason is required").max(500, "reason must be at most 500 characters"),
+  }),
 });
 
 export const gateway999CreateSchema = z
@@ -328,9 +354,21 @@ export const operationsAddIncidentAgencySchema = z.object({
   isLeadAgency: z.boolean().optional().default(false),
 });
 
-export const operationsAvailableUnitsQuerySchema = z.object({
-  incidentPublicUuid: z.uuid({ message: "incidentPublicUuid is required" }),
-});
+export const operationsAvailableUnitsQuerySchema = z
+  .object({
+    incidentPublicUuid: z.uuid({ message: "incidentPublicUuid is required" }),
+    sort: z.enum(["distance_asc"]).optional(),
+    ...includeDistanceField,
+  })
+  .superRefine((data, ctx) => {
+    if (data.includeDistance === true && data.sort !== "distance_asc") {
+      ctx.addIssue({
+        code: "custom",
+        message: "includeDistance requires sort=distance_asc",
+        path: ["includeDistance"],
+      });
+    }
+  });
 
 export const operationsCreateDispatchSchema = z.object({
   unitPublicUuid: z.uuid({ message: "Invalid unit id" }),
@@ -378,7 +416,9 @@ const adminAgencyPayloadSchema = z.object({
 
 export const adminOnboardAgencySchema = z
   .object({
-    user_public_uuid: z.uuid({ message: "user_public_uuid must be a user public UUID" }),
+    user_public_uuid: z
+      .uuid({ message: "user_public_uuid must be a user public UUID" })
+      .optional(),
     agency_public_uuid: z.uuid({ message: "Invalid agency id" }).optional(),
     agency: adminAgencyPayloadSchema.optional(),
   })

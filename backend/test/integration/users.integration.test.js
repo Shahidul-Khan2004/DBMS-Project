@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 
 const dbUp = await isDbAvailable();
 import { request, jsonHeaders } from "../helpers/http.js";
@@ -9,7 +9,6 @@ import { getAdminToken } from "../helpers/authTokens.js";
 import { PLACEHOLDER_UUID } from "../helpers/fixtures.js";
 
 describe("users integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 

@@ -24,6 +24,7 @@ export interface CitizenServiceCase {
   location?: ServiceCaseLocation | null;
   location_text?: string | null;
   linked_incident_public_uuid?: string | null;
+  source_channel?: string | null;
 }
 
 export interface CitizenServiceCaseListResponse {
@@ -45,7 +46,7 @@ export interface ServiceCaseMessageResult {
   created_at: string | null;
   sender?: {
     public_uuid: string;
-    full_name: string;
+    full_name: string | null;
   } | null;
   is_internal?: boolean;
 }
@@ -77,6 +78,7 @@ export interface OperationsServiceCaseListResponse {
 }
 
 export interface ServiceCaseStatusHistoryItem {
+  id?: string;
   status_code: string;
   note?: string | null;
   changed_at: string;
@@ -87,19 +89,39 @@ export interface ServiceCaseStatusHistoryItem {
   } | null;
 }
 
-export interface ServiceCaseAssignment {
-  id: number;
-  assigned_to_user_public_uuid: string;
-  assignment_status: string;
-  created_at?: string;
-  note?: string | null;
+export interface ServiceCaseAssignmentUser {
+  public_uuid: string;
+  full_name: string | null;
 }
 
+export interface ServiceCaseAssignment {
+  id: string | number;
+  assignment_status: string;
+  assigned_at?: string | null;
+  ended_at?: string | null;
+  note?: string | null;
+  assigned_to: ServiceCaseAssignmentUser;
+  assigned_by_public_uuid?: string | null;
+  /** @deprecated list rows may still expose this */
+  assigned_to_user_public_uuid?: string;
+}
+
+export type ServiceCaseResolutionType =
+  | "advice_given"
+  | "referred_to_facility"
+  | "no_action_needed"
+  | "duplicate";
+
 export interface ServiceCaseResolution {
+  id?: string;
   resolution_type: string;
   resolution_text: string;
   recommended_facility_id?: number | null;
-  resolved_at?: string;
+  resolved_at?: string | null;
+  resolved_by?: {
+    public_uuid: string;
+    full_name: string | null;
+  } | null;
 }
 
 export interface ServiceCaseDetailResponse {
@@ -108,4 +130,37 @@ export interface ServiceCaseDetailResponse {
   messages: ServiceCaseMessageResult[];
   assignments: ServiceCaseAssignment[];
   resolution?: ServiceCaseResolution | null;
+}
+
+export interface PatchServiceCaseStatusPayload {
+  statusCode: string;
+  note?: string;
+}
+
+export interface PostServiceCaseMessagePayload {
+  title: string;
+  description?: string;
+}
+
+export interface PostServiceCaseResolvePayload {
+  resolutionType: ServiceCaseResolutionType;
+  resolutionText: string;
+}
+
+export interface IntakeEscalatePayload {
+  severityCode: "low" | "medium" | "high" | "critical";
+  escalationReason: string;
+  incidentTitle?: string;
+  incidentDescription?: string;
+}
+
+export interface IntakeEscalateResponse {
+  message?: string;
+  incident?: {
+    public_uuid?: string;
+    incident_code?: string;
+    title?: string;
+    origin_type?: string;
+  };
+  intake_public_uuid?: string;
 }

@@ -44,6 +44,8 @@ export const ROUTE_MANIFEST = [
   { method: "GET", path: "/locations/my", validationPersona: "citizen" },
   { method: "GET", path: "/locations/search", validationPersona: "citizen" },
   { method: "GET", path: "/locations/reverse", validationPersona: "citizen" },
+  { method: "POST", path: `/locations/${U}/save`, validationPersona: "citizen" },
+  { method: "DELETE", path: `/locations/${U}/save`, validationPersona: "citizen" },
   { method: "GET", path: `/locations/${U}`, validationPersona: "citizen" },
 
   { method: "GET", path: "/notifications/my", validationPersona: "citizen" },
@@ -198,6 +200,14 @@ export const ROUTE_MANIFEST = [
     method: "POST",
     path: `/operations/incidents/${U}/intake-reports`,
     anyPermissions: ["incident.create", "incident.update_status"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "DELETE",
+    path: `/operations/incidents/${U}/intake-reports/${U}`,
+    permissions: ["incident.update_status"],
     denyPersona: "citizen",
     hasBodyValidator: true,
     validationPersona: "dispatcher",
@@ -467,6 +477,70 @@ export const ROUTE_MANIFEST = [
     agencyRouter: true,
     hasBodyValidator: true,
     validationPersona: "agencyRep",
+  },
+
+  { method: "GET", path: "/public/disasters", public: true },
+  { method: "GET", path: `/public/disasters/${U}`, public: true },
+
+  {
+    method: "GET",
+    path: "/reference/administrative-areas/search",
+    anyPermissions: ["disaster.read", "disaster.create", "disaster.manage_affected_areas"],
+    validationPersona: "dispatcher",
+  },
+
+  {
+    method: "POST",
+    path: "/operations/disasters",
+    permissions: ["disaster.create"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
+  {
+    method: "GET",
+    path: "/operations/disasters",
+    permissions: ["disaster.read"],
+    denyPersona: "citizen",
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "GET",
+    path: `/operations/disasters/${U}`,
+    permissions: ["disaster.read"],
+    denyPersona: "citizen",
+    validationPersona: "dispatcher",
+  },
+  {
+    method: "POST",
+    path: `/operations/disasters/${U}/declarations/initial`,
+    permissions: ["disaster.declare"],
+    denyPersona: "dispatcher",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
+
+  {
+    method: "GET",
+    path: "/admin/facilities",
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    validationPersona: "systemAdmin",
+  },
+  {
+    method: "POST",
+    path: "/admin/facilities",
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    hasBodyValidator: true,
+    validationPersona: "systemAdmin",
+  },
+  {
+    method: "PATCH",
+    path: `/admin/facilities/${U}/deactivate`,
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    validationPersona: "systemAdmin",
   },
 ];
 

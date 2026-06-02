@@ -44,5 +44,12 @@
     "supertest": "^7.2.2",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.0.0"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "msgpackr@2.0.1": true,
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.11.1": true,
+    "msgpackr-extract@3.0.3": true
   }
 }

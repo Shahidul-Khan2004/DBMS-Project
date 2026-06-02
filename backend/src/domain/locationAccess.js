@@ -5,6 +5,7 @@
 import BackendError from "../lib/BackendError.js";
 import {
   findAdministrativeAreaById,
+  getLocationRowById,
   getLocationRowByPublicUuid,
 } from "../repositories/locationRepo.js";
 
@@ -54,6 +55,36 @@ export async function requireReporterOwnedLocationId(
     throw new BackendError(404, "LOCATION_NOT_FOUND", "Location not found");
   }
   if (row.created_by_user_id == null || Number(row.created_by_user_id) !== Number(reporterUserId)) {
+    throw new BackendError(
+      403,
+      "LOCATION_NOT_OWNED",
+      "You may only reference locations you created",
+    );
+  }
+  return Number(row.id);
+}
+
+/**
+ * Citizen geo sort: numeric locations.id must exist and belong to the reporter.
+ * @param {import("mysql2/promise").PoolConnection} conn
+ * @returns {Promise<number>}
+ */
+export async function requireReporterOwnedLocationById(conn, locationId, reporterUserId) {
+  if (reporterUserId == null) {
+    throw new BackendError(
+      422,
+      "LOCATION_ID_REQUIRES_USER",
+      "nearLocationId requires an authenticated user",
+    );
+  }
+  const row = await getLocationRowById(conn, locationId);
+  if (!row) {
+    throw new BackendError(404, "LOCATION_NOT_FOUND", "Location not found");
+  }
+  if (
+    row.created_by_user_id == null ||
+    Number(row.created_by_user_id) !== Number(reporterUserId)
+  ) {
     throw new BackendError(
       403,
       "LOCATION_NOT_OWNED",

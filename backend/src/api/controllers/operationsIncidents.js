@@ -89,6 +89,21 @@ export async function postLinkIntakeReportToIncident(req, res) {
   });
 }
 
+export async function deleteOperationsIncidentIntakeReportLink(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const result = await incidentOperationsService.operationsUnlinkIntakeReport(
+    req.actorUserId,
+    params.incidentPublicUuid,
+    params.reportPublicUuid,
+    body.reason,
+  );
+  res.status(200).json({
+    message: "Intake report unlinked from incident",
+    unlink: result,
+  });
+}
+
 export async function postGateway999IntakeAndIncident(req, res) {
   const body = req.validated?.body ?? req.body;
   const result = await intakeService.createGateway999IntakeAndIncident(

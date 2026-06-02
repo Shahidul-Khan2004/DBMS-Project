@@ -64,13 +64,25 @@ CREATE TABLE facility_capabilities (
     CONSTRAINT fk_facility_capabilities_capability FOREIGN KEY (capability_id) REFERENCES capabilities(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE facility_default_capacities (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    facility_id BIGINT UNSIGNED NOT NULL,
+    capacity_type ENUM('shelter_people','hospital_beds','emergency_beds') NOT NULL,
+    total_capacity INT UNSIGNED NOT NULL,
+    effective_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    note VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_facility_default_capacities_facility_type (facility_id, capacity_type),
+    CONSTRAINT fk_facility_default_capacities_facility FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_facility_default_capacities_positive CHECK (total_capacity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE facility_capacity_snapshots (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     facility_id BIGINT UNSIGNED NOT NULL,
-    capacity_type ENUM('beds','icu_beds','shelter_people','blood_units','storage_units') NOT NULL,
+    capacity_type ENUM('hospital_beds','emergency_beds','icu_beds') NOT NULL,
     total_capacity INT UNSIGNED NOT NULL,
-    available_capacity INT UNSIGNED NOT NULL,
-    occupied_capacity INT UNSIGNED NOT NULL,
+    occupied_capacity INT UNSIGNED NOT NULL DEFAULT 0,
     recorded_by_user_id BIGINT UNSIGNED NULL,
     recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     note VARCHAR(500) NULL,
@@ -79,7 +91,6 @@ CREATE TABLE facility_capacity_snapshots (
     KEY idx_facility_capacity_user (recorded_by_user_id),
     CONSTRAINT fk_facility_capacity_facility FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_facility_capacity_user FOREIGN KEY (recorded_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_facility_capacity_available_le_total CHECK (available_capacity <= total_capacity),
     CONSTRAINT chk_facility_capacity_occupied_le_total CHECK (occupied_capacity <= total_capacity)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -105,41 +116,66 @@ CREATE TABLE incident_facility_referrals (
 
 CREATE TABLE shelter_activations (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    public_uuid CHAR(36) NOT NULL,
     disaster_event_id BIGINT UNSIGNED NOT NULL,
     facility_id BIGINT UNSIGNED NOT NULL,
     activated_by_user_id BIGINT UNSIGNED NOT NULL,
-    activation_status ENUM('planned','active','full','closed') NOT NULL DEFAULT 'planned',
+    activation_status ENUM('active','finalized') NOT NULL DEFAULT 'active',
+    activation_source ENUM('auto','manual') NOT NULL DEFAULT 'auto',
+    manual_override_note VARCHAR(1000) NULL,
+    usable_capacity_override INT UNSIGNED NULL,
+    managing_agency_id BIGINT UNSIGNED NULL,
     activated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    closed_at TIMESTAMP NULL,
-    notes VARCHAR(1000) NULL,
+    finalized_at TIMESTAMP NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_shelter_activations_disaster_facility (disaster_event_id, facility_id),
+    UNIQUE KEY uq_shelter_activations_public_uuid (public_uuid),
     KEY idx_shelter_activations_facility (facility_id),
-    KEY idx_shelter_activations_user (activated_by_user_id),
+    KEY idx_shelter_activations_managing_agency (managing_agency_id),
     CONSTRAINT fk_shelter_activations_disaster FOREIGN KEY (disaster_event_id) REFERENCES disaster_events(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_shelter_activations_facility FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_shelter_activations_user FOREIGN KEY (activated_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_shelter_activations_closed_after_activated CHECK (closed_at IS NULL OR closed_at >= activated_at)
+    CONSTRAINT fk_shelter_activations_agency FOREIGN KEY (managing_agency_id) REFERENCES agencies(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_shelter_activations_finalized_after_activated CHECK (finalized_at IS NULL OR finalized_at >= activated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE relief_hub_activations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    public_uuid CHAR(36) NOT NULL,
+    disaster_event_id BIGINT UNSIGNED NOT NULL,
+    facility_id BIGINT UNSIGNED NOT NULL,
+    activated_by_user_id BIGINT UNSIGNED NOT NULL,
+    activation_status ENUM('active','finalized') NOT NULL DEFAULT 'active',
+    activation_source ENUM('auto','manual') NOT NULL DEFAULT 'auto',
+    manual_override_note VARCHAR(1000) NULL,
+    managing_agency_id BIGINT UNSIGNED NULL,
+    activated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finalized_at TIMESTAMP NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_relief_hub_activations_disaster_facility (disaster_event_id, facility_id),
+    UNIQUE KEY uq_relief_hub_activations_public_uuid (public_uuid),
+    KEY idx_relief_hub_activations_facility (facility_id),
+    KEY idx_relief_hub_activations_managing_agency (managing_agency_id),
+    CONSTRAINT fk_relief_hub_activations_disaster FOREIGN KEY (disaster_event_id) REFERENCES disaster_events(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_relief_hub_activations_facility FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_relief_hub_activations_user FOREIGN KEY (activated_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_relief_hub_activations_agency FOREIGN KEY (managing_agency_id) REFERENCES agencies(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_relief_hub_activations_finalized_after_activated CHECK (finalized_at IS NULL OR finalized_at >= activated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE shelter_occupancy_snapshots (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     shelter_activation_id BIGINT UNSIGNED NOT NULL,
     people_count INT UNSIGNED NOT NULL DEFAULT 0,
-    families_count INT UNSIGNED NULL,
-    capacity_limit INT UNSIGNED NOT NULL DEFAULT 0,
-    overflow_flag BOOLEAN NOT NULL DEFAULT FALSE,
     recorded_by_user_id BIGINT UNSIGNED NULL,
     recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_shelter_occupancy_activation_recorded (shelter_activation_id, recorded_at),
     KEY idx_shelter_occupancy_user (recorded_by_user_id),
     CONSTRAINT fk_shelter_occupancy_activation FOREIGN KEY (shelter_activation_id) REFERENCES shelter_activations(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT fk_shelter_occupancy_user FOREIGN KEY (recorded_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_shelter_occupancy_capacity CHECK (people_count <= capacity_limit OR overflow_flag = TRUE)
+    CONSTRAINT fk_shelter_occupancy_user FOREIGN KEY (recorded_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- case_resolutions and case_escalations depend on facilities/emergency_incidents.
 CREATE TABLE case_resolutions (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     case_id BIGINT UNSIGNED NOT NULL,

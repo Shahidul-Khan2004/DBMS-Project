@@ -15,6 +15,26 @@ export const FINAL_INCIDENT_STATUSES = new Set([
   "cancelled",
 ]);
 
+const INCIDENT_CATEGORY_LABELS: Record<string, string> = {
+  crime_public_safety: "Crime / Public Safety",
+  infrastructure_emergency: "Infrastructure Emergency",
+  natural_disaster: "Natural Disaster",
+};
+
+function titleCaseFromSnake(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function formatIncidentCategory(categoryCode: string | null | undefined) {
+  if (!categoryCode?.trim()) return "-";
+  const key = categoryCode.trim().toLowerCase();
+  return INCIDENT_CATEGORY_LABELS[key] ?? titleCaseFromSnake(key);
+}
+
 const INCIDENT_STATUS_LABELS: Record<string, string> = {
   reported: "Reported",
   classified: "Classified",
@@ -50,6 +70,11 @@ export function isActiveIncident(incident: CitizenIncident) {
 
 export function isFinalIncident(incident: CitizenIncident) {
   return FINAL_INCIDENT_STATUSES.has(incident.status_code);
+}
+
+export function isTerminalIncident(status: string | null | undefined) {
+  if (!status) return false;
+  return FINAL_INCIDENT_STATUSES.has(status);
 }
 
 export function isResolvedIncident(incident: CitizenIncident) {

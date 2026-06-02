@@ -507,7 +507,7 @@ export async function createEmergency999PathFromIntake(params) {
     if (
       error?.code === "ER_DUP_ENTRY" &&
       (error.message.includes("uq_emergency_calls_intake_report") ||
-        error.message.includes("uq_incident_report_links_one_incident_per_report"))
+        error.message.includes("uq_incident_report_links_active_one_incident_per_report"))
     ) {
       throw new BackendError(
         409,
@@ -597,7 +597,7 @@ export async function linkGateway999IntakeToExistingIncident(params) {
 
     // Reject an intake already linked to an incident.
     const [linkDup] = await conn.execute(
-      `SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1`,
+      `SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1`,
       [intake.id],
     );
     if (linkDup[0]) {
@@ -779,7 +779,7 @@ export async function linkGateway999IntakeToExistingIncident(params) {
     if (
       error?.code === "ER_DUP_ENTRY" &&
       (error.message.includes("uq_emergency_calls_intake_report") ||
-        error.message.includes("uq_incident_report_links_one_incident_per_report"))
+        error.message.includes("uq_incident_report_links_active_one_incident_per_report"))
     ) {
       throw new BackendError(
         409,

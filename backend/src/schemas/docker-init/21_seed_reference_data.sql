@@ -17,7 +17,21 @@ INSERT INTO permissions (permission_code, module_name, description) VALUES
 ('incident.update','incident','Update emergency incidents'),
 ('incident.dispatch_unit','dispatch','Dispatch emergency units'),
 ('agency.manage','agency','Manage agencies and units'),
+('disaster.create','disaster','Create disaster events'),
+('disaster.read','disaster','View disaster operations'),
+('disaster.update_status','disaster','Update disaster lifecycle status'),
 ('disaster.declare','disaster','Declare disaster/national emergency'),
+('disaster.manage_affected_areas','disaster','Manage disaster affected upazilas'),
+('disaster.manage_responsibilities','disaster','Assign disaster agency responsibilities'),
+('disaster.link_incidents','disaster','Link incidents to disasters'),
+('facility.manage','facility','Manage facility master data'),
+('facility.read','facility','View facilities and capacity'),
+('shelter.manage','shelter','Manage shelter activations'),
+('shelter.record_occupancy','shelter','Record shelter occupancy'),
+('shelter.record_occupancy_own','shelter','Record occupancy for own managed shelter'),
+('relief.manage_inventory','relief','Record verified relief stock'),
+('relief.manage_requests','relief','Approve or reject relief requests'),
+('relief.request_own_shelter','relief','Create relief requests for own shelter'),
 ('relief.distribute','relief','Manage relief distribution'),
 ('blood.manage','blood','Manage blood requests and matches'),
 ('notification.send','notification','Send/queue notifications');
@@ -60,7 +74,7 @@ INSERT INTO intake_statuses (status_code, name, sort_order, is_terminal) VALUES
 ('received','Received',1,FALSE),
 ('under_review','Under Review',2,FALSE),
 ('linked_to_case','Linked to Case',3,FALSE),
-('linked_to_incident','Linked to Incident',4,TRUE),
+('linked_to_incident','Linked to Incident',4,FALSE),
 ('duplicate','Duplicate',5,TRUE),
 ('false_report','False Report',6,TRUE),
 ('closed','Closed',7,TRUE);
@@ -72,6 +86,7 @@ INNER JOIN intake_statuses t ON (
     (f.status_code = 'received' AND t.status_code IN ('under_review', 'duplicate', 'false_report', 'closed'))
     OR (f.status_code = 'under_review' AND t.status_code IN ('linked_to_case', 'linked_to_incident', 'duplicate', 'false_report', 'closed'))
     OR (f.status_code = 'linked_to_case' AND t.status_code = 'linked_to_incident')
+    OR (f.status_code = 'linked_to_incident' AND t.status_code = 'under_review')
 );
 
 INSERT INTO dispatch_statuses (status_code, name, sort_order, is_terminal) VALUES
@@ -164,6 +179,7 @@ INSERT INTO capabilities (capability_code, name, capability_group) VALUES
 ('power_line_repair','Power Line Repair','infrastructure'),
 ('road_clearance','Road Clearance','infrastructure'),
 ('food_distribution','Food Distribution','relief'),
+('relief_distribution_hub','Relief Distribution Hub','relief'),
 ('temporary_shelter','Temporary Shelter','shelter'),
 ('blood_support','Blood Support','blood'),
 ('emergency_care','Emergency Care','medical'),
@@ -189,6 +205,39 @@ INSERT INTO work_queues (queue_code, name, queue_type) VALUES
 ('incident_dispatch_queue','Incident Dispatch Queue','dispatch'),
 ('disaster_relief_queue','Disaster Relief Queue','disaster_relief');
 
+INSERT INTO disaster_event_statuses (status_code, name, sort_order, is_terminal) VALUES
+('monitoring','Monitoring',1,FALSE),
+('declared','Declared',2,FALSE),
+('resolved','Resolved',3,FALSE),
+('closed','Closed',4,TRUE),
+('cancelled','Cancelled',5,TRUE);
+
+INSERT INTO disaster_event_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE, FALSE
+FROM disaster_event_statuses f
+INNER JOIN disaster_event_statuses t ON (
+    (f.status_code = 'monitoring' AND t.status_code IN ('declared','cancelled'))
+    OR (f.status_code = 'declared' AND t.status_code IN ('resolved','cancelled'))
+    OR (f.status_code = 'resolved' AND t.status_code = 'closed')
+);
+
+INSERT INTO relief_request_statuses (status_code, name, sort_order, is_terminal) VALUES
+('submitted','Submitted',1,FALSE),
+('approved','Approved',2,FALSE),
+('rejected','Rejected',3,TRUE),
+('partially_fulfilled','Partially Fulfilled',4,FALSE),
+('fulfilled','Fulfilled',5,TRUE);
+
+INSERT INTO relief_request_status_transitions (from_status_id, to_status_id, is_active, requires_note)
+SELECT f.id, t.id, TRUE,
+       CASE WHEN t.status_code = 'rejected' THEN TRUE ELSE FALSE END
+FROM relief_request_statuses f
+INNER JOIN relief_request_statuses t ON (
+    (f.status_code = 'submitted' AND t.status_code IN ('approved','rejected','partially_fulfilled','fulfilled'))
+    OR (f.status_code = 'approved' AND t.status_code IN ('partially_fulfilled','fulfilled','rejected'))
+    OR (f.status_code = 'partially_fulfilled' AND t.status_code IN ('fulfilled','partially_fulfilled'))
+);
+
 INSERT INTO disaster_event_types (type_code, name) VALUES
 ('flood','Flood'),
 ('cyclone','Cyclone'),
@@ -209,13 +258,11 @@ INSERT INTO facility_types (type_code, name) VALUES
 
 INSERT INTO relief_items (item_code, name, unit_of_measure) VALUES
 ('rice','Rice','kg'),
-('water_bottle','Water Bottle','bottle'),
+('bottled_water','Bottled Water','bottle'),
 ('dry_food_packet','Dry Food Packet','packet'),
 ('blanket','Blanket','piece'),
-('saline','Saline','packet'),
-('medicine_box','Medicine Box','box'),
-('baby_food','Baby Food','packet'),
-('sanitary_pad','Sanitary Pad','packet');
+('medicine_kit','Medicine Kit','kit'),
+('hygiene_kit','Hygiene Kit','kit');
 
 INSERT INTO blood_groups (group_code, name) VALUES
 ('A+','A Positive'),

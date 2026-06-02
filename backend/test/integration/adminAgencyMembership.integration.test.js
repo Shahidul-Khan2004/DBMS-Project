@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
 import pool from "../../src/config/db.js";
 import { ROLE_CODES } from "../../src/services/rbacService.js";
-import { integrationSkipMessage, isDbAvailable } from "../helpers/dbGate.js";
+import { isDbAvailable } from "../helpers/dbGate.js";
 import { SEED } from "../helpers/fixtures.js";
 import { request, jsonHeaders } from "../helpers/http.js";
 import { createIntegrationApp } from "../helpers/testApp.js";
@@ -12,7 +13,6 @@ import { registerTestUser } from "../helpers/registerTestUser.js";
 const dbUp = await isDbAvailable();
 
 describe("admin agency membership integration", { skip: !dbUp }, () => {
-  it(integrationSkipMessage(), { skip: true });
 
   const app = createIntegrationApp();
 
@@ -104,5 +104,27 @@ describe("admin agency membership integration", { skip: !dbUp }, () => {
 
     assert.equal(activeMeRes.status, 200);
     assert.equal(activeMeRes.body.agency?.agency_code, "DHK-FIRE-01");
+  });
+
+  it("onboards agency without user when user_public_uuid is omitted", async () => {
+    const adminToken = await getAdminToken(app);
+    const agencyCode = `TEST-AGENCY-ONLY-${randomUUID().slice(0, 8)}`;
+
+    const onboardRes = await request(app)
+      .post("/admin/agencies/onboard")
+      .set(jsonHeaders(adminToken))
+      .send({
+        agency: {
+          agency_code: agencyCode,
+          name: "Agency Only Onboard",
+          agency_type_code: "fire_service",
+        },
+      });
+
+    assert.equal(onboardRes.status, 201, JSON.stringify(onboardRes.body));
+    assert.equal(onboardRes.body.message, "Agency onboarded");
+    assert.equal(onboardRes.body.agency?.agency_code, agencyCode);
+    assert.equal(onboardRes.body.membership_public_uuid, undefined);
+    assert.equal(onboardRes.body.user_public_uuid, undefined);
   });
 });

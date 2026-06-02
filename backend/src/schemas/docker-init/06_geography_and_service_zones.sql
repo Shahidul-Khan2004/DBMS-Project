@@ -98,3 +98,25 @@ CREATE TABLE service_zone_areas (
     CONSTRAINT fk_service_zone_areas_zone FOREIGN KEY (service_zone_id) REFERENCES service_zones(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_service_zone_areas_admin_area FOREIGN KEY (admin_area_id) REFERENCES administrative_areas(id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE saved_locations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    public_uuid CHAR(36) NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    location_id BIGINT UNSIGNED NOT NULL,
+    label VARCHAR(100) NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_saved_locations_public_uuid (public_uuid),
+    UNIQUE KEY uq_saved_locations_user_location_active (user_id, location_id, is_deleted),
+    KEY idx_saved_locations_user_active_created (user_id, is_deleted, created_at),
+    KEY idx_saved_locations_location (location_id),
+    CONSTRAINT fk_saved_locations_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_saved_locations_location
+        FOREIGN KEY (location_id) REFERENCES locations(id)
+        ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

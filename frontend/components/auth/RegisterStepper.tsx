@@ -260,6 +260,38 @@ function stepSubtitleClass(active: boolean, done: boolean) {
   return "text-slate-500";
 }
 
+function getStepNavState(
+  index: number,
+  currentStep: number,
+  isSubmitting: boolean,
+  step0Valid: boolean,
+  step1Valid: boolean,
+  step2Valid: boolean,
+  step3Valid: boolean,
+  acceptTerms: boolean,
+) {
+  const step = STEP_META[index];
+  const active = index === currentStep;
+  const complete = isStepComplete(
+    index,
+    step0Valid,
+    step1Valid,
+    step2Valid,
+    step3Valid,
+    acceptTerms,
+  );
+  const done = complete && !active;
+  const reachable = isStepReachable(
+    index,
+    step0Valid,
+    step1Valid,
+    step2Valid,
+    step3Valid,
+  );
+  const navigable = !active && !isSubmitting && reachable;
+  return { step, active, done, navigable };
+}
+
 function getDuplicateAccountFieldError(
   code?: string,
 ): { field: RegisterFieldName; message: string } | null {
@@ -534,76 +566,32 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
     if (!nextDisabled) handleNext();
   };
 
-  const renderStepButton = (
-    index: number,
-    variant: "compact" | "vertical",
-  ) => {
-    const step = STEP_META[index];
-    const active = index === currentStep;
-    const complete = isStepComplete(
+  const renderStepButton = (index: number) => {
+    const { step, active, done, navigable } = getStepNavState(
       index,
+      currentStep,
+      isSubmitting,
       step0Valid,
       step1Valid,
       step2Valid,
       step3Valid,
       values.acceptTerms,
     );
-    const done = complete && !active;
-    const reachable = isStepReachable(
-      index,
-      step0Valid,
-      step1Valid,
-      step2Valid,
-      step3Valid,
-    );
-    const navigable = !active && !isSubmitting && reachable;
 
     const badge = (
       <span
         className={[
-          "flex shrink-0 items-center justify-center rounded-full text-sm font-bold",
-          variant === "compact" ? "h-7 w-7" : "h-9 w-9 lg:h-8 lg:w-8",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold lg:h-8 lg:w-8",
           stepBadgeClass(active, done),
         ].join(" ")}
       >
         {done ? (
-          <Check
-            className={variant === "compact" ? "h-3.5 w-3.5" : "h-4 w-4"}
-            aria-hidden
-          />
+          <Check className="h-4 w-4" aria-hidden />
         ) : (
           index + 1
         )}
       </span>
     );
-
-    if (variant === "compact") {
-      return (
-        <button
-          key={step.title}
-          type="button"
-          disabled={!navigable}
-          onClick={() => goToStep(index)}
-          aria-current={active ? "step" : undefined}
-          aria-label={navigable ? `Go to ${step.title}` : step.title}
-          className={[
-            "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
-            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]",
-            stepButtonClass(active, done, navigable),
-          ].join(" ")}
-        >
-          {badge}
-          <span
-            className={[
-              "whitespace-nowrap text-xs font-semibold sm:text-sm",
-              stepTitleClass(active, done),
-            ].join(" ")}
-          >
-            {step.title}
-          </span>
-        </button>
-      );
-    }
 
     return (
       <li key={step.title}>
@@ -666,24 +654,72 @@ export const RegisterStepper: React.FC<RegisterStepperProps> = ({
           <div className="grid items-start gap-6 lg:grid-cols-[clamp(360px,24vw,470px)_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-0">
           <aside className="min-w-0 w-full lg:w-[clamp(360px,24vw,470px)] lg:shrink-0">
             <div
-              className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-[var(--card-p-register)] shadow-xl shadow-[#002D62]/10 lg:p-4"
+              className="rounded-3xl border border-[#C9D6E3] bg-[#F7F9FC] p-4 shadow-xl shadow-[#002D62]/10 lg:p-[var(--card-p-register)]"
             >
-              <nav
-                aria-label="Registration steps"
-                className="flex max-w-full gap-2 overflow-x-auto lg:hidden"
-              >
-                {STEP_META.map((_, index) =>
-                  renderStepButton(index, "compact"),
-                )}
-              </nav>
+              <div className="lg:hidden">
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-[#C9D6E3]"
+                  role="progressbar"
+                  aria-valuenow={currentStep + 1}
+                  aria-valuemin={1}
+                  aria-valuemax={TOTAL_STEPS}
+                  aria-label={`Registration progress, step ${currentStep + 1} of ${TOTAL_STEPS}`}
+                >
+                  <div
+                    className="h-full rounded-full bg-[#002D62] transition-[width] duration-300 ease-out"
+                    style={{
+                      width: `${((currentStep + 1) / TOTAL_STEPS) * 100}%`,
+                    }}
+                  />
+                </div>
+                <ol
+                  className="mt-3 flex justify-between gap-1"
+                  aria-label="Registration steps"
+                >
+                  {STEP_META.map((_, index) => {
+                    const { step, active, done, navigable } = getStepNavState(
+                      index,
+                      currentStep,
+                      isSubmitting,
+                      step0Valid,
+                      step1Valid,
+                      step2Valid,
+                      step3Valid,
+                      values.acceptTerms,
+                    );
+                    return (
+                      <li key={step.title}>
+                        <button
+                          type="button"
+                          disabled={!navigable && !active}
+                          onClick={() => goToStep(index)}
+                          aria-current={active ? "step" : undefined}
+                          aria-label={
+                            navigable ? `Go to ${step.title}` : step.title
+                          }
+                          className={[
+                            "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold transition-colors",
+                            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]",
+                            stepButtonClass(active, done, navigable || active),
+                          ].join(" ")}
+                        >
+                          {done ? (
+                            <Check className="h-4 w-4" aria-hidden />
+                          ) : (
+                            index + 1
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
               <nav
                 aria-label="Registration steps"
                 className="hidden lg:block"
               >
                 <ol className="flex flex-col gap-1.5 lg:gap-1">
-                  {STEP_META.map((_, index) =>
-                    renderStepButton(index, "vertical"),
-                  )}
+                  {STEP_META.map((_, index) => renderStepButton(index))}
                 </ol>
               </nav>
             </div>

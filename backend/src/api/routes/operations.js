@@ -12,6 +12,7 @@ import {
   patchOperationsIncidentStatus,
   postGateway999IntakeAndIncident,
   postLinkIntakeReportToIncident,
+  deleteOperationsIncidentIntakeReportLink,
   postOperationsIncidentNote,
   promoteIntakeToEmergency,
 } from "../controllers/operationsIncidents.js";
@@ -28,6 +29,7 @@ import {
   validateOperationsListIncidentsQuery,
   validateOperationsListIncidentNotesQuery,
   validateOperationsLinkIntakeToIncident,
+  validateOperationsUnlinkIntakeFromIncident,
   validateOperationsListIntakeQuery,
   validateOperationsPatchIncidentStatus,
   validateOperationsPromoteEmergency,
@@ -49,6 +51,7 @@ import {
   validateOperationsDispatchUuidParam,
   validateOperationsPatchDispatchStatus,
 } from "../validators/operationsDispatch.js";
+import { validateOperationsAgencyWorkloadQuery } from "../validators/geoSort.js";
 import {
   getOperationsServiceCase,
   getOperationsServiceCaseMessages,
@@ -168,6 +171,13 @@ router.post(
   postLinkIntakeReportToIncident,
 );
 
+router.delete(
+  "/incidents/:incidentPublicUuid/intake-reports/:reportPublicUuid",
+  requirePermission("incident.update_status"),
+  validateOperationsUnlinkIntakeFromIncident,
+  deleteOperationsIncidentIntakeReportLink,
+);
+
 router.post(
   "/incidents/:incidentPublicUuid/agencies",
   requirePermission("incident.assign_agency"),
@@ -202,6 +212,7 @@ router.patch(
 router.get(
   "/agencies/workload",
   requireAnyPermission("dispatch.create", "incident.assign_agency"),
+  validateOperationsAgencyWorkloadQuery,
   getOperationsAgencyWorkload,
 );
 

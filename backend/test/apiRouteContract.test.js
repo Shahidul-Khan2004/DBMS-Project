@@ -7,6 +7,7 @@ import {
   ROUTE_MANIFEST,
   VALIDATION_BODY_ROUTES,
 } from "./helpers/routeManifest.js";
+import { PLACEHOLDER_UUID } from "./helpers/fixtures.js";
 import { request, jsonHeaders } from "./helpers/http.js";
 import {
   createAgencyForbiddenTestApp,
@@ -178,5 +179,54 @@ describe("API route contract", () => {
 
   it("route manifest covers expected endpoint count", () => {
     assert.ok(ROUTE_MANIFEST.length >= 70, `expected at least 70 routes, got ${ROUTE_MANIFEST.length}`);
+  });
+
+  describe("operations unlink intake report route manifest and validation", () => {
+    const U = PLACEHOLDER_UUID;
+    const routePath = `/operations/incidents/${U}/intake-reports/${U}`;
+
+    it("manifest contains DELETE unlink route with correct properties", () => {
+      const route = ROUTE_MANIFEST.find((r) => r.method === "DELETE" && r.path === routePath);
+      assert.ok(route, `expected route ${routePath} to be present in manifest`);
+      assert.deepEqual(route.permissions, ["incident.update_status"]);
+      assert.equal(route.denyPersona, "citizen");
+      assert.equal(route.hasBodyValidator, true);
+      assert.equal(route.validationPersona, "dispatcher");
+    });
+
+    const app = createContractApp("dispatcher");
+
+    it("returns 422 when reason is missing", async () => {
+      const res = await request(app).delete(routePath).set(jsonHeaders("mock")).send({});
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+    });
+
+    it("returns 422 when reason is blank", async () => {
+      const res = await request(app).delete(routePath).set(jsonHeaders("mock")).send({ reason: "" });
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+    });
+
+    it("returns 422 when reason is too long", async () => {
+      const long = "a".repeat(501);
+      const res = await request(app).delete(routePath).set(jsonHeaders("mock")).send({ reason: long });
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+    });
+
+    it("returns 422 for invalid incidentPublicUuid param", async () => {
+      const badPath = `/operations/incidents/not-a-uuid/intake-reports/${U}`;
+      const res = await request(app).delete(badPath).set(jsonHeaders("mock")).send({ reason: "valid" });
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+    });
+
+    it("returns 422 for invalid reportPublicUuid param", async () => {
+      const badPath = `/operations/incidents/${U}/intake-reports/not-a-uuid`;
+      const res = await request(app).delete(badPath).set(jsonHeaders("mock")).send({ reason: "valid" });
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+    });
   });
 });

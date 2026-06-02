@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import pool from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import {
   assertStatusTransitionAllowed,
   findStatusIdByCode,
@@ -210,9 +212,21 @@ export async function patchAgencyDispatchStatus(params) {
   });
 }
 
-export async function listAgencyUnits(agencyId, { limit = 50, offset = 0 }) {
+export async function listAgencyUnits(agencyId, { limit = 50, offset = 0, geoSort = null } = {}) {
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const safeOffset = Math.max(offset, 0);
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance ? buildDistanceSortClause(geoSort.ref, "entity_loc.id") : null;
+
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc ON entity_loc.id = eu.base_location_id
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "eu.unit_code";
+  const joinParams = useDistance ? distance.joinParams : [];
 
   const [rows] = await pool.execute(
     `
@@ -223,27 +237,31 @@ export async function listAgencyUnits(agencyId, { limit = 50, offset = 0 }) {
         eut.type_code AS unit_type_code,
         us.status_code,
         eu.is_active
+        ${distanceSelect}
       FROM emergency_units eu
       INNER JOIN emergency_unit_types eut ON eut.id = eu.unit_type_id
       INNER JOIN unit_statuses us ON us.id = eu.current_status_id
+      ${refJoinSql}
       WHERE eu.agency_id = ?
-      ORDER BY eu.unit_code
+      ORDER BY ${orderSql}
       LIMIT ${safeLimit} OFFSET ${safeOffset}
     `,
-    [agencyId],
+    [...joinParams, agencyId],
   );
+
+  const mapUnit = (row) => ({
+    public_uuid: row.public_uuid,
+    unit_code: row.unit_code,
+    unit_name: row.unit_name,
+    unit_type_code: row.unit_type_code,
+    status_code: row.status_code,
+    is_active: Boolean(row.is_active),
+  });
 
   return {
     limit: safeLimit,
     offset: safeOffset,
-    units: rows.map((row) => ({
-      public_uuid: row.public_uuid,
-      unit_code: row.unit_code,
-      unit_name: row.unit_name,
-      unit_type_code: row.unit_type_code,
-      status_code: row.status_code,
-      is_active: Boolean(row.is_active),
-    })),
+    units: rows.map((row) => mapRowWithOptionalDistance(mapUnit(row), row, geoSort)),
   };
 }
 

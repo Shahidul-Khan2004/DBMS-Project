@@ -46,3 +46,29 @@ export async function listAdministrativeAreasByTypeUnderParents(pool, areaType, 
     name: String(r.name),
   }));
 }
+
+/**
+ * @param {import("mysql2/promise").Pool} pool
+ * @param {number} adminAreaId
+ * @returns {Promise<string | null>}
+ */
+export async function getAdministrativeAreaLabelById(pool, adminAreaId) {
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        CASE
+          WHEN aa.id IS NULL THEN NULL
+          WHEN aa.area_type = 'upazila' THEN CONCAT(aa.name, ', ', d_aa.name, ', ', div_aa.name)
+          WHEN aa.area_type = 'district' THEN CONCAT(aa.name, ', ', div_aa.name)
+          ELSE aa.name
+        END AS adminAreaLabel
+      FROM administrative_areas aa
+      LEFT JOIN administrative_areas d_aa ON d_aa.id = aa.parent_area_id
+      LEFT JOIN administrative_areas div_aa ON div_aa.id = d_aa.parent_area_id
+      WHERE aa.id = ?
+      LIMIT 1
+    `,
+    [adminAreaId],
+  );
+  return rows[0]?.adminAreaLabel ?? null;
+}

@@ -40,6 +40,26 @@ const AGENCY_REP_PERMISSION_CODES = [
   "dispatch.view_own_agency",
   "dispatch.update_own_agency",
   "response_log.create_own_agency",
+  "disaster.read",
+  "shelter.record_occupancy_own",
+  "relief.request_own_shelter",
+];
+
+const KURIGRAM_DEMO_REPS = [
+  {
+    email: "relief.rep@niers.test",
+    fullName: "Relief Agency Representative",
+    phoneNumber: "01700000011",
+    agencyPublicUuid: "b3000001-0000-4000-8000-000000000001",
+    membershipPublicUuid: "d4000001-0000-4000-8000-000000000011",
+  },
+  {
+    email: "shelter.rep@niers.test",
+    fullName: "Shelter Agency Representative",
+    phoneNumber: "01700000012",
+    agencyPublicUuid: "b3000001-0000-4000-8000-000000000002",
+    membershipPublicUuid: "d4000001-0000-4000-8000-000000000012",
+  },
 ];
 
 async function ensureAgencyRepRoleAndPermissions() {
@@ -114,7 +134,7 @@ export async function bootstrapDemoAgencyRepresentatives() {
   const conn = await pool.getConnection();
 
   try {
-    for (const rep of DEMO_REPS) {
+    for (const rep of [...DEMO_REPS, ...KURIGRAM_DEMO_REPS]) {
       let user = await findUserByEmail(rep.email);
 
       if (!user) {
@@ -178,7 +198,9 @@ export async function bootstrapDemoAgencyRepresentatives() {
       });
     }
 
-    console.log("Bootstrapped demo agency representatives (fire/police/medical.rep@niers.test).");
+    console.log(
+      "Bootstrapped demo agency representatives (Dhaka + relief/shelter.rep@niers.test).",
+    );
   } finally {
     conn.release();
   }

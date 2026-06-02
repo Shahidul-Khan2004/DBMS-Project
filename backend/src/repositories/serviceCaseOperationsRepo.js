@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import pool, { query } from "../config/db.js";
+import { buildDistanceSortClause } from "../lib/geoListSql.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
 import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import { updateIntakeReportStatusInTransaction } from "./intakeGatewayRepo.js";
@@ -156,16 +158,38 @@ export async function listServiceCasesForOperations(filters = {}) {
     filterParams,
   );
 
+  const geoSort = filters.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance
+    ? buildDistanceSortClause(
+        geoSort.ref,
+        "COALESCE(sc.current_location_id, ir.reported_location_id)",
+      )
+    : null;
+
   const baseFrom = `
     FROM service_cases sc
     INNER JOIN case_statuses cs ON cs.id = sc.current_status_id
     INNER JOIN report_categories rc ON rc.id = sc.category_id AND rc.is_active = TRUE
+    LEFT JOIN intake_reports ir ON ir.id = sc.intake_report_id
     LEFT JOIN case_assignments ca
       ON ca.case_id = sc.id
      AND ca.assignment_status = 'active'
      AND ca.ended_at IS NULL
     LEFT JOIN users assignu ON assignu.id = ca.assigned_admin_id
   `;
+
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc
+        ON entity_loc.id = COALESCE(sc.current_location_id, ir.reported_location_id)
+      ${distance.joinSql}
+    `
+    : "";
+
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "sc.updated_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
 
   const countSql = `
     SELECT COUNT(*) AS cnt
@@ -185,33 +209,39 @@ export async function listServiceCasesForOperations(filters = {}) {
       cs.status_code AS status_code,
       rc.category_code AS category_code,
       assignu.public_uuid AS assigned_to_user_public_uuid
+      ${distanceSelect}
     ${baseFrom}
+    ${refJoinSql}
     ${whereSql}
-    ORDER BY sc.updated_at DESC
+    ORDER BY ${orderSql}
     LIMIT ?
     OFFSET ?
   `;
 
   const countResult = await query(countSql, filterParams);
-  const listResult = await query(listSql, [...filterParams, limit, offset]);
+  const listResult = await query(listSql, [...joinParams, ...filterParams, limit, offset]);
   const total =
     typeof countResult.rows[0]?.cnt === "bigint"
       ? Number(countResult.rows[0].cnt)
       : Number(countResult.rows[0]?.cnt || 0);
 
+  const mapCase = (row) => ({
+    public_uuid: row.public_uuid,
+    case_code: row.case_code,
+    title: row.title,
+    description: row.description,
+    priority_level: row.priority_level,
+    status_code: row.status_code,
+    category_code: row.category_code,
+    last_updated: row.updated_at,
+    created_at: row.created_at,
+    assigned_to_user_public_uuid: row.assigned_to_user_public_uuid ?? null,
+  });
+
   return {
-    service_cases: listResult.rows.map((row) => ({
-      public_uuid: row.public_uuid,
-      case_code: row.case_code,
-      title: row.title,
-      description: row.description,
-      priority_level: row.priority_level,
-      status_code: row.status_code,
-      category_code: row.category_code,
-      last_updated: row.updated_at,
-      created_at: row.created_at,
-      assigned_to_user_public_uuid: row.assigned_to_user_public_uuid ?? null,
-    })),
+    service_cases: listResult.rows.map((row) =>
+      mapRowWithOptionalDistance(mapCase(row), row, geoSort),
+    ),
     pagination: { limit, offset, total },
   };
 }
@@ -481,7 +511,26 @@ export async function getServiceCaseDetailForOperations(casePublicUuid) {
   }
 }
 
-export async function listMyServiceCasesByReporterUserId(reporterUserId) {
+export async function listMyServiceCasesByReporterUserId(reporterUserId, options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+  const distance = useDistance
+    ? buildDistanceSortClause(
+        geoSort.ref,
+        "COALESCE(sc.current_location_id, ir.reported_location_id)",
+      )
+    : null;
+  const refJoinSql = useDistance
+    ? `
+      LEFT JOIN locations entity_loc
+        ON entity_loc.id = COALESCE(sc.current_location_id, ir.reported_location_id)
+      ${distance.joinSql}
+    `
+    : "";
+  const distanceSelect = useDistance ? `, ${distance.selectDistanceSql}` : "";
+  const orderSql = useDistance ? distance.orderBySql : "sc.updated_at DESC";
+  const joinParams = useDistance ? distance.joinParams : [];
+
   const { rows } = await query(
     `
       SELECT
@@ -503,18 +552,20 @@ export async function listMyServiceCasesByReporterUserId(reporterUserId) {
         l.place_name AS location_place_name,
         l.admin_area_id AS location_admin_area_id,
         l.source AS location_source
+        ${distanceSelect}
       FROM service_cases sc
       INNER JOIN case_statuses cs ON cs.id = sc.current_status_id
       INNER JOIN report_categories rc ON rc.id = sc.category_id
       INNER JOIN intake_reports ir ON ir.id = sc.intake_report_id
       LEFT JOIN locations l ON l.id = COALESCE(sc.current_location_id, ir.reported_location_id)
+      ${refJoinSql}
       WHERE sc.reporter_user_id = ?
-      ORDER BY sc.updated_at DESC
+      ORDER BY ${orderSql}
     `,
-    [reporterUserId],
+    [...joinParams, reporterUserId],
   );
 
-  return rows.map((row) => ({
+  const mapCase = (row) => ({
     public_uuid: row.public_uuid,
     case_code: row.case_code,
     title: row.title,
@@ -528,7 +579,9 @@ export async function listMyServiceCasesByReporterUserId(reporterUserId) {
     created_at: row.created_at,
     location: mapLocationRow(row),
     location_text: row.location_address_text ?? null,
-  }));
+  });
+
+  return rows.map((row) => mapRowWithOptionalDistance(mapCase(row), row, geoSort));
 }
 
 /**
@@ -1154,7 +1207,7 @@ export async function escalateIntakeServiceCaseToEmergencyInTransaction(params) 
     }
 
     const [linkDup] = await conn.execute(
-      `SELECT id FROM incident_report_links WHERE intake_report_id = ? LIMIT 1`,
+      `SELECT id FROM incident_report_links WHERE intake_report_id = ? AND unlinked_at IS NULL LIMIT 1`,
       [intakeRow.id],
     );
     if (linkDup[0]) {
