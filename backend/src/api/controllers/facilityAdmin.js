@@ -1,8 +1,9 @@
 import BackendError from "../../lib/BackendError.js";
 import * as facilityService from "../../services/facilityAdminService.js";
 
-export async function getFacilities(_req, res) {
-  const facilities = await facilityService.listFacilities();
+export async function getFacilities(req, res) {
+  const query = req.validated?.query ?? req.query;
+  const facilities = await facilityService.listFacilities(query);
   res.status(200).json({ facilities });
 }
 
@@ -45,4 +46,22 @@ export async function putFacilityDefaultCapacities(req, res) {
     body.capacities,
   );
   res.status(200).json({ facility });
+}
+
+export async function patchDeactivateFacility(req, res) {
+  const { facilityPublicUuid } = req.validated?.params ?? req.params;
+  const facility = await facilityService.deactivateFacility(facilityPublicUuid);
+  res.status(200).json({
+    message: "Facility deactivated",
+    facility,
+  });
+}
+
+export async function patchActivateFacility(req, res) {
+  const { facilityPublicUuid } = req.validated?.params ?? req.params;
+  const facility = await facilityService.activateFacility(facilityPublicUuid);
+  res.status(200).json({
+    message: "Facility activated",
+    facility,
+  });
 }

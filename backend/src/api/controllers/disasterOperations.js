@@ -22,17 +22,21 @@ export async function postDisaster(req, res) {
 
 export async function getDisasters(req, res) {
   const query = req.validated?.query ?? req.query;
-  const disasters = await disasterService.listDisasters({
+  const result = await disasterService.listDisasters({
     statusCode: query.statusCode,
     limit: query.limit,
     offset: query.offset,
   });
-  res.status(200).json({ disasters });
+  res.status(200).json(result);
 }
 
 export async function getDisaster(req, res) {
   const params = req.validated?.params ?? req.params;
-  const dashboard = await disasterService.getDisasterDashboard(params.disasterPublicUuid);
+  const query = req.validated?.query ?? req.query;
+  const dashboard = await disasterService.getDisasterDashboard(
+    params.disasterPublicUuid,
+    query,
+  );
   if (!dashboard) {
     throw new BackendError(404, "DISASTER_NOT_FOUND", "Disaster not found");
   }
@@ -213,11 +217,25 @@ export async function postShelterOccupancy(req, res) {
   res.status(201).json({ snapshot });
 }
 
+export async function postDeactivateShelter(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const activation = await disasterService.deactivateShelterActivation({
+    disasterPublicUuid: params.disasterPublicUuid,
+    shelterActivationPublicUuid: params.shelterActivationPublicUuid,
+    note: body.note,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json({ activation });
+}
+
 export async function postStockReceipt(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
   const receipt = await disasterService.recordStockReceipt({
-    hubActivationPublicUuid: params.hubActivationPublicUuid,
+    disasterPublicUuid: params.disasterPublicUuid,
+    reliefHubActivationPublicUuid: params.hubActivationPublicUuid,
     reliefItemCode: body.reliefItemCode,
     quantityReceived: body.quantityReceived,
     note: body.note,
@@ -225,6 +243,19 @@ export async function postStockReceipt(req, res) {
     auditMeta: audit(req),
   });
   res.status(201).json({ receipt });
+}
+
+export async function postDeactivateReliefHub(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const activation = await disasterService.deactivateReliefHubActivation({
+    disasterPublicUuid: params.disasterPublicUuid,
+    hubActivationPublicUuid: params.hubActivationPublicUuid,
+    note: body.note,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json({ activation });
 }
 
 export async function postReliefRequest(req, res) {

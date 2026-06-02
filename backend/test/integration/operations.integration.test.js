@@ -37,6 +37,16 @@ describe("operations integration", { skip: !dbUp }, () => {
     assert.ok(Array.isArray(res.body.intake_reports));
   });
 
+  it("GET /operations/intake-reports returns 422 for distance sort without reference", async () => {
+    const token = await getAdminToken(app);
+    const res = await request(app)
+      .get("/operations/intake-reports")
+      .query({ sort: "distance_asc" })
+      .set(jsonHeaders(token));
+    assert.equal(res.status, 422);
+    assert.equal(res.body.error?.code, "VALIDATION_ERROR");
+  });
+
   it("GET /operations/incidents/:incidentPublicUuid returns response state", async () => {
     const [rows] = await pool.execute(
       `SELECT id FROM emergency_incidents WHERE public_uuid = ? LIMIT 1`,
@@ -53,6 +63,11 @@ describe("operations integration", { skip: !dbUp }, () => {
 
     assert.equal(res.status, 200);
     assert.equal(res.body.incident.public_uuid, SEED.demoIncidentPublicUuid);
+    if (res.body.incident.location) {
+      assert.ok(res.body.incident.location.public_uuid);
+      assert.equal(typeof res.body.incident.location.latitude, "number");
+      assert.equal(typeof res.body.incident.location.longitude, "number");
+    }
     assert.ok(Array.isArray(res.body.linked_intake_reports));
     assert.ok(Array.isArray(res.body.timeline_preview));
     assert.ok(Array.isArray(res.body.participating_agencies));

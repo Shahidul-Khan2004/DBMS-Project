@@ -529,6 +529,13 @@ export const ROUTE_MANIFEST = [
     hasBodyValidator: true,
     validationPersona: "systemAdmin",
   },
+  {
+    method: "PATCH",
+    path: `/admin/facilities/${U}/deactivate`,
+    permissions: ["facility.manage"],
+    denyPersona: "citizen",
+    validationPersona: "systemAdmin",
+  },
 ];
 
 export const PROTECTED_ROUTES = ROUTE_MANIFEST.filter((r) => !r.public);

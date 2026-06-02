@@ -16,6 +16,7 @@ import {
   ensureAgencyMembershipsPublicUuid,
   ensureIncidentReportLinksSoftUnlink,
   ensureIntakeStatusUnlinkTransition,
+  migrateLegacyReportedIncidentStatus,
 } from "./schemaMigrations.js";
 
 const DEFAULT_PERMISSIONS = [
@@ -278,6 +279,7 @@ export async function bootstrapDevelopmentSystemAdmin() {
   await ensureAgencyMembershipsPublicUuid();
   await ensureIncidentReportLinksSoftUnlink();
   await ensureIntakeStatusUnlinkTransition();
+  await migrateLegacyReportedIncidentStatus();
   await bootstrapDemoAgencyRepresentatives();
 
   const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);

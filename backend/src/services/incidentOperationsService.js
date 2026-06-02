@@ -21,6 +21,7 @@ import {
 import { listIntakeReportLocationHistory } from "../repositories/intakeRepo.js";
 import { findIntakeReportByPublicUuid } from "../repositories/intakeRepo.js";
 import { createNotification } from "./notificationService.js";
+import { mergeGeoSortIntoFilters, resolveGeoSortFromQuery } from "./geoSortService.js";
 
 async function getCurrentIncidentStatus(publicUuid) {
   const result = await query(
@@ -52,7 +53,8 @@ function assertOutcomeForTerminal(statusCode, outcomeCode) {
 }
 
 export async function operationsListIntakeReports(queryFilters) {
-  return listIntakeReportsForOperations(queryFilters);
+  const geo = await resolveGeoSortFromQuery(queryFilters);
+  return listIntakeReportsForOperations(mergeGeoSortIntoFilters(queryFilters, geo));
 }
 
 export async function operationsGetIntakeReport(publicUuid) {
@@ -149,15 +151,19 @@ export async function operationsPromoteIntakeEmergency(
 }
 
 export async function operationsListIncidents(filters) {
-  return listIncidentsForOperations(filters);
+  const geo = await resolveGeoSortFromQuery(filters);
+  return listIncidentsForOperations(mergeGeoSortIntoFilters(filters, geo));
 }
 
-export async function listMyIncidents(actorPublicUuid) {
+export async function listMyIncidents(actorPublicUuid, query = {}) {
   const userRow = await findUserByPublicUuid(actorPublicUuid);
   if (!userRow) {
     throw new BackendError(401, "INVALID_ACCESS_TOKEN", "Invalid access token");
   }
-  const incidents = await listMyIncidentsByReporterUserId(userRow.id);
+  const geo = await resolveGeoSortFromQuery(query, { actorUserId: userRow.id });
+  const incidents = await listMyIncidentsByReporterUserId(userRow.id, {
+    geoSort: geo.geoSort,
+  });
   return { incidents };
 }
 

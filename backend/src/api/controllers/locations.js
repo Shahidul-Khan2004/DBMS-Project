@@ -2,6 +2,9 @@ import * as locationService from "../../services/locationService.js";
 import * as savedLocationService from "../../services/savedLocationService.js";
 import { reverseGeocodeBarikoi, searchPlacesBarikoi } from "../../integrations/barikoiReverseGeocoder.js";
 import BackendError from "../../lib/BackendError.js";
+import pool from "../../config/db.js";
+import { resolveAdminAreaFromCoordinates } from "../../services/adminAreaFromGpsService.js";
+import { getAdministrativeAreaLabelById } from "../../repositories/administrativeAreaRepo.js";
 
 export async function postLocation(req, res) {
   const body = req.validated?.body ?? req.body;
@@ -13,7 +16,8 @@ export async function postLocation(req, res) {
 }
 
 export async function getMyLocations(req, res) {
-  const locations = await savedLocationService.listSavedLocationsForActor(req.actorUserId);
+  const query = req.validated?.query ?? req.query;
+  const locations = await locationService.listLocationsForActor(req.actorUserId, query);
   res.status(200).json({ locations });
 }
 
@@ -75,10 +79,11 @@ export async function getLocationReverse(req, res) {
     );
   }
 
-  const { place, authOrQuotaFailure } = await reverseGeocodeBarikoi({
+  const reverseResult = await reverseGeocodeBarikoi({
     latitude,
     longitude,
   });
+  const { place, authOrQuotaFailure } = reverseResult;
 
   if (authOrQuotaFailure) {
     if (authOrQuotaFailure.kind === "invalid_key") {
@@ -97,10 +102,36 @@ export async function getLocationReverse(req, res) {
   }
 
   const placeName = [place.area, place.city, place.thana].filter(Boolean).join(", ");
+  const addressText =
+    place.address?.trim() ||
+    [place.area, place.thana, place.city].filter(Boolean).join(", ") ||
+    undefined;
+  const barikoiAdminAreaLabel =
+    [place.upazila, place.district, place.division].filter(Boolean).join(", ") || undefined;
+
+  let adminAreaId;
+  let adminAreaLabel = barikoiAdminAreaLabel;
+
+  try {
+    const resolved = await resolveAdminAreaFromCoordinates(pool, latitude, longitude, {
+      prefetchedBarikoiResult: reverseResult,
+    });
+    if (resolved?.adminAreaId != null) {
+      adminAreaId = resolved.adminAreaId;
+      const dbLabel = await getAdministrativeAreaLabelById(pool, resolved.adminAreaId);
+      if (dbLabel) {
+        adminAreaLabel = dbLabel;
+      }
+    }
+  } catch {
+    // Admin area matching is optional for reverse lookup display.
+  }
 
   res.status(200).json({
-    addressText: place.address ?? undefined,
+    addressText,
     placeName: placeName || undefined,
+    adminAreaId,
+    adminAreaLabel,
   });
 }
 

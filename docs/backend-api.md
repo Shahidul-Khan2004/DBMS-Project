@@ -82,6 +82,30 @@ Structured `location` objects use **`latitude`** and **`longitude`** (required n
 
 Do not send **`location`** and **`locationId`** in the same request.
 
+## Distance sorting (list endpoints)
+
+Optional proximity sorting uses **stored** `locations` rows only (no raw `latitude`/`longitude` query params).
+
+| Query | Meaning |
+| --- | --- |
+| `sort=distance_asc` | Order by increasing distance from the reference point |
+| `includeDistance=true` | Include `distance_km` on each row (only valid with `sort=distance_asc`) |
+| `nearIncidentPublicUuid` | Reference = incident `current_location_id` |
+| `nearIntakeReportPublicUuid` | Reference = intake `reported_location_id` |
+| `nearServiceCasePublicUuid` | Reference = case `current_location_id`, else linked intake location |
+| `nearFacilityPublicUuid` | Reference = facility `location_id` |
+| `nearDisasterAffectedAreaPublicUuid` | Reference = geographic anchor for that upazila on the disaster (shelters/hubs/linked incidents in area); `422` `GEO_REFERENCE_UNAVAILABLE` if none |
+| `nearLocationId` | Citizen only: numeric `id` from **`GET /locations/my`** (must be owned by caller) |
+
+**Rules:**
+
+- Exactly **one** `near*` parameter is required when `sort=distance_asc` (except **`GET /operations/units/available`**, which uses the required `incidentPublicUuid` as the reference).
+- Any `near*` without `sort=distance_asc` → `422` `VALIDATION_ERROR`.
+- Unknown or inaccessible reference → `404` (or `403` `LOCATION_NOT_OWNED` for citizen `nearLocationId`).
+- Rows with no resolvable entity location stay in the result, sorted **last**; with `includeDistance=true`, `distance_km` is `null` for those rows.
+- Agency distance uses **`head_office_location_id`** only.
+- Default date/name ordering is unchanged when distance sort is not requested.
+
 ## Route index
 
 | Area | Method | Path | Notes |
@@ -386,6 +410,8 @@ Citizen-owned saved locations; `public_uuid` is used as **`locationId`** on inta
 Field names are **camelCase** in JSON.
 
 ### GET `/locations/my`
+
+Query (optional distance sort): `sort=distance_asc`, `nearLocationId` (numeric `id` from this list), `includeDistance=true`.
 
 **Response (200):**
 
@@ -815,7 +841,7 @@ Rollup for dispatcher UIs: **counts** + merged **recent** timeline (intakes pend
 
 ### GET `/operations/intake-reports`
 
-Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc`).
+Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–100, default 50), `offset`, `sort` (`reported_at_desc` \| `reported_at_asc` \| `distance_asc`). For `distance_asc`, require `nearIncidentPublicUuid` and optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -858,7 +884,28 @@ Queue of intake reports. Query: `intake_status`, `categoryCode`, `limit` (1–10
 
 ### GET `/operations/intake-reports/:reportPublicUuid`
 
-Single row, same shape as list elements.
+Same fields as list elements, plus optional read-only reporter/caller detail:
+
+```json
+{
+  "intake_report": {
+    "public_uuid": "…",
+    "report_code": "IR-…",
+    "reporter": {
+      "user_public_uuid": "…",
+      "full_name": "…",
+      "phone_number": "…",
+      "email": null,
+      "is_anonymous": false
+    },
+    "emergency_call": {
+      "caller_phone_number": "+8801700000000"
+    }
+  }
+}
+```
+
+`reporter` and `emergency_call` are omitted or null when not applicable. Anonymous reports set `reporter.is_anonymous` to `true` with contact fields null.
 
 **Response (200):**
 
@@ -1062,7 +1109,9 @@ When `disposition` is `service_case`, the response includes `service_case` inste
 
 ### GET `/operations/incidents`
 
-Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Ordered by `reported_at` descending.
+Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Default order: `reported_at` descending.
+
+Distance sort: `sort=distance_asc`, `nearIntakeReportPublicUuid`, optional `includeDistance=true` (see [Distance sorting](#distance-sorting-list-endpoints)).
 
 **Response (200):**
 
@@ -1119,10 +1168,12 @@ Query: `status_code`, `reported_after`, `reported_before`, `limit`, `offset`. Or
     {
       "link_type": "primary_report",
       "linked_at": "2026-05-04T12:05:00.000Z",
+      "link_note": null,
       "intake_public_uuid": "…",
       "intake_report_code": "IR-…",
       "intake_summary": "…",
-      "intake_status": "linked_to_incident"
+      "intake_status": "linked_to_incident",
+      "location": null
     }
   ],
   "timeline_preview": [
@@ -1384,7 +1435,7 @@ Incident status may auto-advance on milestones (same transaction): agency add �
 
 **Permission:** `dispatch.create`.
 
-**Query:** `incidentPublicUuid` (required UUID) — only units whose agency participates on the incident (`participation_status` `requested` or `active`) and `status_code` = `available`.
+**Query:** `incidentPublicUuid` (required UUID) — only units whose agency participates on the incident (`participation_status` `requested` or `active`) and `status_code` = `available`. Optional `sort=distance_asc` sorts by distance from that incident’s location; optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -1496,7 +1547,7 @@ On `completed` or `cancelled`, unit returns to `available`.
 
 **Permission:** `dispatch.create` or `incident.assign_agency`.
 
-Reads `vw_agency_workload` joined with agency `public_uuid`.
+Reads `vw_agency_workload` joined with agency `public_uuid`. Default order: agency name. Distance sort: `sort=distance_asc`, `nearIncidentPublicUuid`, optional `includeDistance=true` (agency point = head office).
 
 **Response (200):**
 
@@ -1841,9 +1892,9 @@ Promotes an intake that is already on the **service case** path (`intake_status`
   "status_history": [
     {
       "id": "1",
-      "status_code": "submitted",
+      "status_code": "under_review",
       "changed_at": "2026-05-06T10:00:00.000Z",
-      "note": null,
+      "note": "Created from intake …",
       "changed_by": null
     }
   ],
@@ -1899,6 +1950,8 @@ For status history, assignments, and resolution without re-fetching the full pay
 ```
 
 **Transitions (non-terminal →):**
+
+New service cases are created in **`under_review`** (intake classification). The `submitted` transition remains for legacy rows.
 
 - `submitted` → `under_review` \| `cancelled`
 - `under_review` → `awaiting_user_response` \| `closed` \| `cancelled`
@@ -2027,9 +2080,9 @@ Assigning role **`agency_representative`** via `POST /users/:userId/roles` is **
 
 ### POST `/admin/agencies/onboard`
 
-Single transaction: link an **existing** user to an agency (create new agency **or** use existing), upsert **`agency_memberships`** (`representative`, `active`), assign **`agency_representative`** role if missing.
+Single transaction: create a new agency **or** use an existing one. When **`user_public_uuid`** is provided, link that **existing** user, upsert **`agency_memberships`** (`representative`, `active`), and assign **`agency_representative`** if missing. When omitted, only the agency is created or resolved (no membership or role changes).
 
-**Body (new agency):**
+**Body (new agency, with representative):**
 
 ```json
 {
@@ -2048,7 +2101,25 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Body (existing agency):**
+**Body (new agency, agency only):** omit `user_public_uuid`.
+
+```json
+{
+  "agency": {
+    "agency_code": "DHK-FIRE-02",
+    "name": "Dhaka Fire Service North",
+    "agency_type_code": "fire_service",
+    "description": "optional",
+    "head_office_location": {
+      "latitude": 23.81,
+      "longitude": 90.41,
+      "source": "manual_entry"
+    }
+  }
+}
+```
+
+**Body (existing agency, with representative):**
 
 ```json
 {
@@ -2057,7 +2128,15 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Response (201):**
+**Body (existing agency, agency only):** omit `user_public_uuid`.
+
+```json
+{
+  "agency_public_uuid": "b2000001-0000-4000-8000-000000000001"
+}
+```
+
+**Response (201, with representative):**
 
 ```json
 {
@@ -2077,11 +2156,13 @@ Single transaction: link an **existing** user to an agency (create new agency **
 }
 ```
 
-**Errors:** `404` `USER_NOT_FOUND`, `404` `AGENCY_NOT_FOUND`, `409` `AGENCY_CODE_CONFLICT`, `409` `USER_ALREADY_REPRESENTATIVE`.
+**Response (201, agency only):** `"message": "Agency onboarded"`, same `agency` object; `membership_public_uuid` and `user_public_uuid` are omitted.
+
+**Errors:** `404` `USER_NOT_FOUND` (when `user_public_uuid` is sent), `404` `AGENCY_NOT_FOUND`, `409` `AGENCY_CODE_CONFLICT`, `409` `USER_ALREADY_REPRESENTATIVE` (when linking a representative).
 
 ### GET `/admin/agencies`
 
-Query: `limit` (1–100, default 20), `offset` (default 0).
+Query: `limit` (1–100, default 20), `offset` (default 0). Optional distance sort: any one of `nearIncidentPublicUuid`, `nearIntakeReportPublicUuid`, `nearServiceCasePublicUuid`, `nearDisasterAffectedAreaPublicUuid`, `nearFacilityPublicUuid`, plus `sort=distance_asc` and optional `includeDistance=true`.
 
 **Response (200):**
 
@@ -2745,6 +2826,8 @@ Alternatively pass `districtAdminAreaId` to expand to all upazilas under the dis
 
 ### GET `/operations/disasters/:disasterPublicUuid`
 
+Optional query: `sort=distance_asc`, `nearDisasterAffectedAreaPublicUuid`, `includeDistance=true` — re-sorts **`linked_incidents`**, **`shelters`**, and **`relief_hubs`** by distance from the affected upazila anchor; other dashboard sections keep default ordering.
+
 **Response (200):** internal dashboard (abbreviated):
 
 ```json
@@ -2774,6 +2857,8 @@ Alternatively pass `districtAdminAreaId` to expand to all upazilas under the dis
   "recent_audit_logs": []
 }
 ```
+
+Each **`shelters[]`** row is a shelter activation for this disaster (from `vw_disaster_shelter_capacity`). Key fields include `shelter_activation_public_uuid`, `facility_name`, `activation_status` (`active` | `finalized`, etc.), and capacity/occupancy metrics. UIs that create relief requests (POST `.../relief-requests`) must only offer rows with `activation_status === "active"`; the API returns `409` `SHELTER_NOT_ACTIVE` otherwise.
 
 ### POST `/operations/disasters/:disasterPublicUuid/status`
 
@@ -2835,9 +2920,53 @@ Alternatively pass `districtAdminAreaId` to expand to all upazilas under the dis
 
 **Response (201):** dashboard payload.
 
-### POST `/operations/disasters/:disasterPublicUuid/shelters` · `.../relief-hubs`
+### POST `/operations/disasters/:disasterPublicUuid/shelters`
 
-**Body:** `{ "facilityPublicUuid": "f6000001-0000-4000-8000-000000000001" }` — manual activation on the disaster.
+Manual activation of a shelter facility for the disaster.
+
+**Body:**
+
+```json
+{
+  "facilityPublicUuid": "f6000001-0000-4000-8000-000000000001",
+  "usableCapacityOverride": 500,
+  "manualOverrideNote": "Required when facility is outside affected/nearby areas"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `facilityPublicUuid` | yes | Registry facility with shelter capability |
+| `usableCapacityOverride` | no | Positive integer; overrides default usable capacity for this activation |
+| `manualOverrideNote` | conditional | Required (non-empty, max 1000) when the facility is **not** in an affected upazila or the same district as an affected upazila; otherwise omitted |
+
+**Errors:** `422` `MANUAL_ACTIVATION_NOTE_REQUIRED` if override note missing when required; `409` `SHELTER_ALREADY_ACTIVATED` if an **active** activation already exists for this facility; `422` `FACILITY_MISSING_CAPABILITY`.
+
+If a prior activation for the same facility was **deactivated** (`activation_status` `finalized`), the same POST **reactivates** that row instead of inserting a duplicate.
+
+**Response (201):** `{ "activation": { "public_uuid", "activation_status", "facility_public_uuid", … } }`.
+
+### POST `/operations/disasters/:disasterPublicUuid/relief-hubs`
+
+Manual activation of a relief hub facility for the disaster.
+
+**Body:**
+
+```json
+{
+  "facilityPublicUuid": "f6000001-0000-4000-8000-000000000005",
+  "manualOverrideNote": "Required when facility is outside affected/nearby areas"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `facilityPublicUuid` | yes | Registry facility with relief hub capability |
+| `manualOverrideNote` | conditional | Same nearby-area rule as shelter activation |
+
+**Errors:** `422` `MANUAL_ACTIVATION_NOTE_REQUIRED`; `409` `RELIEF_HUB_ALREADY_ACTIVATED` if an **active** activation already exists; `422` `FACILITY_MISSING_CAPABILITY`.
+
+Deactivated (`finalized`) hub activations are **reactivated** on a new POST for the same facility, same as shelters.
 
 **Response (201):** `{ "activation": { "public_uuid", "activation_status", "facility_public_uuid", … } }`.
 
@@ -2974,6 +3103,36 @@ Base path: `/admin/facilities`. Requires `facility.manage`.
 ```
 
 **Response (200):** `{ "facility": { … } }` with updated `defaultCapacities`.
+
+### PATCH `/admin/facilities/:facilityPublicUuid/deactivate`
+
+Deactivates the facility (`isActive: false`). Inactive facilities are excluded from disaster activation eligibility.
+
+**Response (200):**
+
+```json
+{
+  "message": "Facility deactivated",
+  "facility": { "…": "same shape as GET detail" }
+}
+```
+
+**Errors:** `404 FACILITY_NOT_FOUND`, `409 FACILITY_ALREADY_INACTIVE`.
+
+### PATCH `/admin/facilities/:facilityPublicUuid/activate`
+
+Activates the facility (`isActive: true`). Restores eligibility for disaster activation.
+
+**Response (200):**
+
+```json
+{
+  "message": "Facility activated",
+  "facility": { "…": "same shape as GET detail" }
+}
+```
+
+**Errors:** `404 FACILITY_NOT_FOUND`, `409 FACILITY_ALREADY_ACTIVE`.
 
 ---
 

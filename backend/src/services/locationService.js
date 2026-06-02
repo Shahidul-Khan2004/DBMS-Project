@@ -4,6 +4,8 @@ import { getLocationRowByPublicUuid, insertLocationInTransaction } from "../repo
 import { findActiveSavedLocationRow } from "../repositories/savedLocationRepo.js";
 import { resolveAdminAreaIdForLocationPayload } from "./adminAreaFromGpsService.js";
 import { deriveAddressAndSourceForLocation } from "./locationAddressService.js";
+import { distanceKmFromRow } from "../lib/geoDistance.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
 
 /**
  * @param {object | null} row
@@ -102,6 +104,23 @@ export async function createLocationForActor(actorUserId, body) {
   } catch (error) {
     await conn.rollback();
     throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function listLocationsForActor(actorUserId, query = {}) {
+  const { geoSort } = await resolveGeoSortFromQuery(query, { actorUserId });
+  const conn = await pool.getConnection();
+  try {
+    const rows = await listLocationRowsByCreatorUserId(conn, actorUserId, { geoSort });
+    return rows.map((row) => {
+      const mapped = mapRowToLocationResponse(row);
+      if (geoSort?.includeDistance) {
+        return { ...mapped, distance_km: distanceKmFromRow(row) };
+      }
+      return mapped;
+    });
   } finally {
     conn.release();
   }

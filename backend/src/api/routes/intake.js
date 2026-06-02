@@ -35,16 +35,17 @@ import {
   validateIntakeReportUuidParam,
   validatePatchIntakeReportLocation,
 } from "../validators/intake.js";
+import { validateCitizenGeoListQuery } from "../validators/geoSort.js";
 
 export function createIntakeRouter({ requireAuth = defaultRequireAuth } = {}) {
   const router = express.Router();
 
   router.use(requireAuth);
 
-router.get("/reports/my", getMyIntakeReports);
+router.get("/reports/my", validateCitizenGeoListQuery, getMyIntakeReports);
 router.get("/reports/my/stats", getMyIntakeReportStats);
-router.get("/reports/my/service-cases", getMyServiceCases);
-router.get("/reports/my/incidents", getMyIncidents);
+router.get("/reports/my/service-cases", validateCitizenGeoListQuery, getMyServiceCases);
+router.get("/reports/my/incidents", validateCitizenGeoListQuery, getMyIncidents);
 router.get(
   "/service-cases/:publicUuid/messages",
   validateIntakeServiceCasePublicUuidParam,

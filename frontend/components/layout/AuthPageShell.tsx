@@ -20,18 +20,14 @@ export function AuthPageShell({
   variant,
   children,
 }: AuthPageShellProps) {
-  const contentMax =
-    variant === "register" ? "max-w-[1720px]" : "max-w-[800px]";
   const isRegister = variant === "register";
 
   return (
     <div className="niers-auth-bg min-h-[100svh]">
       <NiersNavbar ctaHref={cta.href} ctaLabel={cta.label} />
       <main
-        className={`niers-auth-main mx-auto w-full ${
-          isRegister
-            ? "niers-auth-main--register max-w-[1720px]"
-            : "niers-auth-main--login"
+        className={`niers-auth-main w-full ${
+          isRegister ? "niers-auth-main--register" : "niers-auth-main--login"
         }`}
       >
         <header
@@ -58,11 +54,7 @@ export function AuthPageShell({
             {heading.subtitle}
           </p>
         </header>
-        <div
-          className={`mx-auto w-full ${contentMax} ${
-            variant === "login" ? "mt-6" : ""
-          }`}
-        >
+        <div className={`w-full ${variant === "login" ? "mt-6" : ""}`}>
           {children}
         </div>
       </main>

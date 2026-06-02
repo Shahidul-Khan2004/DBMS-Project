@@ -3,13 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { DispatcherOpsShell } from "@/components/dispatcher/DispatcherOpsShell";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { PageLoading } from "@/components/ui/StatusState";
 import { apiJson } from "@/lib/api";
-import { clearAuthSession, getAuthSession } from "@/lib/auth-store";
+import {
+  clearAuthSession,
+  determineRole,
+  getAuthSession,
+} from "@/lib/auth-store";
+import {
+  DISPATCHER_DASHBOARD_SUBTITLE,
+  DISPATCHER_DASHBOARD_TITLE,
+} from "@/lib/dispatcher-dashboard";
 import { formatBangladeshTime } from "@/lib/datetime";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { AuthzInfo, LoginResponse } from "@/types/auth";
@@ -21,6 +30,10 @@ type MeResponse = {
 
 function formatRoleLabel(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function isDispatcherShellRole(role: string) {
+  return role === "dispatcher" || role === "system_admin";
 }
 
 export default function ProfilePage() {
@@ -53,8 +66,118 @@ export default function ProfilePage() {
     router.push("/");
   };
 
-  if (isChecking) {
+  if (isChecking || (!user && !error)) {
     return <PageLoading label="Loading profile" />;
+  }
+
+  const resolvedRole = authz?.roleCodes?.length
+    ? determineRole(authz.roleCodes)
+    : getAuthSession().userRole;
+  const isDispatcherShell = isDispatcherShellRole(resolvedRole);
+
+  const pageBody = (
+    <div className="w-full space-y-6">
+      {error && <ErrorAlert message={error} />}
+
+      <Card className="shadow-md">
+        <CardHeader>
+          <h2 className="text-lg font-semibold text-[#002D62]">
+            Identity and Status
+          </h2>
+        </CardHeader>
+        <CardContent>
+          {!user && !error ? (
+            <LoadingSkeleton lines={5} />
+          ) : user ? (
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Full Name</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900">
+                  {user.full_name || "-"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">
+                  Account Status
+                </dt>
+                <dd className="mt-1">
+                  <Badge tone={user.account_status}>
+                    {formatBadgeLabel(user.account_status)}
+                  </Badge>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Email</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {user.email || "-"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">
+                  Phone Number
+                </dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {user.phone_number || "-"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">
+                  User Public UUID
+                </dt>
+                <dd className="mt-1 break-all text-sm text-gray-900">
+                  {user.id}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-600">Created</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {formatBangladeshTime(user.created_at)}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {user ? (
+        <Card className="shadow-md">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-[#002D62]">
+              Role Information
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700">Roles</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(authz?.roleCodes?.length
+                  ? authz.roleCodes
+                  : [getAuthSession().userRole]
+                ).map((roleCode) => (
+                  <Badge key={roleCode} tone="active">
+                    {formatRoleLabel(roleCode)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+
+  if (isDispatcherShell) {
+    return (
+      <DashboardLayout
+        title={DISPATCHER_DASHBOARD_TITLE}
+        subtitle={DISPATCHER_DASHBOARD_SUBTITLE}
+        onLogout={handleLogout}
+        hideSidebar
+        showHealthBadge={false}
+      >
+        <DispatcherOpsShell>{pageBody}</DispatcherOpsShell>
+      </DashboardLayout>
+    );
   }
 
   return (
@@ -63,95 +186,7 @@ export default function ProfilePage() {
       subtitle="Account details from /users/me"
       onLogout={handleLogout}
     >
-      <div className="mx-auto max-w-5xl space-y-6">
-        {error && <ErrorAlert message={error} />}
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <h2 className="text-lg font-semibold text-[#002D62]">
-              Identity and Status
-            </h2>
-          </CardHeader>
-          <CardContent>
-            {!user && !error ? (
-              <LoadingSkeleton lines={5} />
-            ) : user ? (
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">Full Name</dt>
-                  <dd className="mt-1 text-sm font-semibold text-gray-900">
-                    {user.full_name || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Account Status
-                  </dt>
-                  <dd className="mt-1">
-                    <Badge tone={user.account_status}>
-                      {formatBadgeLabel(user.account_status)}
-                    </Badge>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">Email</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {user.email || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Phone Number
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {user.phone_number || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    User Public UUID
-                  </dt>
-                  <dd className="mt-1 break-all text-sm text-gray-900">
-                    {user.id}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">Created</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {formatBangladeshTime(user.created_at)}
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        {user ? (
-          <Card className="shadow-md">
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-[#002D62]">
-                Role Information
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700">Roles</h3>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(authz?.roleCodes?.length
-                    ? authz.roleCodes
-                    : [getAuthSession().userRole]
-                  ).map((roleCode) => (
-                    <Badge key={roleCode} tone="active">
-                      {formatRoleLabel(roleCode)}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+      {pageBody}
     </DashboardLayout>
   );
 }

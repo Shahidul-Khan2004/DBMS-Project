@@ -22,3 +22,14 @@ export function sortNewestFirst<T>(
       newestTimestamp(getTimestampValues(left)),
   );
 }
+
+export function sortOldestFirst<T>(
+  items: T[],
+  getTimestampValues: (item: T) => Array<string | null | undefined>,
+) {
+  return [...items].sort(
+    (left, right) =>
+      newestTimestamp(getTimestampValues(left)) -
+      newestTimestamp(getTimestampValues(right)),
+  );
+}

@@ -1,7 +1,7 @@
 import React from "react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "danger";
+  variant?: "primary" | "secondary" | "outline" | "danger" | "emergency";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
   fullWidth?: boolean;
@@ -22,14 +22,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseStyles =
-      "font-semibold rounded-2xl transition-colors duration-200 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]";
+      "cursor-pointer font-semibold rounded-2xl transition-colors duration-200 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62]";
 
     const variants = {
-      primary: "bg-[#002D62] text-white hover:bg-[#001F4A]",
+      primary:
+        "bg-[#002D62] text-white hover:bg-[#001F4A] active:bg-[#001433] disabled:hover:bg-[#002D62]",
       secondary:
-        "border border-[#002D62]/20 bg-[#E8F2FF] text-[#002D62] hover:border-[#002D62]/30 hover:bg-[#DCEBFF]",
-      outline: "border-2 border-[#002D62] bg-white text-[#002D62] hover:bg-[#EFF6FF]",
-      danger: "bg-[#DA291C] text-white hover:bg-[#B71C1C]",
+        "border border-[#002D62]/20 bg-[#E8F2FF] text-[#002D62] hover:border-[#002D62]/30 hover:bg-[#DCEBFF] active:bg-[#CFE4FF] disabled:hover:border-[#002D62]/20 disabled:hover:bg-[#E8F2FF]",
+      outline:
+        "border-2 border-[#002D62] bg-white text-[#002D62] hover:bg-[#EFF6FF] active:bg-[#DCEBFF] disabled:hover:bg-white",
+      danger:
+        "bg-[#B91C1C] text-white hover:bg-[#991B1B] active:bg-[#7F1D1D] disabled:hover:bg-[#B91C1C]",
+      emergency:
+        "bg-[#B91C1C] text-white hover:bg-[#991B1B] active:bg-[#7F1D1D] disabled:hover:bg-[#B91C1C]",
     };
 
     const sizes = {

@@ -1,4 +1,5 @@
 import * as agencyRepo from "../repositories/agencyRepo.js";
+import { mergeGeoSortIntoFilters, resolveGeoSortFromQuery } from "./geoSortService.js";
 
 export async function resolveAgencyContextForUser(userId) {
   const row = await agencyRepo.loadActiveRepresentativeContext(userId);
@@ -34,8 +35,15 @@ export function agencyPatchDispatchStatus(agencyId, dispatchPublicUuid, body, ac
   });
 }
 
-export function agencyListUnits(agencyId, query) {
-  return agencyRepo.listAgencyUnits(agencyId, query);
+export async function agencyListUnits(agencyId, query) {
+  const geo = await resolveGeoSortFromQuery(query);
+  return agencyRepo.listAgencyUnits(
+    agencyId,
+    mergeGeoSortIntoFilters(
+      { limit: query.limit, offset: query.offset },
+      geo,
+    ),
+  );
 }
 
 export function agencyCreateUnit(agencyId, body, actorUserId) {

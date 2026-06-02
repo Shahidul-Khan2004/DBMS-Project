@@ -151,6 +151,11 @@ export const validateStockReceipt = validate(
   }),
 );
 
+export const validateActivationDeactivation = validate(
+  "activationDeactivation",
+  z.object({ note: z.string().max(500).optional() }),
+);
+
 export const validateCreateReliefRequest = validate(
   "createReliefRequest",
   z.object({

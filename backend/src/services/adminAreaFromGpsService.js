@@ -35,6 +35,7 @@ function pickHits(rows, providerName) {
  *   fetchFn?: typeof fetch
  *   barikoiApiKey?: string | null
  *   listAdministrativeAreasByTypeUnderParents?: typeof listAdministrativeAreasByTypeUnderParents
+ *   prefetchedBarikoiResult?: Awaited<ReturnType<typeof reverseGeocodeBarikoi>>
  * }} [deps]
  * @returns {Promise<AdminAreaGpsResolution | null>}
  */
@@ -43,13 +44,18 @@ export async function resolveAdminAreaFromCoordinates(pool, latitude, longitude,
     deps.listAdministrativeAreasByTypeUnderParents ??
     listAdministrativeAreasByTypeUnderParents;
 
-  const bg = await reverseGeocodeBarikoi({
-    latitude,
-    longitude,
-    fetchFn: deps.fetchFn,
-    apiKey: deps.barikoiApiKey,
-  });
+  const bg =
+    deps.prefetchedBarikoiResult ??
+    (await reverseGeocodeBarikoi({
+      latitude,
+      longitude,
+      fetchFn: deps.fetchFn,
+      apiKey: deps.barikoiApiKey,
+    }));
   if (bg.authOrQuotaFailure) {
+    if (deps.prefetchedBarikoiResult) {
+      return null;
+    }
     const { kind, httpStatus, providerMessage } = bg.authOrQuotaFailure;
     const details = { httpStatus, providerMessage: providerMessage ?? null };
     if (kind === "quota") {

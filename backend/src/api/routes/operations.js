@@ -51,6 +51,7 @@ import {
   validateOperationsDispatchUuidParam,
   validateOperationsPatchDispatchStatus,
 } from "../validators/operationsDispatch.js";
+import { validateOperationsAgencyWorkloadQuery } from "../validators/geoSort.js";
 import {
   getOperationsServiceCase,
   getOperationsServiceCaseMessages,
@@ -211,6 +212,7 @@ router.patch(
 router.get(
   "/agencies/workload",
   requireAnyPermission("dispatch.create", "incident.assign_agency"),
+  validateOperationsAgencyWorkloadQuery,
   getOperationsAgencyWorkload,
 );
 

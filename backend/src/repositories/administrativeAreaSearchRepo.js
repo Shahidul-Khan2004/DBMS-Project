@@ -19,9 +19,9 @@ export async function searchAdministrativeAreas(params) {
           d.code,
           d.name,
           d.area_type AS areaType,
-          CONCAT(d.name, ', ', div.name) AS hierarchyPath
+          CONCAT(d.name, ', ', division.name) AS hierarchyPath
         FROM administrative_areas d
-        INNER JOIN administrative_areas div ON div.id = d.parent_area_id
+        INNER JOIN administrative_areas division ON division.id = d.parent_area_id
         WHERE d.area_type = 'district'
           AND d.name LIKE ?
         ORDER BY d.name
@@ -39,10 +39,10 @@ export async function searchAdministrativeAreas(params) {
         u.code,
         u.name,
         u.area_type AS areaType,
-        CONCAT(u.name, ', ', d.name, ', ', div.name) AS hierarchyPath
+        CONCAT(u.name, ', ', d.name, ', ', division.name) AS hierarchyPath
       FROM administrative_areas u
       INNER JOIN administrative_areas d ON d.id = u.parent_area_id
-      INNER JOIN administrative_areas div ON div.id = d.parent_area_id
+      INNER JOIN administrative_areas division ON division.id = d.parent_area_id
       WHERE u.area_type = 'upazila'
         AND u.name LIKE ?
       ORDER BY u.name

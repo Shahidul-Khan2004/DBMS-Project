@@ -2,6 +2,8 @@ import express from "express";
 import {
   getFacilities,
   getFacility,
+  patchActivateFacility,
+  patchDeactivateFacility,
   postFacility,
   putFacilityCapabilities,
   putFacilityDefaultCapacities,
@@ -12,6 +14,7 @@ import {
   validateFacilityCapabilities,
   validateFacilityDefaultCapacities,
 } from "../validators/facility.js";
+import { validateAdminFacilitiesListQuery } from "../validators/geoSort.js";
 import validate from "../validators/validator.js";
 import { z } from "zod";
 
@@ -26,7 +29,7 @@ export function createFacilitiesRouter({ requireAuth = defaultRequireAuth } = {}
   router.use(requireAuth);
   router.use(requirePermission("facility.manage"));
 
-  router.get("/", getFacilities);
+  router.get("/", validateAdminFacilitiesListQuery, getFacilities);
   router.post("/", validateCreateFacility, postFacility);
   router.get("/:facilityPublicUuid", validateFacilityUuidParam, getFacility);
   router.put(
@@ -40,6 +43,16 @@ export function createFacilitiesRouter({ requireAuth = defaultRequireAuth } = {}
     validateFacilityUuidParam,
     validateFacilityDefaultCapacities,
     putFacilityDefaultCapacities,
+  );
+  router.patch(
+    "/:facilityPublicUuid/deactivate",
+    validateFacilityUuidParam,
+    patchDeactivateFacility,
+  );
+  router.patch(
+    "/:facilityPublicUuid/activate",
+    validateFacilityUuidParam,
+    patchActivateFacility,
   );
   return router;
 }

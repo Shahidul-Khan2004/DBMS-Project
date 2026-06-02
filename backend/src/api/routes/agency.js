@@ -24,6 +24,7 @@ import {
   validateAgencyDispatchUuidParam,
   validateAgencyIncidentUuidParam,
   validateAgencyListQuery,
+  validateAgencyUnitsListQuery,
   validateAgencyPatchDispatchStatus,
   validateAgencyPatchUnit,
   validateAgencyPatchUnitStatus,
@@ -59,7 +60,12 @@ export function createAgencyRouter({
     validateAgencyPatchDispatchStatus,
     patchAgencyDispatchStatus,
   );
-  router.get("/units", requirePermission("agency.view_own"), validateAgencyListQuery, getAgencyUnits);
+  router.get(
+    "/units",
+    requirePermission("agency.view_own"),
+    validateAgencyUnitsListQuery,
+    getAgencyUnits,
+  );
   router.post(
     "/units",
     requirePermission("agency.manage_own_units"),

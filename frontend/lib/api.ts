@@ -6,7 +6,9 @@ import {
   getAuthSession,
   getValidAccessToken,
   saveAuthSession,
+  saveAuthz,
 } from "@/lib/auth-store";
+import type { AuthzInfo } from "@/types/auth";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -48,15 +50,13 @@ export class ApiError extends Error {
 type RefreshResponse = {
   accessToken: string;
   refreshToken: string;
-  authz?: {
-    roleCodes?: string[];
-  };
+  authz?: AuthzInfo;
   user?: unknown;
 };
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "method"> & {
   body?: unknown;
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 };
 
 let refreshSessionPromise: Promise<string | null> | null = null;
@@ -144,6 +144,10 @@ async function refreshSessionRequest() {
 
   const nextRole = determineRole(data.authz?.roleCodes ?? [userRole]);
   saveAuthSession(data.accessToken, data.refreshToken, nextRole);
+
+  if (data.authz) {
+    saveAuthz(data.authz);
+  }
 
   if (data.user) {
     sessionStorage.setItem("loggedInUser", JSON.stringify(data.user));
@@ -295,6 +299,22 @@ export function apiPatch<TResponse, TBody = unknown>(
   init?: Omit<ApiRequestOptions, "method" | "body">,
 ) {
   return protectedJson<TResponse>(path, { ...init, method: "PATCH", body });
+}
+
+export function apiPut<TResponse, TBody = unknown>(
+  path: string,
+  body?: TBody,
+  init?: Omit<ApiRequestOptions, "method" | "body">,
+) {
+  return protectedJson<TResponse>(path, { ...init, method: "PUT", body });
+}
+
+export function apiDelete<TResponse, TBody = unknown>(
+  path: string,
+  body?: TBody,
+  init?: Omit<ApiRequestOptions, "method" | "body">,
+) {
+  return protectedJson<TResponse>(path, { ...init, method: "DELETE", body });
 }
 
 export function publicPost<TResponse, TBody = unknown>(
