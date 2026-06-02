@@ -1,19 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ActivateShelterModal } from "@/components/admin/disasters/detail/ActivateShelterModal";
 import { ShelterManagingAgencyModal } from "@/components/admin/disasters/detail/ShelterManagingAgencyModal";
 import { ShelterOccupancyModal } from "@/components/admin/disasters/detail/ShelterOccupancyModal";
 import { DisasterLocationDisplay } from "@/components/admin/disasters/detail/DisasterLocationDisplay";
+import { ApiError, getApiErrorMessage } from "@/lib/api";
+import { postDeactivateDisasterShelter } from "@/lib/disaster-operations-api";
+import { isActiveDisasterActivation } from "@/lib/disaster-operations-format";
 import type { DisasterDashboardResponse, DisasterShelterActivation } from "@/types/disaster-operations";
-import type { FacilityLocation } from "@/types/admin-facility";
+import type { AdminFacilityListItem, FacilityLocation } from "@/types/admin-facility";
 
 type DisasterSheltersTabProps = {
   disasterPublicUuid: string;
   dashboard: DisasterDashboardResponse;
+  facilities: AdminFacilityListItem[];
   facilityLocations: Map<string, FacilityLocation | null | undefined>;
   isReadOnly: boolean;
   onRefresh: () => Promise<void>;
@@ -22,6 +28,7 @@ type DisasterSheltersTabProps = {
 export function DisasterSheltersTab({
   disasterPublicUuid,
   dashboard,
+  facilities,
   facilityLocations,
   isReadOnly,
   onRefresh,
@@ -31,7 +38,34 @@ export function DisasterSheltersTab({
     useState<DisasterShelterActivation | null>(null);
   const [occupancyShelter, setOccupancyShelter] =
     useState<DisasterShelterActivation | null>(null);
-  const shelters = dashboard.shelters ?? [];
+  const [deactivateShelter, setDeactivateShelter] =
+    useState<DisasterShelterActivation | null>(null);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const shelters = (dashboard.shelters ?? []).filter((s) =>
+    isActiveDisasterActivation(s.activation_status),
+  );
+
+  const handleDeactivateShelter = async () => {
+    if (!deactivateShelter?.shelter_activation_public_uuid) return;
+    setIsDeactivating(true);
+    try {
+      await postDeactivateDisasterShelter(
+        disasterPublicUuid,
+        deactivateShelter.shelter_activation_public_uuid,
+      );
+      toast.success("Shelter deactivated.");
+      setDeactivateShelter(null);
+      await onRefresh();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? getApiErrorMessage(err, err.message)
+          : "Failed to deactivate shelter.",
+      );
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
 
   return (
     <>
@@ -40,13 +74,13 @@ export function DisasterSheltersTab({
         headerAction={
           !isReadOnly ? (
             <Button type="button" size="sm" onClick={() => setActivateOpen(true)}>
-              Activate shelter
+              Activate shelters
             </Button>
           ) : undefined
         }
       >
         {shelters.length === 0 ? (
-          <p className="text-sm text-slate-600">No shelter activations.</p>
+          <p className="text-sm text-slate-600">No active shelter activations.</p>
         ) : (
           <ul className="space-y-3 text-sm">
             {shelters.map((s) => {
@@ -111,6 +145,14 @@ export function DisasterSheltersTab({
                         >
                           Record occupancy
                         </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setDeactivateShelter(s)}
+                        >
+                          Deactivate shelter
+                        </Button>
                       </div>
                     ) : null}
                   </div>
@@ -124,6 +166,8 @@ export function DisasterSheltersTab({
       <ActivateShelterModal
         open={activateOpen}
         disasterPublicUuid={disasterPublicUuid}
+        dashboard={dashboard}
+        facilities={facilities}
         onClose={() => setActivateOpen(false)}
         onSuccess={onRefresh}
       />
@@ -140,6 +184,15 @@ export function DisasterSheltersTab({
         shelter={occupancyShelter}
         onClose={() => setOccupancyShelter(null)}
         onSuccess={onRefresh}
+      />
+      <ConfirmModal
+        open={deactivateShelter != null}
+        title="Deactivate shelter"
+        message={`Deactivate ${deactivateShelter?.facility_name ?? "this shelter"}?`}
+        confirmLabel="Deactivate"
+        isLoading={isDeactivating}
+        onConfirm={() => void handleDeactivateShelter()}
+        onCancel={() => setDeactivateShelter(null)}
       />
     </>
   );

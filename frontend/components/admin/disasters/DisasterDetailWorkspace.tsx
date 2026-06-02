@@ -39,6 +39,7 @@ export function DisasterDetailWorkspace({
 }: DisasterDetailWorkspaceProps) {
   const {
     dashboard,
+    facilities,
     facilityLocations,
     isLoading,
     isRefreshing,
@@ -235,6 +236,7 @@ export function DisasterDetailWorkspace({
           <DisasterSheltersTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
+            facilities={facilities}
             facilityLocations={facilityLocations}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}
@@ -244,6 +246,7 @@ export function DisasterDetailWorkspace({
           <DisasterReliefHubsTab
             disasterPublicUuid={disasterPublicUuid}
             dashboard={dashboard}
+            facilities={facilities}
             facilityLocations={facilityLocations}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}

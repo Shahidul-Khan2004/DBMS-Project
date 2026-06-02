@@ -13,7 +13,10 @@ import {
 } from "@/components/admin/disasters/detail/ReliefLineItemsEditor";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postDisasterReliefRequest } from "@/lib/disaster-operations-api";
-import { RELIEF_ITEM_OPTIONS } from "@/lib/disaster-operations-format";
+import {
+  isActiveDisasterActivation,
+  RELIEF_ITEM_OPTIONS,
+} from "@/lib/disaster-operations-format";
 import type { DisasterShelterActivation } from "@/types/disaster-operations";
 
 type CreateReliefRequestModalProps = {
@@ -42,7 +45,7 @@ export function CreateReliefRequestModal({
   const activeShelters = shelters.filter(
     (s) =>
       s.shelter_activation_public_uuid &&
-      (s.activation_status ?? "active") === "active",
+      isActiveDisasterActivation(s.activation_status),
   );
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function CreateReliefRequestModal({
     const firstActive = shelters.find(
       (s) =>
         s.shelter_activation_public_uuid &&
-        (s.activation_status ?? "active") === "active",
+        isActiveDisasterActivation(s.activation_status),
     );
     setShelterUuid(firstActive?.shelter_activation_public_uuid ?? "");
     setRequestNote("");

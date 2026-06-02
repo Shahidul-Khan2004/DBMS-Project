@@ -5,7 +5,7 @@ import { getDisasterDashboard } from "@/lib/disaster-operations-api";
 import { isTerminalDisasterStatus } from "@/lib/disaster-operations-format";
 import { listAdminFacilities } from "@/lib/admin-facility-api";
 import type { DisasterDashboardResponse } from "@/types/disaster-operations";
-import type { FacilityLocation } from "@/types/admin-facility";
+import type { AdminFacilityListItem, FacilityLocation } from "@/types/admin-facility";
 
 export function useDisasterDashboard(disasterPublicUuid: string) {
   const [dashboard, setDashboard] = useState<DisasterDashboardResponse | null>(
@@ -14,6 +14,7 @@ export function useDisasterDashboard(disasterPublicUuid: string) {
   const [facilityLocations, setFacilityLocations] = useState<
     Map<string, FacilityLocation | null | undefined>
   >(new Map());
+  const [facilities, setFacilities] = useState<AdminFacilityListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +27,10 @@ export function useDisasterDashboard(disasterPublicUuid: string) {
         map.set(facility.publicUuid, facility.location);
       }
       setFacilityLocations(map);
+      setFacilities(data.facilities ?? []);
     } catch {
       setFacilityLocations(new Map());
+      setFacilities([]);
     }
   }, []);
 
@@ -76,6 +79,7 @@ export function useDisasterDashboard(disasterPublicUuid: string) {
 
   return {
     dashboard,
+    facilities,
     facilityLocations,
     isLoading,
     isRefreshing,

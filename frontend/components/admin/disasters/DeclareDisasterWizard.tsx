@@ -49,12 +49,16 @@ function buildAssessment(
   estimatedAffectedPeople: string,
   assessmentNote: string,
   impactLevel: string,
+  shelterSupportRequired: boolean,
+  reliefSupportRequired: boolean,
 ): DisasterAssessmentInput | undefined {
   const people = estimatedAffectedPeople.trim();
   const note = assessmentNote.trim();
   const impact = impactLevel.trim();
 
-  if (!people && !note && !impact) return undefined;
+  if (!people && !note && !impact && !shelterSupportRequired && !reliefSupportRequired) {
+    return undefined;
+  }
 
   const assessment: DisasterAssessmentInput = {};
   if (people) {
@@ -72,12 +76,15 @@ function buildAssessment(
   ) {
     assessment.impactLevel = impact;
   }
+  if (shelterSupportRequired) assessment.shelterSupportRequired = true;
+  if (reliefSupportRequired) assessment.reliefSupportRequired = true;
   return assessment;
 }
 
 export function DeclareDisasterWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [eventDraftReady, setEventDraftReady] = useState(false);
   const [disasterPublicUuid, setDisasterPublicUuid] = useState<string | null>(
     null,
   );
@@ -104,11 +111,14 @@ export function DeclareDisasterWizard() {
   const [selectedUpazilas, setSelectedUpazilas] = useState<
     AdministrativeAreaSearchResult[]
   >([]);
-  const [selectedDistrict, setSelectedDistrict] =
-    useState<AdministrativeAreaSearchResult | null>(null);
+  const [selectedDistricts, setSelectedDistricts] = useState<
+    AdministrativeAreaSearchResult[]
+  >([]);
   const [estimatedAffectedPeople, setEstimatedAffectedPeople] = useState("");
   const [assessmentNote, setAssessmentNote] = useState("");
   const [impactLevel, setImpactLevel] = useState("");
+  const [shelterSupportRequired, setShelterSupportRequired] = useState(false);
+  const [reliefSupportRequired, setReliefSupportRequired] = useState(false);
 
   const [declarationTitle, setDeclarationTitle] = useState("");
   const [publicGuidance, setPublicGuidance] = useState("");
@@ -119,7 +129,7 @@ export function DeclareDisasterWizard() {
   const [areasCompleted, setAreasCompleted] = useState(false);
   const [maxStepReached, setMaxStepReached] = useState(0);
 
-  const eventCompleted = disasterPublicUuid !== null;
+  const eventCompleted = eventDraftReady;
 
   const invalidateAreasCompletion = useCallback(() => {
     setAreasCompleted(false);
@@ -135,6 +145,7 @@ export function DeclareDisasterWizard() {
 
   const resetWizard = useCallback(() => {
     setStep(0);
+    setEventDraftReady(false);
     setDisasterPublicUuid(null);
     setDashboard(null);
     setError(null);
@@ -147,10 +158,12 @@ export function DeclareDisasterWizard() {
     setAreaQuery("");
     setSearchResults([]);
     setSelectedUpazilas([]);
-    setSelectedDistrict(null);
+    setSelectedDistricts([]);
     setEstimatedAffectedPeople("");
     setAssessmentNote("");
     setImpactLevel("");
+    setShelterSupportRequired(false);
+    setReliefSupportRequired(false);
     setDeclarationTitle("");
     setPublicGuidance("");
     setReason("");
@@ -227,7 +240,7 @@ export function DeclareDisasterWizard() {
     [stepNav],
   );
 
-  const handleCreateEvent = async (event: FormEvent) => {
+  const handleCreateEvent = (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) {
       setError("Title is required.");
@@ -235,38 +248,12 @@ export function DeclareDisasterWizard() {
     }
 
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const body: Parameters<typeof createDisaster>[0] = {
-        eventTypeCode,
-        title: title.trim(),
-        severityLevel,
-      };
-      const desc = description.trim();
-      if (desc) body.description = desc;
-      if (startedAt.trim()) {
-        body.startedAt = new Date(startedAt).toISOString();
-      }
-
-      const response = await createDisaster(body);
-      setDisasterPublicUuid(response.disaster.public_uuid);
-      setDeclarationTitle(response.disaster.title);
-      setAreasCompleted(false);
-      setDashboard(null);
-      setMaxStepReached(1);
-      setStep(1);
-      toast.success("Disaster event created.");
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? getApiErrorMessage(err, err.message)
-          : err instanceof Error
-            ? err.message
-            : "Failed to create disaster event.",
-      );
-    } finally {
-      setIsSubmitting(false);
+    setEventDraftReady(true);
+    if (!declarationTitle.trim()) {
+      setDeclarationTitle(title.trim());
     }
+    setMaxStepReached(1);
+    setStep(1);
   };
 
   const addUpazila = (area: AdministrativeAreaSearchResult) => {
@@ -278,64 +265,35 @@ export function DeclareDisasterWizard() {
     setSearchResults([]);
   };
 
+  const addDistrict = (area: AdministrativeAreaSearchResult) => {
+    invalidateAreasCompletion();
+    setSelectedDistricts((prev) =>
+      prev.some((a) => a.id === area.id) ? prev : [...prev, area],
+    );
+    setAreaQuery("");
+    setSearchResults([]);
+  };
+
   const handleAddAffectedAreas = async (event: FormEvent) => {
     event.preventDefault();
-    if (!disasterPublicUuid) return;
-
-    const assessment = buildAssessment(
-      estimatedAffectedPeople,
-      assessmentNote,
-      impactLevel,
-    );
 
     if (areaMode === "upazila") {
       if (selectedUpazilas.length === 0) {
         setError("Select at least one upazila.");
         return;
       }
-    } else if (!selectedDistrict) {
-      setError("Select a district.");
+    } else if (selectedDistricts.length === 0) {
+      setError("Select at least one district.");
       return;
     }
 
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const body =
-        areaMode === "upazila"
-          ? {
-              upazilaAdminAreaIds: selectedUpazilas.map((a) => a.id),
-              ...(assessment ? { assessment } : {}),
-            }
-          : {
-              districtAdminAreaId: selectedDistrict!.id,
-              ...(assessment ? { assessment } : {}),
-            };
-
-      const response = await addDisasterAffectedAreas(
-        disasterPublicUuid,
-        body,
-      );
-      setDashboard(response);
-      setAreasCompleted(true);
-      setStep(2);
-      toast.success("Affected areas recorded.");
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? getApiErrorMessage(err, err.message)
-          : err instanceof Error
-            ? err.message
-            : "Failed to add affected areas.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    setAreasCompleted(true);
+    setStep(2);
   };
 
   const handleDeclare = async (event: FormEvent) => {
     event.preventDefault();
-    if (!disasterPublicUuid) return;
 
     if (!declarationTitle.trim()) {
       setError("Declaration title is required.");
@@ -353,18 +311,52 @@ export function DeclareDisasterWizard() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const response = await postInitialDisasterDeclaration(
-        disasterPublicUuid,
-        {
-          title: declarationTitle.trim(),
-          publicGuidance: publicGuidance.trim(),
-          reason: reason.trim(),
-          ...(legalReference.trim()
-            ? { legalReference: legalReference.trim() }
-            : {}),
-        },
+      const createBody: Parameters<typeof createDisaster>[0] = {
+        eventTypeCode,
+        title: title.trim(),
+        severityLevel,
+      };
+      const desc = description.trim();
+      if (desc) createBody.description = desc;
+      if (startedAt.trim()) {
+        createBody.startedAt = new Date(startedAt).toISOString();
+      }
+
+      const created = await createDisaster(createBody);
+      const disasterUuid = created.disaster.public_uuid;
+      setDisasterPublicUuid(disasterUuid);
+
+      const assessment = buildAssessment(
+        estimatedAffectedPeople,
+        assessmentNote,
+        impactLevel,
+        shelterSupportRequired,
+        reliefSupportRequired,
       );
-      setDashboard(response);
+      if (areaMode === "upazila") {
+        await addDisasterAffectedAreas(disasterUuid, {
+          upazilaAdminAreaIds: selectedUpazilas.map((a) => a.id),
+          ...(assessment ? { assessment } : {}),
+        });
+      } else {
+        for (const district of selectedDistricts) {
+          await addDisasterAffectedAreas(disasterUuid, {
+            districtAdminAreaId: district.id,
+            ...(assessment ? { assessment } : {}),
+          });
+        }
+      }
+
+      const declared = await postInitialDisasterDeclaration(disasterUuid, {
+        title: declarationTitle.trim(),
+        publicGuidance: publicGuidance.trim(),
+        reason: reason.trim(),
+        ...(legalReference.trim()
+          ? { legalReference: legalReference.trim() }
+          : {}),
+      });
+
+      setDashboard(declared);
       setIsComplete(true);
       toast.success("Disaster declared successfully.");
     } catch (err) {
@@ -458,7 +450,7 @@ export function DeclareDisasterWizard() {
         ) : null}
 
         {step === 0 ? (
-          <form onSubmit={(e) => void handleCreateEvent(e)} className="space-y-4">
+          <form onSubmit={handleCreateEvent} className="space-y-4">
             <div>
               <FieldLabel htmlFor="event-type" required>
                 Event type
@@ -577,7 +569,7 @@ export function DeclareDisasterWizard() {
                     onChange={() => {
                       invalidateAreasCompletion();
                       setAreaMode("upazila");
-                      setSelectedDistrict(null);
+                      setSelectedDistricts([]);
                       setAreaQuery("");
                       setSearchResults([]);
                     }}
@@ -637,10 +629,7 @@ export function DeclareDisasterWizard() {
                         className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
                         onClick={() => {
                           if (areaMode === "district") {
-                            invalidateAreasCompletion();
-                            setSelectedDistrict(area);
-                            setAreaQuery("");
-                            setSearchResults([]);
+                            addDistrict(area);
                           } else {
                             addUpazila(area);
                           }
@@ -669,11 +658,11 @@ export function DeclareDisasterWizard() {
                   {selectedUpazilas.map((area) => (
                     <li
                       key={area.id}
-                      className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs"
+                      className="flex w-full items-start gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:w-auto sm:items-center sm:rounded-full"
                     >
-                      <span>
+                      <span className="min-w-0 break-words text-slate-800">
                         {area.name}
-                        <span className="text-slate-500">
+                        <span className="text-slate-600">
                           {" "}
                           · {area.hierarchyPath}
                         </span>
@@ -698,21 +687,51 @@ export function DeclareDisasterWizard() {
               </div>
             ) : null}
 
-            {areaMode === "district" && selectedDistrict ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <p className="font-medium text-slate-900">
-                  {selectedDistrict.name}
+            {areaMode === "district" && selectedDistricts.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-medium text-slate-600">
+                  Selected districts
                 </p>
-                <p className="text-xs text-slate-600">
-                  {selectedDistrict.hierarchyPath}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Backend will expand to all upazilas in this district.
+                <ul className="flex flex-wrap gap-2">
+                  {selectedDistricts.map((area) => (
+                    <li
+                      key={area.id}
+                      className="flex w-full items-start gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:w-auto sm:items-center sm:rounded-full"
+                    >
+                      <span className="min-w-0 break-words text-slate-800">
+                        {area.name}
+                        <span className="text-slate-600">
+                          {" "}
+                          · {area.hierarchyPath}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="ml-1 text-slate-500 hover:text-red-600"
+                        onClick={() => {
+                          invalidateAreasCompletion();
+                          setSelectedDistricts((prev) =>
+                            prev.filter((a) => a.id !== area.id),
+                          );
+                        }}
+                        aria-label={`Remove ${area.name}`}
+                        disabled={isSubmitting}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-slate-500">
+                  Backend will expand each selected district to all upazilas.
                 </p>
               </div>
             ) : null}
 
             {areaMode === "upazila" && selectedUpazilas.length === 0 ? (
+              <p className="text-sm text-slate-500">No affected areas selected.</p>
+            ) : null}
+            {areaMode === "district" && selectedDistricts.length === 0 ? (
               <p className="text-sm text-slate-500">No affected areas selected.</p>
             ) : null}
 
@@ -756,6 +775,39 @@ export function DeclareDisasterWizard() {
                     <option value="high">High</option>
                     <option value="severe">Severe</option>
                   </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="mb-2 text-xs font-medium text-slate-600">
+                    Support requirements
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-5">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={shelterSupportRequired}
+                        onChange={(e) => {
+                          invalidateAreasCompletion();
+                          setShelterSupportRequired(e.target.checked);
+                        }}
+                        className="size-3.5 rounded border-slate-300 accent-[#002D62]"
+                        disabled={isSubmitting}
+                      />
+                      Shelter support required
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={reliefSupportRequired}
+                        onChange={(e) => {
+                          invalidateAreasCompletion();
+                          setReliefSupportRequired(e.target.checked);
+                        }}
+                        className="size-3.5 rounded border-slate-300 accent-[#002D62]"
+                        disabled={isSubmitting}
+                      />
+                      Relief support required
+                    </label>
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <FieldLabel htmlFor="assessment-note">Assessment note</FieldLabel>

@@ -157,6 +157,10 @@ export function getAvailableLifecycleActions(
   return [];
 }
 
+export function isActiveDisasterActivation(activationStatus?: string) {
+  return (activationStatus ?? "active") === "active";
+}
+
 export function getShelterActivationPublicUuid(shelter: {
   shelter_activation_public_uuid?: string;
 }) {

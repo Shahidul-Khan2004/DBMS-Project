@@ -52,12 +52,19 @@ export function RecordReliefDistributionModal({
 
   useEffect(() => {
     if (!open) return;
-    setRequestUuid(approvedRequests[0]?.relief_request_public_uuid ?? "");
-    setHubUuid(activeHubs[0]?.relief_hub_public_uuid ?? "");
+    const firstRequest = reliefRequests.find(
+      (r) =>
+        r.status_code === "approved" || r.status_code === "partially_fulfilled",
+    );
+    const firstHub = reliefHubs.find((h) => h.relief_hub_public_uuid);
+    setRequestUuid(firstRequest?.relief_request_public_uuid ?? "");
+    setHubUuid(firstHub?.relief_hub_public_uuid ?? "");
     setNote("");
     setItems([{ reliefItemCode: RELIEF_ITEM_OPTIONS[0].value, quantity: "" }]);
     setSubmitError(null);
-  }, [open, approvedRequests, activeHubs]);
+  // Reset when the modal opens; reliefRequests/reliefHubs are read from the latest render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 

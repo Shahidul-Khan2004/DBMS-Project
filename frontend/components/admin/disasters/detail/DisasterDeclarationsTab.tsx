@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { DeclarationAmendmentModal } from "@/components/admin/disasters/detail/DeclarationAmendmentModal";
 import { hasInitialDeclaration } from "@/lib/disaster-operations-format";
 import type { DisasterDashboardResponse } from "@/types/disaster-operations";
@@ -30,13 +29,6 @@ export function DisasterDeclarationsTab({
     <>
       <CommandSectionCard
         title="Declarations"
-        headerAction={
-          !isReadOnly && canAmend ? (
-            <Button type="button" size="sm" onClick={() => setAmendOpen(true)}>
-              Issue amendment
-            </Button>
-          ) : undefined
-        }
       >
         {declarations.length === 0 ? (
           <p className="text-sm text-slate-600">No declarations on record.</p>

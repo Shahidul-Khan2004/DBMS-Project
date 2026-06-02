@@ -260,6 +260,10 @@ export type StockReceiptPayload = {
   note?: string;
 };
 
+export type ActivationDeactivationPayload = {
+  note?: string;
+};
+
 export type ReliefRequestItemPayload = {
   reliefItemCode: string;
   quantityRequested: number;

@@ -2,6 +2,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type {
   ActivateReliefHubPayload,
   ActivateShelterPayload,
+  ActivationDeactivationPayload,
   AddAffectedAreasPayload,
   AssignResponsibilityPayload,
   CreateDisasterPayload,
@@ -175,6 +176,17 @@ export function postShelterOccupancy(
   );
 }
 
+export function postDeactivateDisasterShelter(
+  disasterPublicUuid: string,
+  shelterActivationPublicUuid: string,
+  body: ActivationDeactivationPayload = {},
+) {
+  return apiPost<{ activation: unknown }, ActivationDeactivationPayload>(
+    `${disasterPath(disasterPublicUuid)}/shelters/${encodeURIComponent(shelterActivationPublicUuid)}/deactivate`,
+    body,
+  );
+}
+
 export function postActivateDisasterReliefHub(
   disasterPublicUuid: string,
   body: ActivateReliefHubPayload,
@@ -192,6 +204,17 @@ export function postReliefHubStockReceipt(
 ) {
   return apiPost<{ receipt: unknown }, StockReceiptPayload>(
     `${disasterPath(disasterPublicUuid)}/relief-hubs/${encodeURIComponent(hubActivationPublicUuid)}/stock-receipts`,
+    body,
+  );
+}
+
+export function postDeactivateDisasterReliefHub(
+  disasterPublicUuid: string,
+  hubActivationPublicUuid: string,
+  body: ActivationDeactivationPayload = {},
+) {
+  return apiPost<{ activation: unknown }, ActivationDeactivationPayload>(
+    `${disasterPath(disasterPublicUuid)}/relief-hubs/${encodeURIComponent(hubActivationPublicUuid)}/deactivate`,
     body,
   );
 }

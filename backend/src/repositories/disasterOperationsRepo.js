@@ -2013,6 +2013,124 @@ export async function assignShelterManagingAgency(params) {
   }
 }
 
+export async function deactivateShelterActivation(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const disaster = await requireDisaster(conn, params.disasterPublicUuid);
+    const [saRows] = await conn.execute(
+      `
+        SELECT id, activation_status
+        FROM shelter_activations
+        WHERE public_uuid = ? AND disaster_event_id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.shelterActivationPublicUuid, disaster.id],
+    );
+    if (!saRows[0]) {
+      throw new BackendError(404, "SHELTER_ACTIVATION_NOT_FOUND", "Shelter activation not found");
+    }
+    if (saRows[0].activation_status !== "active") {
+      throw new BackendError(409, "SHELTER_NOT_ACTIVE", "Shelter activation is not active");
+    }
+
+    await conn.execute(
+      `
+        UPDATE shelter_activations
+        SET activation_status = 'finalized',
+            finalized_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [saRows[0].id],
+    );
+
+    await writeAudit(conn, {
+      actorUserId: params.actorUserId,
+      action: "shelter_activation.finalized",
+      entityType: "shelter_activation",
+      entityId: saRows[0].id,
+      relatedDisasterEventId: disaster.id,
+      detailsJson: {
+        reason: "manual_deactivation",
+        note: params.note ?? null,
+      },
+      auditMeta: params.auditMeta,
+    });
+
+    await conn.commit();
+    const [viewRow] = await conn.execute(
+      `SELECT * FROM vw_disaster_shelter_capacity WHERE shelter_activation_id = ?`,
+      [saRows[0].id],
+    );
+    return viewRow[0];
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function deactivateReliefHubActivation(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const disaster = await requireDisaster(conn, params.disasterPublicUuid);
+    const [hubRows] = await conn.execute(
+      `
+        SELECT id, activation_status
+        FROM relief_hub_activations
+        WHERE public_uuid = ? AND disaster_event_id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.hubActivationPublicUuid, disaster.id],
+    );
+    if (!hubRows[0]) {
+      throw new BackendError(404, "RELIEF_HUB_NOT_FOUND", "Relief hub activation not found");
+    }
+    if (hubRows[0].activation_status !== "active") {
+      throw new BackendError(409, "RELIEF_HUB_NOT_ACTIVE", "Relief hub activation is not active");
+    }
+
+    await conn.execute(
+      `
+        UPDATE relief_hub_activations
+        SET activation_status = 'finalized',
+            finalized_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [hubRows[0].id],
+    );
+
+    await writeAudit(conn, {
+      actorUserId: params.actorUserId,
+      action: "relief_hub_activation.finalized",
+      entityType: "relief_hub_activation",
+      entityId: hubRows[0].id,
+      relatedDisasterEventId: disaster.id,
+      detailsJson: {
+        reason: "manual_deactivation",
+        note: params.note ?? null,
+      },
+      auditMeta: params.auditMeta,
+    });
+
+    await conn.commit();
+    return {
+      relief_hub_activation_id: hubRows[0].id,
+      relief_hub_public_uuid: params.hubActivationPublicUuid,
+      activation_status: "finalized",
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function recordShelterOccupancy(params) {
   const conn = await pool.getConnection();
   try {
