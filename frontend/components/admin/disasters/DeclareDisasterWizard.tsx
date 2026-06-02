@@ -25,7 +25,7 @@ import {
 } from "@/lib/disaster-operations-format";
 import { searchAdministrativeAreas } from "@/lib/reference-api";
 import type {
-  DisasterAssessmentPayload,
+  DisasterAssessmentInput,
   DisasterDashboardResponse,
 } from "@/types/disaster-operations";
 import type { AdministrativeAreaSearchResult } from "@/types/reference";
@@ -49,14 +49,14 @@ function buildAssessment(
   estimatedAffectedPeople: string,
   assessmentNote: string,
   impactLevel: string,
-): DisasterAssessmentPayload | undefined {
+): DisasterAssessmentInput | undefined {
   const people = estimatedAffectedPeople.trim();
   const note = assessmentNote.trim();
   const impact = impactLevel.trim();
 
   if (!people && !note && !impact) return undefined;
 
-  const assessment: DisasterAssessmentPayload = {};
+  const assessment: DisasterAssessmentInput = {};
   if (people) {
     const n = Number.parseInt(people, 10);
     if (Number.isFinite(n) && n >= 0) {

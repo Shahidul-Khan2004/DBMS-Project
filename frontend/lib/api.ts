@@ -56,7 +56,7 @@ type RefreshResponse = {
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "method"> & {
   body?: unknown;
-  method?: "GET" | "POST" | "PATCH" | "PUT";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 };
 
 let refreshSessionPromise: Promise<string | null> | null = null;
@@ -307,6 +307,14 @@ export function apiPut<TResponse, TBody = unknown>(
   init?: Omit<ApiRequestOptions, "method" | "body">,
 ) {
   return protectedJson<TResponse>(path, { ...init, method: "PUT", body });
+}
+
+export function apiDelete<TResponse, TBody = unknown>(
+  path: string,
+  body?: TBody,
+  init?: Omit<ApiRequestOptions, "method" | "body">,
+) {
+  return protectedJson<TResponse>(path, { ...init, method: "DELETE", body });
 }
 
 export function publicPost<TResponse, TBody = unknown>(
