@@ -43,6 +43,7 @@ export function IncidentCommandWorkspace({
   onDispatchStatusAction,
   onRefreshDetail,
   onViewReportDetails,
+  onReportUnlinked,
 }: {
   detail: IncidentDetailResponse;
   incidentPublicUuid: string;
@@ -58,6 +59,7 @@ export function IncidentCommandWorkspace({
   ) => void;
   onRefreshDetail: () => Promise<void>;
   onViewReportDetails: (report: LinkedIntakeReport) => void;
+  onReportUnlinked: (reportPublicUuid: string) => Promise<void>;
 }) {
   const terminal = isTerminalIncident(detail.status);
   const canAssignAgency = !terminal;
@@ -106,8 +108,10 @@ export function IncidentCommandWorkspace({
           timelinePreview={detail.timelinePreview}
           incidentPublicUuid={incidentPublicUuid}
           incidentTitle={detail.title}
+          incidentIsTerminal={terminal}
           onRefreshDetail={onRefreshDetail}
           onViewReportDetails={onViewReportDetails}
+          onReportUnlinked={onReportUnlinked}
           className="min-h-0 flex-1 lg:h-full"
         />
       </div>

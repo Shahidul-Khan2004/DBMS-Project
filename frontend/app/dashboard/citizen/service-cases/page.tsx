@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FileText, MapPin } from "lucide-react";
+import { ArrowRight, ClipboardCheck } from "lucide-react";
+import {
+  CitizenLocationPill,
+  CitizenMetaItem,
+  CitizenRecordCard,
+  CitizenSectionCard,
+  getCitizenFriendlyError,
+} from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -53,10 +59,12 @@ export default function CitizenServiceCasesPage() {
           ]),
         );
       } catch (err) {
+        console.error("Failed to load citizen service cases", err);
         setError(
-          err instanceof Error
-            ? err.message
-            : "Unexpected error while loading service cases.",
+          getCitizenFriendlyError(
+            err,
+            "We could not load your service cases right now. Please try again.",
+          ),
         );
       } finally {
         setIsLoading(false);
@@ -78,76 +86,42 @@ export default function CitizenServiceCasesPage() {
 
   return (
     <DashboardLayout
-      title="My Service Cases"
-      subtitle="View service cases linked to your reports"
+      title="Service Cases"
+      subtitle="Follow up on non-emergency cases created from your reports."
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => router.push("/dashboard/citizen")}
-          >
-            Back to Dashboard
-          </Button>
-          <Button onClick={() => router.push("/dashboard/citizen/reports")}> 
-            View My Reports
-          </Button>
-        </div>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
-                <FileText className="h-5 w-5" aria-hidden />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#002D62]">
-                  Citizen Service Cases
-                </h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  Service cases opened from your reports will appear here.
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <CitizenSectionCard
+          title="Your Service Cases"
+          subtitle="Service cases opened from your reports will appear here."
+          icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
+        >
             {isLoading && (
-              <p className="text-sm text-gray-600">Loading your service cases...</p>
+              <p className="text-sm text-[#42547A]">Loading your service cases...</p>
             )}
 
             {error && <ErrorAlert message={error} />}
 
             {!isLoading && !error && serviceCases.length === 0 && (
               <EmptyState
-                title="No service cases yet"
+                title="No service cases yet."
                 description="Service cases created from your reports will appear here after a dispatcher classifies them."
-                icon={<FileText className="h-6 w-6" aria-hidden />}
-                action={
-                  <Button
-                    type="button"
-                    onClick={() => router.push("/dashboard/citizen/reports")}
-                  >
-                    View My Reports
-                  </Button>
-                }
+                icon={<ClipboardCheck className="h-6 w-6" aria-hidden />}
               />
             )}
 
             {!isLoading && !error && serviceCases.length > 0 && (
               <div className="grid gap-4">
                 {serviceCases.map((serviceCase) => (
-                  <div
+                  <CitizenRecordCard
                     key={serviceCase.public_uuid}
-                    className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-wide text-[#006747]">
                           {serviceCase.case_code}
                         </p>
-                        <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                        <h3 className="mt-1 break-words text-lg font-semibold text-slate-950">
                           {serviceCase.title}
                         </h3>
                       </div>
@@ -158,40 +132,37 @@ export default function CitizenServiceCasesPage() {
                         {isServiceCaseFinal(serviceCase.status_code) ? (
                           <Badge tone="closed">Final</Badge>
                         ) : null}
-                        <Badge tone={serviceCase.priority_level}>
-                          {formatBadgeLabel(serviceCase.priority_level)}
-                        </Badge>
+                        {serviceCase.priority_level ? (
+                          <Badge tone={serviceCase.priority_level}>
+                            {formatBadgeLabel(serviceCase.priority_level)}
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 text-sm text-gray-600 sm:grid-cols-2">
-                      <p>
-                        <span className="font-medium text-gray-800">Category:</span>{" "}
-                        {formatBadgeLabel(serviceCase.category_code)}
-                      </p>
-                      <p>
-                        <span className="font-medium text-gray-800">Intake report:</span>{" "}
-                        {serviceCase.intake_report_code ?? "-"}
-                      </p>
-                      <p>
-                        <span className="font-medium text-gray-800">Last updated:</span>{" "}
-                        {formatBangladeshTime(serviceCase.last_updated)}
-                      </p>
-                      <p>
-                        <span className="font-medium text-gray-800">Created:</span>{" "}
-                        {formatBangladeshTime(serviceCase.created_at)}
-                      </p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <CitizenMetaItem
+                        label="Category"
+                        value={formatBadgeLabel(serviceCase.category_code)}
+                      />
+                      <CitizenMetaItem
+                        label="Intake report"
+                        value={serviceCase.intake_report_code ?? "-"}
+                      />
+                      <CitizenMetaItem
+                        label="Last updated"
+                        value={formatBangladeshTime(serviceCase.last_updated)}
+                      />
+                      <CitizenMetaItem
+                        label="Created"
+                        value={formatBangladeshTime(serviceCase.created_at)}
+                      />
                       <div className="sm:col-span-2">
-                        <div className="flex gap-2 rounded-2xl bg-[#EFF6FF] px-3 py-2">
-                          <MapPin
-                            className="mt-0.5 h-4 w-4 shrink-0 text-[#006747]"
-                            aria-hidden
-                          />
-                          <p className="text-sm text-gray-700">
-                            <span className="font-medium text-gray-800">Location:</span>{" "}
-                            {formatLocation(serviceCase.location) || serviceCase.location_text || "-"}
-                          </p>
-                        </div>
+                        <CitizenLocationPill>
+                          {formatLocation(serviceCase.location) ||
+                            serviceCase.location_text ||
+                            "-"}
+                        </CitizenLocationPill>
                       </div>
                     </div>
 
@@ -209,12 +180,11 @@ export default function CitizenServiceCasesPage() {
                         <ArrowRight className="h-4 w-4" aria-hidden />
                       </Button>
                     </div>
-                  </div>
+                  </CitizenRecordCard>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </CitizenSectionCard>
       </div>
     </DashboardLayout>
   );

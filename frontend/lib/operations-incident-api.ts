@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type {
   AddIncidentOperationalNotePayload,
   AddIncidentOperationalNoteResponse,
@@ -14,6 +14,8 @@ import type {
   OperationsResponseTimingResponse,
   PatchIncidentStatusPayload,
   PatchIncidentStatusResponse,
+  UnlinkIncidentIntakeReportPayload,
+  UnlinkIncidentIntakeReportResponse,
   UpdateDispatchStatusPayload,
   UpdateDispatchStatusResponse,
 } from "@/types/operations-incident";
@@ -102,6 +104,19 @@ export function addIncidentOperationalNote(
 ) {
   return apiPost<AddIncidentOperationalNoteResponse>(
     `/operations/incidents/${encodeURIComponent(incidentPublicUuid)}/notes`,
+    body,
+  );
+}
+
+export function unlinkIntakeReportFromIncident(
+  incidentPublicUuid: string,
+  reportPublicUuid: string,
+  body: UnlinkIncidentIntakeReportPayload,
+) {
+  return apiDelete<UnlinkIncidentIntakeReportResponse>(
+    `/operations/incidents/${encodeURIComponent(
+      incidentPublicUuid,
+    )}/intake-reports/${encodeURIComponent(reportPublicUuid)}`,
     body,
   );
 }

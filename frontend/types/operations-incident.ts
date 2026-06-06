@@ -200,6 +200,24 @@ export type AddIncidentOperationalNoteResponse = {
   note: OperationsTimelineEvent;
 };
 
+export type UnlinkIncidentIntakeReportPayload = {
+  reason: string;
+};
+
+export type UnlinkIncidentIntakeReportResponse = {
+  message: string;
+  unlink: {
+    incident_public_uuid: string;
+    incident_code: string;
+    intake_report_public_uuid: string;
+    intake_report_code: string;
+    link_type: string;
+    unlinked_at: string;
+    unlink_reason: string;
+    intake_status: string;
+  };
+};
+
 export type OperationsResponseTiming = {
   incident_public_uuid: string;
   incident_code: string;

@@ -3,9 +3,12 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, MapPin, PlusCircle } from "lucide-react";
+import { MapPin, PlusCircle, RefreshCw } from "lucide-react";
+import {
+  CitizenSectionCard,
+  getCitizenFriendlyError,
+} from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { Input } from "@/components/ui/Input";
@@ -14,16 +17,14 @@ import type {
   LocationPickerSelectionDetails,
   LocationPickerValue,
 } from "@/components/location/LocationPicker";
-import { apiJson } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import {
+  createSavedLocation,
+  getMySavedLocations,
+} from "@/lib/locations-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
-import type {
-  CreateSavedLocationResponse,
-  SavedLocation,
-  SavedLocationResponse,
-  SavedLocationsResponse,
-} from "@/types/locations";
+import type { SavedLocation } from "@/types/locations";
 
 const LocationPicker = dynamic(
   () =>
@@ -33,15 +34,15 @@ const LocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[420px] animate-pulse rounded-2xl bg-slate-100" />
+      <div className="h-[210px] animate-pulse rounded-2xl bg-slate-100" />
     ),
   },
 );
 
 function formatLocation(location: SavedLocation) {
   return (
-    location.addressText ||
     location.placeName ||
+    location.addressText ||
     "Map location selected"
   );
 }
@@ -72,14 +73,12 @@ export default function CitizenLocationsPage() {
   const router = useRouter();
   const isChecking = useAuthGuard(["citizen"]);
   const [locations, setLocations] = useState<SavedLocation[]>([]);
-  const [activeLocation, setActiveLocation] =
-    useState<SavedLocation | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingDetailUuid, setLoadingDetailUuid] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
-  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [showAllLocations, setShowAllLocations] = useState(true);
   const [form, setForm] = useState({
     latitude: "",
     longitude: "",
@@ -89,20 +88,21 @@ export default function CitizenLocationsPage() {
 
   const loadLocations = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
-      const data = await apiJson<SavedLocationsResponse>("/locations/my");
-      setLocations(data.locations ?? []);
-      setActiveLocation((current) => {
-        if (!current) return null;
-        return (
-          data.locations?.find(
-            (location) => location.publicUuid === current.publicUuid,
-          ) ?? null
-        );
-      });
+      const data = await getMySavedLocations();
+      const nextLocations = data.locations;
+      setLocations(nextLocations);
+      return nextLocations;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load locations.");
+      console.error("Failed to load saved locations", err);
+      setLoadError(
+        getCitizenFriendlyError(
+          err,
+          "We could not load your saved locations right now.",
+        ),
+      );
+      return [];
     } finally {
       setLoading(false);
     }
@@ -150,44 +150,27 @@ export default function CitizenLocationsPage() {
 
     setSaving(true);
     try {
-      const data = await apiJson<CreateSavedLocationResponse>("/locations", {
-        method: "POST",
-        body: JSON.stringify({
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-          address_text: form.addressText.trim() || undefined,
-          place_name: form.placeName.trim() || undefined,
-          source: "user_shared",
-        }),
+      const data = await createSavedLocation({
+        latitude: selectedLocation.latitude,
+        longitude: selectedLocation.longitude,
+        address_text: form.addressText.trim() || undefined,
+        place_name: form.placeName.trim() || undefined,
+        source: "user_shared",
       });
 
-      setLocations((current) => [data.location, ...current]);
-      setActiveLocation(data.location);
       setForm({ latitude: "", longitude: "", addressText: "", placeName: "" });
       setMessage(data.message || "Location saved.");
+      await loadLocations();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save location.");
+      console.error("Failed to save location", err);
+      setError(
+        getCitizenFriendlyError(
+          err,
+          "We could not save this location right now. Please try again.",
+        ),
+      );
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleViewLocation(publicUuid: string) {
-    setError("");
-    setMessage("");
-    setLoadingDetailUuid(publicUuid);
-
-    try {
-      const data = await apiJson<SavedLocationResponse>(
-        `/locations/${publicUuid}`,
-      );
-      setActiveLocation(data.location);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not load location details.",
-      );
-    } finally {
-      setLoadingDetailUuid("");
     }
   }
 
@@ -199,52 +182,44 @@ export default function CitizenLocationsPage() {
   const locationsByNewest = getLocationsByNewest(locations);
   const displayedLocations = showAllLocations
     ? locationsByNewest
-    : locationsByNewest.slice(0, 3);
+    : locationsByNewest.slice(0, 5);
 
   return (
     <DashboardLayout
       title="Saved Locations"
-      subtitle="Keep reusable places for future citizen reports"
+      subtitle="Manage your saved locations for faster reporting."
       onLogout={handleLogout}
     >
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(620px,1.25fr)_minmax(360px,0.75fr)]">
-        <Card className="h-fit overflow-hidden bg-white shadow-md">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#006747] text-white">
-                <PlusCircle className="h-5 w-5" aria-hidden />
-              </div>
-              <h2 className="text-lg font-semibold text-[#002D62]">
-                Add Location
-              </h2>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
+      <div className="space-y-3">
+       <div className="grid items-start gap-3 xl:grid-cols-[minmax(420px,1.15fr)_minmax(340px,0.85fr)]">
+        <CitizenSectionCard
+          title="Add Location"
+          subtitle="Search, use current position, or click the map."
+          icon={<PlusCircle className="h-5 w-5" aria-hidden />}
+          className="flex flex-col [&_header]:px-4 [&_header]:py-3"
+          contentClassName="!p-4 flex flex-1 flex-col gap-3"
+        >
             {error && <ErrorAlert message={error} />}
             {message && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 {message}
               </div>
             )}
-            <div className="space-y-5">
+            <div className="flex flex-1 flex-col gap-3">
               <LocationPicker
                 value={formSelectedLocation}
                 onChange={handleLocationChange}
                 selectedAddress={form.addressText}
                 selectedPlaceName={form.placeName}
                 syncSearchQueryToSelectedLabel={false}
+                embedded
+                embeddedCompact
+                mapClassName="h-[clamp(230px,38vh,360px)] w-full"
+                showSelectionSummary={false}
               />
 
-              <div className="rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-[#002D62]">
-                    Location Details
-                  </h3>
-                  <p className="mt-1 text-xs leading-5 text-gray-600">
-                    These labels help responders recognize the place.
-                  </p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#002D62]/10 bg-[#F6F9FE] p-3">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
                   <Input
                     value={form.addressText}
                     onChange={(event) =>
@@ -267,107 +242,110 @@ export default function CitizenLocationsPage() {
                     label="Place Name"
                     placeholder="Home, office, school gate"
                   />
+                  <Button
+                    type="button"
+                    isLoading={saving}
+                    onClick={() => void handleSaveLocation()}
+                    className="h-[46px] whitespace-nowrap"
+                  >
+                    Save Location
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  isLoading={saving}
-                  onClick={() => void handleSaveLocation()}
-                  fullWidth
-                  className="mt-4"
-                >
-                  Save Location
-                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CitizenSectionCard>
 
-        <Card className="h-fit overflow-hidden bg-white shadow-md">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
-                  <MapPin className="h-5 w-5" aria-hidden />
-                </div>
-                <h2 className="text-lg font-semibold text-[#002D62]">
-                  My Recent Locations
-                </h2>
-              </div>
-              {!loading && locations.length > 0 ? (
-                <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
-                  Showing {displayedLocations.length} of {locations.length}
-                </span>
-              ) : null}
-              {!loading && locations.length > 3 ? (
+        <CitizenSectionCard
+          title="My Recent Locations"
+          icon={<MapPin className="h-5 w-5" aria-hidden />}
+          className="flex flex-col [&_header]:px-4 [&_header]:py-3"
+          contentClassName="flex min-h-[620px] flex-1 flex-col p-0"
+        >
+          <div className="border-b border-[#002D62]/10 px-4 py-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-sm leading-5 text-[#42547A]">
+                Saved places are listed newest first.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                {!loading && locations.length > 0 ? (
+                  <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
+                    Showing {displayedLocations.length} of {locations.length}
+                  </span>
+                ) : null}
+                {!loading && locations.length > 3 ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3"
+                    onClick={() => setShowAllLocations((current) => !current)}
+                  >
+                    {showAllLocations ? "Show Recent" : "View All"}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowAllLocations((current) => !current)}
+                  className="h-8 px-3"
+                  onClick={() => void loadLocations()}
+                  disabled={loading}
                 >
-                  {showAllLocations ? "Show Recent" : "View All"}
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                  Refresh
                 </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => void loadLocations()}
-                disabled={loading}
-              >
-                Refresh
-              </Button>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
+          </div>
             {loading ? (
-              <div className="px-6 py-10 text-center text-sm text-gray-500">
+              <div className="flex flex-1 items-center justify-center px-6 py-10 text-center text-sm text-gray-500">
                 Loading locations...
               </div>
+            ) : loadError ? (
+              <div className="flex flex-1 flex-col justify-center space-y-3 px-6 py-6">
+                <ErrorAlert message={loadError} />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void loadLocations()}
+                >
+                  Retry
+                </Button>
+              </div>
             ) : locations.length === 0 ? (
-              <div className="p-6">
+              <div className="flex flex-1 items-center p-6">
                 <EmptyState
-                  title="No saved locations yet"
+                  title="No saved locations yet."
                   description="Add your home, workplace, school, or another place you report from often."
                   icon={<MapPin className="h-6 w-6" aria-hidden />}
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-[#002D62]/10">
+              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                 {displayedLocations.map((location) => (
-                  <li key={location.publicUuid} className="px-6 py-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
+                  <li
+                    key={location.publicUuid}
+                    className="rounded-2xl border border-[#002D62]/10 bg-white p-4 shadow-sm"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-gray-900">
                           {formatLocation(location)}
                         </h3>
-                        <div className="mt-2 grid gap-1 text-sm text-gray-600">
-                          <p>Address: {location.addressText || "-"}</p>
-                          <p>Place: {location.placeName || "-"}</p>
-                          <p>Source: {location.source}</p>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
+                        <p className="mt-1 line-clamp-1 text-xs text-[#42547A]">
+                          {location.addressText || location.placeName || "-"}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
                           Saved {formatBangladeshTime(location.createdAt)}
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2 sm:justify-end">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          isLoading={loadingDetailUuid === location.publicUuid}
-                          onClick={() =>
-                            void handleViewLocation(location.publicUuid)
-                          }
-                        >
-                          <Eye className="h-4 w-4" aria-hidden />
-                          View
-                        </Button>
+                      <div className="flex shrink-0 sm:justify-end">
                         <a
                           href={`https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=16/${location.latitude}/${location.longitude}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-2xl border border-[#002D62]/20 bg-[#E8F2FF] px-3 py-2 text-sm font-semibold text-[#002D62] shadow-sm transition-colors hover:border-[#002D62]/30 hover:bg-[#DCEBFF]"
+                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center whitespace-nowrap rounded-full border border-[#002D62]/20 bg-[#E8F2FF] px-3 text-xs font-semibold text-[#002D62] shadow-sm transition-colors hover:border-[#002D62]/30 hover:bg-[#DCEBFF]"
                         >
                           Open map
                         </a>
@@ -377,52 +355,8 @@ export default function CitizenLocationsPage() {
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
-
-        {activeLocation && (
-          <Card className="shadow-md xl:col-span-2">
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-[#002D62]">
-                Location Details
-              </h2>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Place Name
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {activeLocation.placeName || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Address Text
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {activeLocation.addressText || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">Source</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {activeLocation.source}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-600">
-                    Public UUID
-                  </dt>
-                  <dd className="mt-1 break-words text-sm text-gray-900">
-                    {activeLocation.publicUuid}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-        )}
+        </CitizenSectionCard>
+        </div>
       </div>
     </DashboardLayout>
   );

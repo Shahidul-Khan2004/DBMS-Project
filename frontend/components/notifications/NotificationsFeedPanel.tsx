@@ -48,13 +48,13 @@ export function NotificationsFeedPanel({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:min-h-0 ${className}`.trim()}
+      className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 lg:min-h-0 ${className}`.trim()}
       aria-label={title}
     >
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#002D62]/10 px-4 py-3">
+        <h3 className="text-sm font-semibold text-[#002D62]">{title}</h3>
         {unreadCount > 0 ? (
-          <span className="shrink-0 text-sm font-medium text-slate-600">
+          <span className="shrink-0 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
             {unreadCount} unread
           </span>
         ) : null}

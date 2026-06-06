@@ -45,17 +45,11 @@ export function HealthBadge() {
 
   return (
     <span
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${
-        isRunning
-          ? "border-green-200 bg-green-50"
-          : status === "checking"
-            ? "border-gray-200 bg-gray-100"
-            : "border-red-200 bg-red-50"
-      }`}
+      className="inline-flex h-10 w-10 items-center justify-center"
       aria-label={statusLabel}
     >
       <span
-        className={`h-2.5 w-2.5 rounded-full ${
+        className={`h-3 w-3 rounded-full ${
           isRunning
             ? "bg-green-500"
             : status === "checking"
