@@ -172,6 +172,13 @@ Optional proximity sorting uses **stored** `locations` rows only (no raw `latitu
 | Agency | GET | `/agency/incidents/:incidentPublicUuid/notes` | `dispatch.view_own_agency` |
 | Agency | GET | `/agency/incidents/:incidentPublicUuid/response-logs` | `dispatch.view_own_agency` |
 | Agency | POST | `/agency/incidents/:incidentPublicUuid/response-logs` | `response_log.create_own_agency` |
+| Agency | GET | `/agency/disasters` | `disaster.read` + active membership |
+| Agency | GET | `/agency/disasters/:disasterPublicUuid` | `disaster.read` |
+| Agency | GET | `/agency/disasters/:disasterPublicUuid/shelters` | `disaster.read` |
+| Agency | POST | `/agency/disasters/:disasterPublicUuid/shelters/:shelterActivationPublicUuid/occupancy` | `shelter.record_occupancy_own` |
+| Agency | GET | `/agency/disasters/:disasterPublicUuid/relief-requests` | `disaster.read` |
+| Agency | POST | `/agency/disasters/:disasterPublicUuid/relief-requests` | `relief.request_own_shelter` |
+| Agency | GET | `/agency/disasters/:disasterPublicUuid/incidents` | `disaster.read` |
 | Operations | GET | `/operations/service-cases` | Permission `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid` | `case.respond` |
 | Operations | GET | `/operations/service-cases/:publicUuid/messages` | `case.respond`; message thread only |
@@ -2641,6 +2648,106 @@ Lists **this agency’s** response logs on the incident (newest first). Query: `
 ```
 
 **Errors:** `404` `INCIDENT_NOT_IN_AGENCY`, `422` `RESPONSE_LOG_DISPATCH_MISMATCH`.
+
+### Agency national disaster (scoped read + own-shelter writes)
+
+All routes require JWT, active representative membership, and the listed permission. Data is scoped to disasters where the agency has an active responsibility, manages at least one shelter, or has submitted relief requests.
+
+**Ownership:** occupancy and relief-request POST require `shelter_activations.managing_agency_id` to match the caller's agency. Cross-agency shelter UUID → `404` `SHELTER_NOT_FOUND`.
+
+#### GET `/agency/disasters`
+
+Lists disasters involving the caller's agency. Query: `limit`, `offset`.
+
+**Response (200):**
+
+```json
+{
+  "limit": 20,
+  "offset": 0,
+  "disasters": [
+    {
+      "public_uuid": "de000001-0000-4000-8000-000000000001",
+      "event_code": "FLD-KUR-2026-01",
+      "title": "Kurigram flood response",
+      "status_code": "declared",
+      "severity_level": "high",
+      "event_type_code": "flood",
+      "event_type_name": "Flood"
+    }
+  ]
+}
+```
+
+#### GET `/agency/disasters/:disasterPublicUuid`
+
+Trimmed dashboard: `disaster`, `declarations`, `affected_areas`, agency-managed `shelters`, agency `relief_requests` only.
+
+**Errors:** `404` `DISASTER_NOT_FOUND`, `404` `DISASTER_NOT_IN_AGENCY`
+
+#### GET `/agency/disasters/:disasterPublicUuid/shelters`
+
+Shelters where `managing_agency_id` matches the caller's agency.
+
+**Response (200):** `{ "disaster_public_uuid": "…", "shelters": [ … ] }` — each shelter includes `managing_agency_public_uuid`, `latest_occupancy`, `effective_capacity`.
+
+#### POST `/agency/disasters/:disasterPublicUuid/shelters/:shelterActivationPublicUuid/occupancy`
+
+**Body:**
+
+```json
+{
+  "peopleCount": 120
+}
+```
+
+**Response (201):** `{ "snapshot": { …shelter capacity view row… } }`
+
+**Errors:** `404` `SHELTER_NOT_FOUND`, `409` `SHELTER_NOT_ACTIVE`
+
+#### GET `/agency/disasters/:disasterPublicUuid/relief-requests`
+
+Relief requests for agency-managed shelters or where `requesting_agency_id` is the caller's agency.
+
+#### POST `/agency/disasters/:disasterPublicUuid/relief-requests`
+
+**Body:**
+
+```json
+{
+  "shelterActivationPublicUuid": "…",
+  "requestNote": "Need supplies for 120 evacuees",
+  "items": [
+    { "reliefItemCode": "rice", "quantityRequested": 50 }
+  ]
+}
+```
+
+`requesting_agency_id` is set from membership context. Shelter must be active and agency-managed.
+
+**Response (201):** `{ "request": { "public_uuid", "request_code", "status_code": "submitted" } }`
+
+#### GET `/agency/disasters/:disasterPublicUuid/incidents`
+
+Linked incidents where the agency has `incident_agency_participation` (`requested` or `active`). Read-only situational awareness.
+
+**Response (200):**
+
+```json
+{
+  "disaster_public_uuid": "…",
+  "incidents": [
+    {
+      "incident_public_uuid": "e5000001-0000-4000-8000-000000000001",
+      "incident_code": "EI-DEMO0001",
+      "title": "Power line down",
+      "incident_status": "classified",
+      "participation_status": "active",
+      "linked_at": "2026-06-02T09:00:00.000Z"
+    }
+  ]
+}
+```
 
 ---
 
