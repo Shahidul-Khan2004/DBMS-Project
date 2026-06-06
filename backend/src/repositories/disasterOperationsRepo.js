@@ -120,6 +120,222 @@ async function loadAgencyByPublicUuid(conn, agencyPublicUuid) {
   return rows[0] || null;
 }
 
+async function loadLeadShelterManagerAgency(conn, disasterEventId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT dar.agency_id, a.public_uuid AS agency_public_uuid, a.name AS agency_name
+      FROM disaster_agency_responsibilities dar
+      INNER JOIN agencies a ON a.id = dar.agency_id
+      WHERE dar.disaster_event_id = ?
+        AND dar.responsibility_type = 'shelter_management'
+        AND dar.is_lead = TRUE
+        AND dar.deactivated_at IS NULL
+      LIMIT 1
+    `,
+    [disasterEventId],
+  );
+  return rows[0] ?? null;
+}
+
+async function assignActiveSheltersToManagingAgency(
+  conn,
+  {
+    disasterEventId,
+    agencyId,
+    agencyPublicUuid,
+    actorUserId,
+    auditMeta,
+    auditReason = "shelter_management_lead_assigned",
+    shelterActivationIds = null,
+  },
+) {
+  const [shelters] = await conn.execute(
+    `
+      SELECT id
+      FROM shelter_activations
+      WHERE disaster_event_id = ?
+        AND activation_status = 'active'
+        ${shelterActivationIds?.length ? `AND id IN (${shelterActivationIds.map(() => "?").join(", ")})` : ""}
+    `,
+    shelterActivationIds?.length
+      ? [disasterEventId, ...shelterActivationIds]
+      : [disasterEventId],
+  );
+
+  for (const shelter of shelters) {
+    await conn.execute(
+      `
+        UPDATE shelter_activations
+        SET managing_agency_id = ?
+        WHERE id = ?
+      `,
+      [agencyId, shelter.id],
+    );
+
+    await writeAudit(conn, {
+      actorUserId,
+      action: "shelter_activation.managing_agency_assigned",
+      entityType: "shelter_activation",
+      entityId: shelter.id,
+      relatedDisasterEventId: disasterEventId,
+      detailsJson: {
+        agency_public_uuid: agencyPublicUuid,
+        auto_assigned: true,
+        reason: auditReason,
+      },
+      auditMeta,
+    });
+  }
+
+  return shelters.length;
+}
+
+async function assignShelterToLeadManagerIfPresent(
+  conn,
+  { disasterEventId, shelterActivationId, actorUserId, auditMeta },
+) {
+  const leadManager = await loadLeadShelterManagerAgency(conn, disasterEventId);
+  if (!leadManager) return false;
+
+  await assignActiveSheltersToManagingAgency(conn, {
+    disasterEventId,
+    agencyId: leadManager.agency_id,
+    agencyPublicUuid: leadManager.agency_public_uuid,
+    actorUserId,
+    auditMeta,
+    auditReason: "shelter_activation_auto_assigned_to_lead",
+    shelterActivationIds: [shelterActivationId],
+  });
+  return true;
+}
+
+async function backfillUnassignedSheltersToLeadManager(conn, disasterEventId) {
+  const [result] = await conn.execute(
+    `
+      UPDATE shelter_activations sa
+      INNER JOIN disaster_agency_responsibilities dar
+        ON dar.disaster_event_id = sa.disaster_event_id
+       AND dar.responsibility_type = 'shelter_management'
+       AND dar.is_lead = TRUE
+       AND dar.deactivated_at IS NULL
+      SET sa.managing_agency_id = dar.agency_id
+      WHERE sa.disaster_event_id = ?
+        AND sa.activation_status = 'active'
+        AND sa.managing_agency_id IS NULL
+    `,
+    [disasterEventId],
+  );
+  return result.affectedRows ?? 0;
+}
+
+async function loadLeadReliefManagerAgency(conn, disasterEventId) {
+  const [rows] = await conn.execute(
+    `
+      SELECT dar.agency_id, a.public_uuid AS agency_public_uuid, a.name AS agency_name
+      FROM disaster_agency_responsibilities dar
+      INNER JOIN agencies a ON a.id = dar.agency_id
+      WHERE dar.disaster_event_id = ?
+        AND dar.responsibility_type = 'relief_management'
+        AND dar.is_lead = TRUE
+        AND dar.deactivated_at IS NULL
+      LIMIT 1
+    `,
+    [disasterEventId],
+  );
+  return rows[0] ?? null;
+}
+
+async function assignActiveReliefHubsToManagingAgency(
+  conn,
+  {
+    disasterEventId,
+    agencyId,
+    agencyPublicUuid,
+    actorUserId,
+    auditMeta,
+    auditReason = "relief_management_lead_assigned",
+    reliefHubActivationIds = null,
+  },
+) {
+  const [hubs] = await conn.execute(
+    `
+      SELECT id
+      FROM relief_hub_activations
+      WHERE disaster_event_id = ?
+        AND activation_status = 'active'
+        ${reliefHubActivationIds?.length ? `AND id IN (${reliefHubActivationIds.map(() => "?").join(", ")})` : ""}
+    `,
+    reliefHubActivationIds?.length
+      ? [disasterEventId, ...reliefHubActivationIds]
+      : [disasterEventId],
+  );
+
+  for (const hub of hubs) {
+    await conn.execute(
+      `
+        UPDATE relief_hub_activations
+        SET managing_agency_id = ?
+        WHERE id = ?
+      `,
+      [agencyId, hub.id],
+    );
+
+    await writeAudit(conn, {
+      actorUserId,
+      action: "relief_hub_activation.managing_agency_assigned",
+      entityType: "relief_hub_activation",
+      entityId: hub.id,
+      relatedDisasterEventId: disasterEventId,
+      detailsJson: {
+        agency_public_uuid: agencyPublicUuid,
+        auto_assigned: true,
+        reason: auditReason,
+      },
+      auditMeta,
+    });
+  }
+
+  return hubs.length;
+}
+
+async function assignReliefHubToLeadManagerIfPresent(
+  conn,
+  { disasterEventId, reliefHubActivationId, actorUserId, auditMeta },
+) {
+  const leadManager = await loadLeadReliefManagerAgency(conn, disasterEventId);
+  if (!leadManager) return false;
+
+  await assignActiveReliefHubsToManagingAgency(conn, {
+    disasterEventId,
+    agencyId: leadManager.agency_id,
+    agencyPublicUuid: leadManager.agency_public_uuid,
+    actorUserId,
+    auditMeta,
+    auditReason: "relief_hub_activation_auto_assigned_to_lead",
+    reliefHubActivationIds: [reliefHubActivationId],
+  });
+  return true;
+}
+
+async function backfillUnassignedReliefHubsToLeadManager(conn, disasterEventId) {
+  const [result] = await conn.execute(
+    `
+      UPDATE relief_hub_activations rha
+      INNER JOIN disaster_agency_responsibilities dar
+        ON dar.disaster_event_id = rha.disaster_event_id
+       AND dar.responsibility_type = 'relief_management'
+       AND dar.is_lead = TRUE
+       AND dar.deactivated_at IS NULL
+      SET rha.managing_agency_id = dar.agency_id
+      WHERE rha.disaster_event_id = ?
+        AND rha.activation_status = 'active'
+        AND rha.managing_agency_id IS NULL
+    `,
+    [disasterEventId],
+  );
+  return result.affectedRows ?? 0;
+}
+
 async function loadFacilityByPublicUuid(conn, facilityPublicUuid) {
   const [rows] = await conn.execute(
     `
@@ -831,6 +1047,9 @@ export async function getDisasterDashboard(publicUuid, options = {}) {
     const disaster = await requireDisaster(conn, publicUuid);
     const disasterEventId = disaster.id;
 
+    await backfillUnassignedSheltersToLeadManager(conn, disasterEventId);
+    await backfillUnassignedReliefHubsToLeadManager(conn, disasterEventId);
+
     const [statusHistory] = await conn.execute(
       `
         SELECT
@@ -1271,50 +1490,202 @@ export async function assignResponsibility(params) {
       }
     }
 
-    try {
-      const [result] = await conn.execute(
-        `
-          INSERT INTO disaster_agency_responsibilities (
-            disaster_event_id,
-            agency_id,
-            responsibility_type,
-            is_lead,
-            assigned_by_user_id
-          )
-          VALUES (?, ?, ?, ?, ?)
-        `,
-        [
-          disaster.id,
-          agency.id,
-          params.responsibilityType,
-          Boolean(params.isLead),
-          params.actorUserId,
-        ],
-      );
+    const [existing] = await conn.execute(
+      `
+        SELECT id, deactivated_at
+        FROM disaster_agency_responsibilities
+        WHERE disaster_event_id = ?
+          AND agency_id = ?
+          AND responsibility_type = ?
+        LIMIT 1
+      `,
+      [disaster.id, agency.id, params.responsibilityType],
+    );
 
-      await writeAudit(conn, {
-        actorUserId: params.actorUserId,
-        action: "disaster.responsibility.assigned",
-        entityType: "disaster_agency_responsibility",
-        entityId: result.insertId,
-        relatedDisasterEventId: disaster.id,
-        detailsJson: {
-          agency_public_uuid: params.agencyPublicUuid,
-          responsibility_type: params.responsibilityType,
-          is_lead: Boolean(params.isLead),
-        },
-        auditMeta: params.auditMeta,
-      });
-    } catch (err) {
-      if (err.code === "ER_DUP_ENTRY") {
+    let responsibilityId;
+    let auditAction = "disaster.responsibility.assigned";
+
+    if (existing[0]) {
+      if (!existing[0].deactivated_at) {
         throw new BackendError(
           409,
           "RESPONSIBILITY_DUPLICATE",
           "Agency already has this responsibility type for the disaster",
         );
       }
-      throw err;
+
+      await conn.execute(
+        `
+          UPDATE disaster_agency_responsibilities
+          SET deactivated_at = NULL,
+              is_lead = ?,
+              assigned_by_user_id = ?,
+              assigned_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [Boolean(params.isLead), params.actorUserId, existing[0].id],
+      );
+      responsibilityId = existing[0].id;
+      auditAction = "disaster.responsibility.reassigned";
+    } else {
+      try {
+        const [result] = await conn.execute(
+          `
+            INSERT INTO disaster_agency_responsibilities (
+              disaster_event_id,
+              agency_id,
+              responsibility_type,
+              is_lead,
+              assigned_by_user_id
+            )
+            VALUES (?, ?, ?, ?, ?)
+          `,
+          [
+            disaster.id,
+            agency.id,
+            params.responsibilityType,
+            Boolean(params.isLead),
+            params.actorUserId,
+          ],
+        );
+        responsibilityId = result.insertId;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          throw new BackendError(
+            409,
+            "RESPONSIBILITY_DUPLICATE",
+            "Agency already has this responsibility type for the disaster",
+          );
+        }
+        throw err;
+      }
     }
+
+    await writeAudit(conn, {
+      actorUserId: params.actorUserId,
+      action: auditAction,
+      entityType: "disaster_agency_responsibility",
+      entityId: responsibilityId,
+      relatedDisasterEventId: disaster.id,
+      detailsJson: {
+        agency_public_uuid: params.agencyPublicUuid,
+        responsibility_type: params.responsibilityType,
+        is_lead: Boolean(params.isLead),
+      },
+      auditMeta: params.auditMeta,
+    });
+
+    if (params.responsibilityType === "shelter_management" && params.isLead) {
+      await assignActiveSheltersToManagingAgency(conn, {
+        disasterEventId: disaster.id,
+        agencyId: agency.id,
+        agencyPublicUuid: params.agencyPublicUuid,
+        actorUserId: params.actorUserId,
+        auditMeta: params.auditMeta,
+      });
+    }
+
+    if (params.responsibilityType === "relief_management" && params.isLead) {
+      await assignActiveReliefHubsToManagingAgency(conn, {
+        disasterEventId: disaster.id,
+        agencyId: agency.id,
+        agencyPublicUuid: params.agencyPublicUuid,
+        actorUserId: params.actorUserId,
+        auditMeta: params.auditMeta,
+      });
+    }
+
+    await conn.commit();
+    return getDisasterDashboard(params.disasterPublicUuid);
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function revokeResponsibility(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const disaster = await requireDisaster(conn, params.disasterPublicUuid, {
+      forUpdate: true,
+    });
+    const agency = await loadAgencyByPublicUuid(conn, params.agencyPublicUuid);
+    if (!agency) {
+      throw new BackendError(404, "AGENCY_NOT_FOUND", "Agency not found");
+    }
+
+    const [rows] = await conn.execute(
+      `
+        SELECT id, is_lead
+        FROM disaster_agency_responsibilities
+        WHERE disaster_event_id = ?
+          AND agency_id = ?
+          AND responsibility_type = ?
+          AND deactivated_at IS NULL
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [disaster.id, agency.id, params.responsibilityType],
+    );
+    if (!rows[0]) {
+      throw new BackendError(
+        404,
+        "RESPONSIBILITY_NOT_FOUND",
+        "Active responsibility assignment not found",
+      );
+    }
+
+    await conn.execute(
+      `
+        UPDATE disaster_agency_responsibilities
+        SET deactivated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [rows[0].id],
+    );
+
+    if (params.responsibilityType === "shelter_management") {
+      await conn.execute(
+        `
+          UPDATE shelter_activations
+          SET managing_agency_id = NULL
+          WHERE disaster_event_id = ?
+            AND managing_agency_id = ?
+        `,
+        [disaster.id, agency.id],
+      );
+    }
+
+    if (params.responsibilityType === "relief_management") {
+      await conn.execute(
+        `
+          UPDATE relief_hub_activations
+          SET managing_agency_id = NULL
+          WHERE disaster_event_id = ?
+            AND managing_agency_id = ?
+        `,
+        [disaster.id, agency.id],
+      );
+    }
+
+    await writeAudit(conn, {
+      actorUserId: params.actorUserId,
+      action: "disaster.responsibility.revoked",
+      entityType: "disaster_agency_responsibility",
+      entityId: rows[0].id,
+      relatedDisasterEventId: disaster.id,
+      detailsJson: {
+        agency_public_uuid: params.agencyPublicUuid,
+        responsibility_type: params.responsibilityType,
+        is_lead: Boolean(rows[0].is_lead),
+        note: params.note ?? null,
+      },
+      auditMeta: params.auditMeta,
+    });
 
     await conn.commit();
     return getDisasterDashboard(params.disasterPublicUuid);
@@ -1648,6 +2019,13 @@ export async function manualActivateShelter(params) {
       auditMeta: params.auditMeta,
     });
 
+    await assignShelterToLeadManagerIfPresent(conn, {
+      disasterEventId: disaster.id,
+      shelterActivationId: activationId,
+      actorUserId: params.actorUserId,
+      auditMeta: params.auditMeta,
+    });
+
     await conn.commit();
 
     const [rows] = await conn.execute(
@@ -1768,6 +2146,13 @@ export async function manualActivateReliefHub(params) {
       entityId: activationId,
       relatedDisasterEventId: disaster.id,
       detailsJson: { facility_public_uuid: params.facilityPublicUuid, nearby },
+      auditMeta: params.auditMeta,
+    });
+
+    await assignReliefHubToLeadManagerIfPresent(conn, {
+      disasterEventId: disaster.id,
+      reliefHubActivationId: activationId,
+      actorUserId: params.actorUserId,
       auditMeta: params.auditMeta,
     });
 
@@ -2109,6 +2494,95 @@ export async function assignShelterManagingAgency(params) {
   }
 }
 
+export async function assignReliefHubManagingAgency(params) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const disaster = await requireDisaster(conn, params.disasterPublicUuid);
+    const agency = await loadAgencyByPublicUuid(conn, params.agencyPublicUuid);
+    if (!agency || !agency.is_active) {
+      throw new BackendError(404, "AGENCY_NOT_FOUND", "Agency not found");
+    }
+
+    const [resp] = await conn.execute(
+      `
+        SELECT id
+        FROM disaster_agency_responsibilities
+        WHERE disaster_event_id = ?
+          AND agency_id = ?
+          AND responsibility_type = 'relief_management'
+          AND deactivated_at IS NULL
+        LIMIT 1
+      `,
+      [disaster.id, agency.id],
+    );
+    if (!resp[0]) {
+      throw new BackendError(
+        409,
+        "RELIEF_MANAGER_LACKS_RESPONSIBILITY",
+        "Agency does not have relief_management responsibility for this disaster",
+      );
+    }
+
+    const [hubRows] = await conn.execute(
+      `
+        SELECT rha.id
+        FROM relief_hub_activations rha
+        WHERE rha.public_uuid = ? AND rha.disaster_event_id = ?
+        LIMIT 1
+      `,
+      [params.hubActivationPublicUuid, disaster.id],
+    );
+    if (!hubRows[0]) {
+      throw new BackendError(404, "RELIEF_HUB_NOT_FOUND", "Relief hub activation not found");
+    }
+
+    await conn.execute(
+      `
+        UPDATE relief_hub_activations
+        SET managing_agency_id = ?
+        WHERE id = ?
+      `,
+      [agency.id, hubRows[0].id],
+    );
+
+    await writeAudit(conn, {
+      actorUserId: params.actorUserId,
+      action: "relief_hub_activation.managing_agency_assigned",
+      entityType: "relief_hub_activation",
+      entityId: hubRows[0].id,
+      relatedDisasterEventId: disaster.id,
+      detailsJson: { agency_public_uuid: params.agencyPublicUuid },
+      auditMeta: params.auditMeta,
+    });
+
+    await conn.commit();
+
+    const [viewRow] = await conn.execute(
+      `
+        SELECT
+          rha.id AS relief_hub_activation_id,
+          rha.public_uuid AS relief_hub_public_uuid,
+          rha.activation_status,
+          rha.activation_source,
+          f.public_uuid AS facility_public_uuid,
+          f.name AS facility_name
+        FROM relief_hub_activations rha
+        INNER JOIN facilities f ON f.id = rha.facility_id
+        WHERE rha.id = ?
+      `,
+      [hubRows[0].id],
+    );
+    return viewRow[0];
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function deactivateShelterActivation(params) {
   const conn = await pool.getConnection();
   try {
@@ -2228,6 +2702,10 @@ export async function deactivateReliefHubActivation(params) {
 }
 
 export async function recordShelterOccupancy(params) {
+  if (!params.disasterPublicUuid) {
+    throw new BackendError(422, "VALIDATION_ERROR", "disasterPublicUuid is required");
+  }
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -2236,7 +2714,7 @@ export async function recordShelterOccupancy(params) {
 
     const [saRows] = await conn.execute(
       `
-        SELECT sa.id, sa.activation_status
+        SELECT sa.id, sa.activation_status, sa.managing_agency_id
         FROM shelter_activations sa
         WHERE sa.public_uuid = ? AND sa.disaster_event_id = ?
         LIMIT 1
@@ -2246,6 +2724,12 @@ export async function recordShelterOccupancy(params) {
     );
     if (!saRows[0]) {
       throw new BackendError(404, "SHELTER_ACTIVATION_NOT_FOUND", "Shelter activation not found");
+    }
+    if (
+      params.agencyId != null &&
+      Number(saRows[0].managing_agency_id) !== Number(params.agencyId)
+    ) {
+      throw new BackendError(404, "SHELTER_NOT_FOUND", "Shelter activation not found for this agency");
     }
     if (saRows[0].activation_status !== "active") {
       throw new BackendError(409, "SHELTER_NOT_ACTIVE", "Shelter activation is not active");
@@ -2302,7 +2786,7 @@ export async function recordStockReceipt(params) {
 
     const [hubRows] = await conn.execute(
       `
-        SELECT rha.id, rha.activation_status
+        SELECT rha.id, rha.activation_status, rha.managing_agency_id
         FROM relief_hub_activations rha
         WHERE rha.public_uuid = ? AND rha.disaster_event_id = ?
         LIMIT 1
@@ -2312,6 +2796,12 @@ export async function recordStockReceipt(params) {
     );
     if (!hubRows[0]) {
       throw new BackendError(404, "RELief_HUB_NOT_FOUND", "Relief hub activation not found");
+    }
+    if (
+      params.agencyId != null &&
+      Number(hubRows[0].managing_agency_id) !== Number(params.agencyId)
+    ) {
+      throw new BackendError(404, "RELief_HUB_NOT_FOUND", "Relief hub activation not found for this agency");
     }
     if (hubRows[0].activation_status !== "active") {
       throw new BackendError(
@@ -2539,7 +3029,7 @@ export async function createReliefRequest(params) {
 
     const [saRows] = await conn.execute(
       `
-        SELECT sa.id, sa.activation_status
+        SELECT sa.id, sa.activation_status, sa.managing_agency_id
         FROM shelter_activations sa
         WHERE sa.public_uuid = ? AND sa.disaster_event_id = ?
         LIMIT 1
@@ -2552,6 +3042,12 @@ export async function createReliefRequest(params) {
     if (saRows[0].activation_status !== "active") {
       throw new BackendError(409, "SHELTER_NOT_ACTIVE", "Shelter activation is not active");
     }
+    if (
+      params.agencyId != null &&
+      Number(saRows[0].managing_agency_id) !== Number(params.agencyId)
+    ) {
+      throw new BackendError(404, "SHELTER_NOT_FOUND", "Shelter activation not found for this agency");
+    }
 
     const [submittedStatus] = await conn.execute(
       `
@@ -2562,7 +3058,9 @@ export async function createReliefRequest(params) {
     );
 
     let requestingAgencyId = null;
-    if (params.requestingAgencyPublicUuid) {
+    if (params.agencyId != null) {
+      requestingAgencyId = params.agencyId;
+    } else if (params.requestingAgencyPublicUuid) {
       const agency = await loadAgencyByPublicUuid(conn, params.requestingAgencyPublicUuid);
       if (!agency) {
         throw new BackendError(404, "AGENCY_NOT_FOUND", "Requesting agency not found");
