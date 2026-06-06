@@ -156,28 +156,17 @@ export function useGateway999Intake() {
 
   const handleAddressTextChange = useCallback(
     (value: string) => {
-      setForm((current) => ({
-        ...current,
-        addressText: value,
-        selectedLocation: current.selectedLocation
-          ? { ...current.selectedLocation, addressText: value.trim() || undefined }
-          : current.selectedLocation,
-      }));
-      setSubmitError("");
+      updateForm({ addressText: value });
     },
-    [],
+    [updateForm],
   );
 
-  const handlePlaceNameChange = useCallback((value: string) => {
-    setForm((current) => ({
-      ...current,
-      placeName: value,
-      selectedLocation: current.selectedLocation
-        ? { ...current.selectedLocation, placeName: value.trim() || undefined }
-        : current.selectedLocation,
-    }));
-    setSubmitError("");
-  }, []);
+  const handlePlaceNameChange = useCallback(
+    (value: string) => {
+      updateForm({ placeName: value });
+    },
+    [updateForm],
+  );
 
   const resetForm = useCallback(() => {
     setForm(createInitialFormState());

@@ -88,12 +88,11 @@ export function Gateway999LocationPanel({
       ? "Select a reported location before submitting."
       : null;
 
+  const pickerAddressText = selectedLocation?.addressText?.trim() ?? "";
+  const pickerPlaceName = selectedLocation?.placeName?.trim() ?? "";
+
   const locationDisplayLabel =
-    addressText.trim() ||
-    placeName.trim() ||
-    selectedLocation?.addressText?.trim() ||
-    selectedLocation?.placeName?.trim() ||
-    null;
+    pickerAddressText || pickerPlaceName || null;
 
   const pickerValue: LocationPickerValue | null = validCoords;
 
@@ -102,13 +101,6 @@ export function Gateway999LocationPanel({
       location: LocationPickerValue,
       details?: LocationPickerSelectionDetails,
     ) => {
-      if (details?.addressText != null && details.addressText !== "") {
-        onAddressTextChange(details.addressText);
-      }
-      if (details?.placeName != null && details.placeName !== "") {
-        onPlaceNameChange(details.placeName);
-      }
-
       onLocationChange({
         latitude: location.latitude,
         longitude: location.longitude,
@@ -116,7 +108,7 @@ export function Gateway999LocationPanel({
         placeName: details?.placeName?.trim() || undefined,
       });
     },
-    [onLocationChange, onAddressTextChange, onPlaceNameChange],
+    [onLocationChange],
   );
 
   const handleClearLocation = useCallback(() => {
@@ -126,9 +118,9 @@ export function Gateway999LocationPanel({
   }, [onLocationChange, onAddressTextChange, onPlaceNameChange]);
 
   const showDistinctPlaceName =
-    placeName.trim() &&
-    placeName.trim() !== addressText.trim() &&
-    placeName.trim() !== locationDisplayLabel;
+    pickerPlaceName &&
+    pickerPlaceName !== pickerAddressText &&
+    pickerPlaceName !== locationDisplayLabel;
 
   return (
     <CommandSectionCard
@@ -138,14 +130,14 @@ export function Gateway999LocationPanel({
       className="h-full !p-4 sm:!p-4"
       bodyClassName="!mt-2"
       fillHeight
+      scrollableBody
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <LocationPicker
           value={pickerValue}
           onChange={handlePickerChange}
-          selectedAddress={addressText}
-          selectedPlaceName={placeName}
-          fallbackSearchQuery={addressText}
+          selectedAddress={selectedLocation?.addressText}
+          selectedPlaceName={selectedLocation?.placeName}
           syncSearchQueryToSelectedLabel={false}
           showCurrentLocation={false}
           showSelectionSummary={false}
@@ -166,23 +158,21 @@ export function Gateway999LocationPanel({
         >
           {validCoords ? (
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-slate-900">
-                Selected location
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-slate-900">
+                  Selected location
+                </p>
+                <ClearLocationButton
+                  onClick={handleClearLocation}
+                  disabled={isSubmitting}
+                />
+              </div>
               <p className="text-sm font-medium leading-snug text-slate-900">
                 {locationDisplayLabel ?? "Selected map point"}
               </p>
               {showDistinctPlaceName ? (
-                <p className="text-xs text-slate-500">{placeName.trim()}</p>
+                <p className="text-xs text-slate-500">{pickerPlaceName}</p>
               ) : null}
-              <p className="text-xs text-slate-500">
-                Lat: {validCoords.latitude.toFixed(6)} · Lng:{" "}
-                {validCoords.longitude.toFixed(6)}
-              </p>
-              <ClearLocationButton
-                onClick={handleClearLocation}
-                disabled={isSubmitting}
-              />
             </div>
           ) : (
             <div className="space-y-0.5">
@@ -201,7 +191,7 @@ export function Gateway999LocationPanel({
           ) : null}
         </div>
 
-        <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-2.5 py-1.5 pb-2">
+        <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-2.5 py-1.5">
           <p className="text-xs font-medium text-slate-700">
             Optional location details
           </p>
