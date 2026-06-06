@@ -5,6 +5,12 @@ import {
 } from "../middlewares/auth.js";
 import { requireAgencyContext as defaultRequireAgencyContext } from "../middlewares/agencyContext.js";
 import {
+  getAgencyDisasterDetail,
+  getAgencyDisasterIncidents,
+  getAgencyDisasterReliefHubs,
+  getAgencyDisasterReliefRequests,
+  getAgencyDisasterShelters,
+  getAgencyDisasters,
   getAgencyDispatches,
   getAgencyIncidents,
   getAgencyIncidentNotes,
@@ -15,15 +21,24 @@ import {
   patchAgencyDispatchStatus,
   patchAgencyUnit,
   patchAgencyUnitStatus,
+  postAgencyDisasterReliefRequest,
+  postAgencyReliefHubStockReceipt,
   postAgencyResponseLog,
+  postAgencyShelterOccupancy,
   postAgencyUnit,
 } from "../controllers/agency.js";
 import {
+  validateAgencyCreateReliefRequest,
   validateAgencyCreateResponseLog,
+  validateAgencyHubActivationParam,
   validateAgencyCreateUnit,
+  validateAgencyDisasterUuidParam,
   validateAgencyDispatchUuidParam,
   validateAgencyIncidentUuidParam,
   validateAgencyListQuery,
+  validateAgencyOccupancySnapshot,
+  validateAgencyShelterActivationParam,
+  validateAgencyStockReceipt,
   validateAgencyUnitsListQuery,
   validateAgencyPatchDispatchStatus,
   validateAgencyPatchUnit,
@@ -41,6 +56,63 @@ export function createAgencyRouter({
   router.use(requireAgencyContext);
 
   router.get("/me", requirePermission("agency.view_own"), getAgencyMe);
+  router.get(
+    "/disasters",
+    requirePermission("disaster.read"),
+    validateAgencyListQuery,
+    getAgencyDisasters,
+  );
+  router.get(
+    "/disasters/:disasterPublicUuid",
+    requirePermission("disaster.read"),
+    validateAgencyDisasterUuidParam,
+    getAgencyDisasterDetail,
+  );
+  router.get(
+    "/disasters/:disasterPublicUuid/shelters",
+    requirePermission("disaster.read"),
+    validateAgencyDisasterUuidParam,
+    getAgencyDisasterShelters,
+  );
+  router.get(
+    "/disasters/:disasterPublicUuid/relief-hubs",
+    requirePermission("disaster.read"),
+    validateAgencyDisasterUuidParam,
+    getAgencyDisasterReliefHubs,
+  );
+  router.post(
+    "/disasters/:disasterPublicUuid/shelters/:shelterActivationPublicUuid/occupancy",
+    requirePermission("shelter.record_occupancy_own"),
+    validateAgencyShelterActivationParam,
+    validateAgencyOccupancySnapshot,
+    postAgencyShelterOccupancy,
+  );
+  router.get(
+    "/disasters/:disasterPublicUuid/relief-requests",
+    requirePermission("disaster.read"),
+    validateAgencyDisasterUuidParam,
+    getAgencyDisasterReliefRequests,
+  );
+  router.post(
+    "/disasters/:disasterPublicUuid/relief-requests",
+    requirePermission("relief.request_own_shelter"),
+    validateAgencyDisasterUuidParam,
+    validateAgencyCreateReliefRequest,
+    postAgencyDisasterReliefRequest,
+  );
+  router.post(
+    "/disasters/:disasterPublicUuid/relief-hubs/:hubActivationPublicUuid/stock-receipts",
+    requirePermission("relief.manage_inventory_own"),
+    validateAgencyHubActivationParam,
+    validateAgencyStockReceipt,
+    postAgencyReliefHubStockReceipt,
+  );
+  router.get(
+    "/disasters/:disasterPublicUuid/incidents",
+    requirePermission("disaster.read"),
+    validateAgencyDisasterUuidParam,
+    getAgencyDisasterIncidents,
+  );
   router.get(
     "/incidents",
     requirePermission("dispatch.view_own_agency"),

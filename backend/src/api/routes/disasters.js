@@ -19,8 +19,10 @@ import {
   postManualShelter,
   postRejectReliefRequest,
   postReliefDistribution,
+  postReliefHubManagingAgency,
   postReliefRequest,
   postResponsibility,
+  postRevokeResponsibility,
   postShelterManagingAgency,
   postShelterOccupancy,
   postStockReceipt,
@@ -46,7 +48,9 @@ import {
   validateManualHubActivation,
   validateManualShelterActivation,
   validateOccupancySnapshot,
+  validateReliefHubManagingAgency,
   validateReliefRequestAction,
+  validateRevokeResponsibility,
   validateShelterManagingAgency,
   validateStockReceipt,
   validateUnlinkIncident,
@@ -143,6 +147,13 @@ export function createDisastersRouter({ requireAuth = defaultRequireAuth } = {})
     validateAssignResponsibility,
     postResponsibility,
   );
+  router.post(
+    "/:disasterPublicUuid/responsibilities/revoke",
+    requirePermission("disaster.manage_responsibilities"),
+    validateDisasterUuidParam,
+    validateRevokeResponsibility,
+    postRevokeResponsibility,
+  );
 
   router.post(
     "/:disasterPublicUuid/declarations/initial",
@@ -221,6 +232,13 @@ export function createDisastersRouter({ requireAuth = defaultRequireAuth } = {})
     validateDisasterUuidParam,
     validateManualHubActivation,
     postManualReliefHub,
+  );
+  router.post(
+    "/:disasterPublicUuid/relief-hubs/:hubActivationPublicUuid/managing-agency",
+    requirePermission("shelter.manage"),
+    validateHubActivationParam,
+    validateReliefHubManagingAgency,
+    postReliefHubManagingAgency,
   );
   router.post(
     "/:disasterPublicUuid/relief-hubs/:hubActivationPublicUuid/stock-receipts",
