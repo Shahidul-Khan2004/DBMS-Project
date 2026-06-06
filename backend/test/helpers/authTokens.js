@@ -55,6 +55,14 @@ export async function getDispatcherToken(app) {
   return loginAs(app, "dispatcher@niers.test", password);
 }
 
+export async function getCitizenToken(app, email = "citizen.rahima@niers.test") {
+  const password = process.env.DEMO_CITIZEN_PASSWORD;
+  if (!password) {
+    throw new Error("DEMO_CITIZEN_PASSWORD is required for citizen integration tests");
+  }
+  return loginAs(app, email, password);
+}
+
 export function clearTokenCache() {
   tokenCache.clear();
 }

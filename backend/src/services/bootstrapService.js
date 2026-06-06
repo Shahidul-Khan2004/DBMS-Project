@@ -13,6 +13,8 @@ import {
 import { ROLE_CODES } from "./rbacService.js";
 import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js";
 import { bootstrapDemoDispatcher } from "./demoDispatcherBootstrapService.js";
+import { bootstrapDemoCitizens } from "./demoCitizenBootstrapService.js";
+import { runOperationalDemoSeeds } from "./operationalDemoSeedService.js";
 import {
   ensureAgencyMembershipsPublicUuid,
   ensureUserProfilesSecondaryPhoneNumber,
@@ -289,6 +291,8 @@ export async function bootstrapDevelopmentSystemAdmin() {
   await ensureIncidentReportLinksSoftUnlink();
   await ensureIntakeStatusUnlinkTransition();
   await migrateLegacyReportedIncidentStatus();
+  await bootstrapDemoCitizens();
+  await runOperationalDemoSeeds();
   await bootstrapDemoAgencyRepresentatives();
   await bootstrapDemoDispatcher();
 
