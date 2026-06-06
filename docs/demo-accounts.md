@@ -10,6 +10,9 @@ Copy [`backend/.env.example`](../backend/.env.example) as a starting point. Pass
 |-------|------|------------------|------------------|
 | Value of `SYSTEM_ADMIN__EMAIL` (default `admin@example.com`) | `system_admin` | `SYSTEM_ADMIN_PASSWORD` | `ChangeMeAdmin123` |
 | `dispatcher@niers.test` | `dispatcher` | `DEMO_DISPATCHER_PASSWORD` | `ChangeMeDispatcher123` |
+| `citizen.rahima@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
+| `citizen.karim@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
+| `citizen.farhana@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
 | `fire.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
 | `police.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
 | `medical.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
@@ -17,6 +20,39 @@ Copy [`backend/.env.example`](../backend/.env.example) as a starting point. Pass
 | `shelter.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
 
 All demo passwords (`DEMO_*`) must be **at least 8 characters** or bootstrap is skipped.
+
+---
+
+## Showcase seed (day-to-day operations)
+
+When `DEMO_CITIZEN_PASSWORD` is set, the backend also applies operational demo SQL (`29`–`31` in [`docker-init/`](../backend/src/schemas/docker-init/)) after creating demo citizens.
+
+**What is pre-seeded**
+
+- Routine intakes (medical, fire, road safety, relief follow-up)
+- One open service case (`SC-KUR-SHOW-001`) with citizen messages
+- Three active Kurigram incidents (`EMI-KUR-PRE-001` … `003`) with dispatches and response logs
+- Kurigram agencies, units, and facilities from seed `28` (master data only)
+
+**What is not pre-seeded**
+
+- No `disaster_events` rows — `GET /public/disasters` returns an empty list until a disaster is **declared live**
+- No `natural_disaster` category on showcase intakes/incidents (reserved for live disaster demo)
+- No flood/mass-evacuation narratives — presenter creates and declares the disaster during the showcase
+
+**Pending dispatcher work:** intakes `IR-KUR-SHOW-003` (potholes) and `IR-KUR-SHOW-005` (child fever).
+
+---
+
+## Demo citizens
+
+| Email | Name | Phone |
+|-------|------|-------|
+| `citizen.rahima@niers.test` | Rahima Begum | `01710000001` |
+| `citizen.karim@niers.test` | Abdul Karim | `01710000002` |
+| `citizen.farhana@niers.test` | Farhana Akter | `01710000003` |
+
+**Bootstrap:** [`demoCitizenBootstrapService.js`](../backend/src/services/demoCitizenBootstrapService.js)
 
 ---
 

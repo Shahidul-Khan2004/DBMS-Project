@@ -54,5 +54,8 @@ npm run test:integration
 - `SYSTEM_ADMIN__EMAIL` / `SYSTEM_ADMIN_PASSWORD` for admin/operations smoke tests
 - `DEMO_REP_PASSWORD` for agency rep smoke tests (`fire.rep@niers.test` seed user)
 - `DEMO_DISPATCHER_PASSWORD` for dispatcher smoke tests (`dispatcher@niers.test` seed user)
+- `DEMO_CITIZEN_PASSWORD` for citizen/showcase seed (`citizen.rahima@niers.test` and day-to-day demo data)
+
+Restart the backend after changing demo env vars so bootstrap and operational seeds (`29`–`31`) run.
 
 Optional: `npm run test:barikoi-live` exercises the real Barikoi API when `BARIKOI_API_KEY` is set.
