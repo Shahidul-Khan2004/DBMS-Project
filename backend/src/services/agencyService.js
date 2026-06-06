@@ -1,4 +1,10 @@
 import * as agencyRepo from "../repositories/agencyRepo.js";
+import * as agencyDisasterRepo from "../repositories/agencyDisasterRepo.js";
+import {
+  createReliefRequest,
+  recordShelterOccupancy,
+  recordStockReceipt,
+} from "../repositories/disasterOperationsRepo.js";
 import { mergeGeoSortIntoFilters, resolveGeoSortFromQuery } from "./geoSortService.js";
 
 export async function resolveAgencyContextForUser(userId) {
@@ -97,6 +103,80 @@ export function agencyCreateResponseLog(agencyId, incidentPublicUuid, body, acto
     dispatchPublicUuid: body.dispatch_public_uuid,
     logType: body.log_type,
     message: body.message,
+    actorUserId,
+  });
+}
+
+export function agencyListDisasters(agencyId, query) {
+  return agencyDisasterRepo.listAgencyDisasters(agencyId, query);
+}
+
+export function agencyGetDisasterDetail(agencyId, disasterPublicUuid) {
+  return agencyDisasterRepo.getAgencyDisasterDetail(agencyId, disasterPublicUuid);
+}
+
+export function agencyListDisasterShelters(agencyId, disasterPublicUuid) {
+  return agencyDisasterRepo.listAgencyManagedShelters(agencyId, disasterPublicUuid);
+}
+
+export function agencyListDisasterReliefHubs(agencyId, disasterPublicUuid) {
+  return agencyDisasterRepo.listAgencyManagedReliefHubs(agencyId, disasterPublicUuid);
+}
+
+export function agencyListDisasterReliefRequests(agencyId, disasterPublicUuid) {
+  return agencyDisasterRepo.listAgencyReliefRequests(agencyId, disasterPublicUuid);
+}
+
+export function agencyListDisasterIncidents(agencyId, disasterPublicUuid) {
+  return agencyDisasterRepo.listAgencyDisasterIncidents(agencyId, disasterPublicUuid);
+}
+
+export function agencyRecordShelterOccupancy(
+  agencyId,
+  disasterPublicUuid,
+  shelterActivationPublicUuid,
+  body,
+  actorUserId,
+) {
+  return recordShelterOccupancy({
+    disasterPublicUuid,
+    shelterActivationPublicUuid,
+    peopleCount: body.peopleCount,
+    agencyId,
+    actorUserId,
+  });
+}
+
+export function agencyCreateReliefRequest(
+  agencyId,
+  disasterPublicUuid,
+  body,
+  actorUserId,
+) {
+  return createReliefRequest({
+    disasterPublicUuid,
+    shelterActivationPublicUuid: body.shelterActivationPublicUuid,
+    items: body.items,
+    requestNote: body.requestNote,
+    agencyId,
+    actorUserId,
+  });
+}
+
+export function agencyRecordReliefHubStockReceipt(
+  agencyId,
+  disasterPublicUuid,
+  hubActivationPublicUuid,
+  body,
+  actorUserId,
+) {
+  return recordStockReceipt({
+    disasterPublicUuid,
+    reliefHubActivationPublicUuid: hubActivationPublicUuid,
+    reliefItemCode: body.reliefItemCode,
+    quantityReceived: body.quantityReceived,
+    note: body.note,
+    agencyId,
     actorUserId,
   });
 }

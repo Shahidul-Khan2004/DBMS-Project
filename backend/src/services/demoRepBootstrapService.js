@@ -43,6 +43,7 @@ const AGENCY_REP_PERMISSION_CODES = [
   "disaster.read",
   "shelter.record_occupancy_own",
   "relief.request_own_shelter",
+  "relief.manage_inventory_own",
 ];
 
 const KURIGRAM_DEMO_REPS = [

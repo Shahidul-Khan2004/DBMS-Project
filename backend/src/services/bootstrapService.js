@@ -173,6 +173,11 @@ const DEFAULT_PERMISSIONS = [
     description: "Record verified relief stock",
   },
   {
+    permissionCode: "relief.manage_inventory_own",
+    moduleName: "relief",
+    description: "Record verified relief stock for own managed relief hub",
+  },
+  {
     permissionCode: "relief.manage_requests",
     moduleName: "relief",
     description: "Approve or reject relief requests",
@@ -226,6 +231,7 @@ const AGENCY_REPRESENTATIVE_PERMISSION_CODES = [
   "disaster.read",
   "shelter.record_occupancy_own",
   "relief.request_own_shelter",
+  "relief.manage_inventory_own",
 ];
 
 async function ensureRolesAndPermissions() {
