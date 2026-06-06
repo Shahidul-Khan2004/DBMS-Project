@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Clock3, FileText, MessageSquare, RefreshCw } from "lucide-react";
+import { CitizenBackButton } from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -247,15 +248,12 @@ export default function CitizenServiceCaseDetailPage() {
       subtitle={`Case ${serviceCase?.case_code ?? publicUuid}`}
       onLogout={handleLogout}
     >
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-start">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => router.push("/dashboard/citizen/service-cases")}
-          >
-            Back to Service Cases
-          </Button>
+          <CitizenBackButton
+            href="/dashboard/citizen/service-cases"
+            label="Back to Service Cases"
+          />
         </div>
 
         {error && <ErrorAlert message={error} />}
@@ -295,7 +293,7 @@ export default function CitizenServiceCaseDetailPage() {
                 description="This case may no longer be available or may not belong to your account."
               />
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-[#006747]">
@@ -390,7 +388,7 @@ export default function CitizenServiceCaseDetailPage() {
                   icon={<MessageSquare className="h-6 w-6" aria-hidden />}
                 />
               ) : (
-                <ul className="space-y-4">
+                <ul className="max-h-[min(28rem,50vh)] space-y-3 overflow-y-auto overscroll-y-contain pr-1">
                   {messages.map((message) => {
                     const parsed = normalizeMessage(message);
                     const fromCitizen = message.message_type === "user_message";

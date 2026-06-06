@@ -99,7 +99,6 @@ export interface CreateIntakeReportRequest {
   categoryCode: string;
   summary: string;
   description?: string;
-  urgencyType?: "non_emergency" | "emergency" | "unknown";
   reportedAt?: string;
   location?: IntakeStructuredLocation;
   locationId?: string;

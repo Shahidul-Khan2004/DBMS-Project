@@ -11,7 +11,6 @@ import {
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
-import { Input } from "@/components/ui/Input";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import type {
   LocationPickerSelectionDetails,
@@ -179,6 +178,14 @@ export default function CitizenLocationsPage() {
   }
 
   const formSelectedLocation = getFormLocation(form);
+  const selectedLocationLabel =
+    form.addressText.trim() ||
+    form.placeName.trim() ||
+    "Selected map point";
+  const showDistinctPlaceName =
+    Boolean(form.placeName.trim()) &&
+    form.placeName.trim() !== form.addressText.trim() &&
+    form.placeName.trim() !== selectedLocationLabel;
   const locationsByNewest = getLocationsByNewest(locations);
   const displayedLocations = showAllLocations
     ? locationsByNewest
@@ -194,10 +201,10 @@ export default function CitizenLocationsPage() {
        <div className="grid items-start gap-3 xl:grid-cols-[minmax(420px,1.15fr)_minmax(340px,0.85fr)]">
         <CitizenSectionCard
           title="Add Location"
-          subtitle="Search, use current position, or click the map."
+          subtitle="Search or place a marker for the location you want to save."
           icon={<PlusCircle className="h-5 w-5" aria-hidden />}
-          className="flex flex-col [&_header]:px-4 [&_header]:py-3"
-          contentClassName="!p-4 flex flex-1 flex-col gap-3"
+          className="flex flex-col xl:h-[calc(100dvh-11rem)] xl:min-h-[34rem] xl:max-h-[46rem] [&_header]:px-4 [&_header]:py-3"
+          contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain !p-4"
         >
             {error && <ErrorAlert message={error} />}
             {message && (
@@ -205,7 +212,7 @@ export default function CitizenLocationsPage() {
                 {message}
               </div>
             )}
-            <div className="flex flex-1 flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <LocationPicker
                 value={formSelectedLocation}
                 onChange={handleLocationChange}
@@ -214,39 +221,116 @@ export default function CitizenLocationsPage() {
                 syncSearchQueryToSelectedLabel={false}
                 embedded
                 embeddedCompact
-                mapClassName="h-[clamp(230px,38vh,360px)] w-full"
+                searchPlaceholder="Search address, place, or landmark..."
+                mapClassName="h-[clamp(210px,30vh,250px)] w-full"
+                mapWrapperClassName="w-full"
+                embeddedMapSectionClassName="mt-3 w-full shrink-0"
                 showSelectionSummary={false}
               />
 
-              <div className="rounded-xl border border-[#002D62]/10 bg-[#F6F9FE] p-3">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-                  <Input
-                    value={form.addressText}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        addressText: event.target.value,
-                      }))
-                    }
-                    label="Address Text"
-                    placeholder="Optional address or landmark"
-                  />
-                  <Input
-                    value={form.placeName}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        placeName: event.target.value,
-                      }))
-                    }
-                    label="Place Name"
-                    placeholder="Home, office, school gate"
-                  />
+              <div
+                className="shrink-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
+                aria-live="polite"
+              >
+                {formSelectedLocation ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-slate-900">
+                      Selected location
+                    </p>
+                    <p className="text-sm font-medium leading-snug text-slate-900">
+                      {selectedLocationLabel}
+                    </p>
+                    {showDistinctPlaceName ? (
+                      <p className="text-xs text-slate-500">
+                        {form.placeName.trim()}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm({
+                          latitude: "",
+                          longitude: "",
+                          addressText: "",
+                          placeName: "",
+                        });
+                        setError("");
+                        setMessage("");
+                      }}
+                      disabled={saving}
+                      className="text-xs font-medium text-[#006747] underline-offset-2 transition hover:text-[#002D62] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006747]/30 disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                      Clear Location
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-slate-900">
+                      No map point selected
+                    </p>
+                    <p className="text-xs leading-snug text-slate-600">
+                      Choose a map point before saving this location.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2">
+                <p className="text-xs font-medium text-slate-700">
+                  Optional location details
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="saved-location-address"
+                      className="block text-xs font-semibold text-slate-700"
+                    >
+                      Location Name or Address
+                    </label>
+                    <input
+                      id="saved-location-address"
+                      value={form.addressText}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          addressText: event.target.value,
+                        }))
+                      }
+                      disabled={saving}
+                      placeholder="Building, road, or landmark description"
+                      className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35 disabled:bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="saved-location-place"
+                      className="block text-xs font-semibold text-slate-700"
+                    >
+                      Place Name
+                    </label>
+                    <input
+                      id="saved-location-place"
+                      value={form.placeName}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          placeName: event.target.value,
+                        }))
+                      }
+                      disabled={saving}
+                      placeholder="Optional landmark or place name"
+                      className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35 disabled:bg-slate-50"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end">
                   <Button
                     type="button"
                     isLoading={saving}
                     onClick={() => void handleSaveLocation()}
-                    className="h-[46px] whitespace-nowrap"
+                    disabled={!formSelectedLocation}
+                    size="sm"
+                    className="whitespace-nowrap"
                   >
                     Save Location
                   </Button>
@@ -258,8 +342,8 @@ export default function CitizenLocationsPage() {
         <CitizenSectionCard
           title="My Recent Locations"
           icon={<MapPin className="h-5 w-5" aria-hidden />}
-          className="flex flex-col [&_header]:px-4 [&_header]:py-3"
-          contentClassName="flex min-h-[620px] flex-1 flex-col p-0"
+          className="flex flex-col xl:h-[calc(100dvh-11rem)] xl:min-h-[34rem] xl:max-h-[46rem] [&_header]:px-4 [&_header]:py-3"
+          contentClassName="flex min-h-0 flex-1 flex-col !p-0"
         >
           <div className="border-b border-[#002D62]/10 px-4 py-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -322,7 +406,7 @@ export default function CitizenLocationsPage() {
                 />
               </div>
             ) : (
-              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain p-4">
                 {displayedLocations.map((location) => (
                   <li
                     key={location.publicUuid}

@@ -104,11 +104,13 @@ export default function CitizenIncidentsPage() {
       subtitle="Emergency incidents linked to your reports"
       onLogout={handleLogout}
     >
-      <div className="space-y-6">
+      <div className="space-y-3">
         <CitizenSectionCard
           title="Linked Emergency Incidents"
           subtitle="Newest incident updates appear first."
           icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
+          className="flex max-h-[calc(100dvh-11rem)] min-h-[22rem] flex-col"
+          contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
         >
             {isLoading ? (
               <p className="text-sm text-[#42547A]">Loading your incidents...</p>

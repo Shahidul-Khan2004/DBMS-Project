@@ -6,7 +6,6 @@ import React, { useEffect, useState } from "react";
 import { getAuthSession, type UserRole } from "@/lib/auth-store";
 import {
   AlertTriangle,
-  ArrowLeft,
   ClipboardCheck,
   FileText,
   LayoutGrid,
@@ -74,37 +73,37 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const showCitizenReportAction = !isCitizenReportNewPage;
   const shellWidthClass = "w-full";
   const shellClassName = isCitizenDashboardShell
-    ? "min-h-screen bg-[#F6F9FE] text-[#002D62]"
+    ? "min-h-dvh overflow-x-hidden bg-[#F6F9FE] text-[#002D62]"
     : "min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200";
   const headerClassName = isCitizenDashboardShell
     ? "border-b border-[#002D62]/10 bg-white shadow-sm"
     : "border-b border-[#002D62]/10 bg-zinc-200/95 shadow-sm backdrop-blur-md";
   const headerInnerClassName = isCitizenDashboardShell
-    ? `${shellWidthClass} px-6 py-4 sm:px-8 lg:px-10 2xl:px-12`
+    ? `${shellWidthClass} px-4 py-3 sm:px-6 lg:px-8 2xl:px-10`
     : `${shellWidthClass} px-4 py-4 sm:px-6 lg:px-8 2xl:px-10 xl:py-5`;
   const headerRowClassName = isCitizenDashboardShell
-    ? "flex flex-wrap items-center justify-between gap-4"
+    ? "flex flex-wrap items-center justify-between gap-2 sm:gap-3"
     : "flex flex-nowrap items-center justify-between gap-3";
   const headerTitleGroupClassName = isCitizenDashboardShell
-    ? "flex min-w-0 items-center gap-5"
+    ? "flex min-w-0 items-center gap-3 sm:gap-4"
     : "flex min-w-0 items-center gap-3 sm:gap-4";
   const logoClassName = isCitizenDashboardShell
-    ? "flex h-14 w-[116px] shrink-0 items-center justify-center bg-[#002D62] text-2xl font-bold text-white shadow-sm"
+    ? "flex h-11 w-24 shrink-0 items-center justify-center bg-[#002D62] text-xl font-bold text-white shadow-sm sm:h-12 sm:w-28 sm:text-2xl"
     : "shrink-0 bg-[#002D62] px-4 py-2.5 text-lg font-bold tracking-[-1px] text-white sm:px-5 sm:py-3 sm:text-xl";
   const titleClassName = isCitizenDashboardShell
-    ? "truncate text-2xl font-bold text-[#002D62] sm:text-[30px]"
+    ? "truncate text-xl font-bold text-[#002D62] sm:text-2xl"
     : "truncate text-xl font-bold text-[#002D62] sm:text-2xl";
   const subtitleClassName = isCitizenDashboardShell
-    ? "mt-1 truncate text-base text-slate-500"
+    ? "mt-0.5 truncate text-sm text-slate-500"
     : "mt-0.5 truncate text-sm text-gray-600";
   const actionsClassName = isCitizenDashboardShell
-    ? "flex shrink-0 items-center gap-4"
+    ? "flex shrink-0 items-center gap-2"
     : "flex shrink-0 items-center gap-2 sm:gap-3";
   const logoutClassName = isCitizenDashboardShell
-    ? "inline-flex h-12 items-center gap-2 rounded-xl border-2 border-[#0B3FE8] bg-white px-5 text-sm font-bold text-[#002D62] transition-colors hover:bg-[#EFF6FF]"
+    ? "inline-flex h-10 items-center gap-2 rounded-xl border border-[#0B3FE8] bg-white px-3 text-sm font-bold text-[#002D62] transition-colors hover:bg-[#EFF6FF] sm:px-4"
     : "inline-flex items-center gap-2 rounded-2xl border-2 border-[#002D62] bg-white px-4 py-2 text-sm font-semibold text-[#002D62] transition-colors hover:bg-[#EFF6FF]";
   const contentOuterClassName = isCitizenDashboardShell
-    ? `${shellWidthClass} w-full px-6 py-6 sm:px-8 lg:px-10 2xl:px-12`
+    ? `${shellWidthClass} w-full px-4 py-4 sm:px-6 lg:px-8 2xl:px-10`
     : `${shellWidthClass} w-full px-4 py-6 sm:px-6 lg:px-8 2xl:px-10`;
 
   const accountActions = (
@@ -181,11 +180,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       </div>
 
       {showCitizenTopNav ? (
-        <div className="border-b border-[#002D62]/10 bg-white">
-          <div className={`${shellWidthClass} px-6 sm:px-8 lg:px-10 2xl:px-12`}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="border-b border-[#002D62]/10 bg-white/95 backdrop-blur-sm">
+          <div className={`${shellWidthClass} px-4 sm:px-6 lg:px-8 2xl:px-10`}>
+            <div className="flex h-12 min-w-0 items-center gap-3">
               <nav
-                className="flex max-w-full gap-6 overflow-x-auto lg:gap-12"
+                className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto"
                 aria-label="Citizen dashboard navigation"
               >
                 {navItems.map((item) => {
@@ -198,33 +197,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`relative inline-flex h-[72px] shrink-0 items-center gap-3 whitespace-nowrap px-2 text-sm font-semibold transition-colors ${
+                      className={`relative inline-flex h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors ${
                         active
-                          ? "text-[#0B3FE8]"
-                          : "text-[#1F3768] hover:text-[#0B3FE8]"
+                          ? "bg-[#EFF6FF] text-[#0B3FE8]"
+                          : "text-[#1F3768] hover:bg-[#F6F9FE] hover:text-[#0B3FE8]"
                       }`}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
                       {item.label}
                       {active ? (
-                        <span className="absolute inset-x-0 bottom-0 h-1 rounded-t-full bg-[#0B3FE8]" />
+                        <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-t-full bg-[#0B3FE8]" />
                       ) : null}
                     </Link>
                   );
                 })}
               </nav>
-              {isCitizenReportNewPage ? (
-                <Link
-                  href="/dashboard/citizen"
-                  className="mb-2 inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-lg border border-[#002D62]/20 bg-white px-7 text-base font-bold text-[#002D62] shadow-sm transition-colors hover:bg-[#EFF6FF] lg:mb-0"
-                >
-                  <ArrowLeft className="h-5 w-5" aria-hidden />
-                  Back to Dashboard
-                </Link>
-              ) : showCitizenReportAction ? (
+              {showCitizenReportAction ? (
                 <Link
                   href="/dashboard/citizen/report-new"
-                  className="mb-2 inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-lg bg-[#B91C1C] px-9 text-base font-bold text-white shadow-lg shadow-[#B91C1C]/20 transition-colors hover:bg-[#991B1B] lg:mb-0"
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-[#B91C1C] px-4 text-sm font-semibold text-white shadow-sm shadow-[#B91C1C]/20 transition-colors hover:bg-[#991B1B]"
                 >
                   <Plus className="h-5 w-5" aria-hidden />
                   Report New Incident

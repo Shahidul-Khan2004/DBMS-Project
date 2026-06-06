@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, FileText } from "lucide-react";
+import { AlertTriangle, FileText } from "lucide-react";
 import {
+  CitizenBackButton,
   CitizenLocationPill,
   CitizenMetaItem,
   CitizenSectionCard,
@@ -109,16 +110,12 @@ export default function CitizenIncidentDetailPage() {
       subtitle={`Incident ${incident?.incident_code ?? ""}`.trim()}
       onLogout={handleLogout}
     >
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div className="flex justify-start">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => router.push("/dashboard/citizen/incidents")}
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to Incidents
-          </Button>
+          <CitizenBackButton
+            href="/dashboard/citizen/incidents"
+            label="Back to My Incidents"
+          />
         </div>
 
         {error ? <ErrorAlert message={error} /> : null}

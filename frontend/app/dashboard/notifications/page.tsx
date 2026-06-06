@@ -138,43 +138,45 @@ export default function NotificationsPage() {
         isDispatcherShell ? "" : "mx-auto w-full max-w-5xl"
       }`.trim()}
     >
-      <div className="flex shrink-0 justify-start">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="h-9 shrink-0 rounded-full border border-[#002D62]/15 bg-white px-3 text-[#002D62] shadow-sm shadow-[#002D62]/5"
-          onClick={() => router.push(getDashboardHref(role))}
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          {getBackLabel(role)}
-        </Button>
-      </div>
-
-      <header
-        className={`flex shrink-0 flex-wrap items-start justify-between gap-3 ${
-          isDispatcherShell
-            ? ""
-            : "rounded-2xl border border-[#002D62]/10 bg-white px-5 py-4 shadow-sm shadow-[#002D62]/5"
-        }`.trim()}
-      >
-        <div className="min-w-0">
-          <h2
-            className={`text-xl font-semibold ${
-              isDispatcherShell ? "text-slate-900" : "text-[#002D62]"
-            }`}
+      {role !== "citizen" ? (
+        <div className="flex shrink-0 justify-start">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-9 shrink-0 rounded-full border border-[#002D62]/15 bg-white px-3 text-[#002D62] shadow-sm shadow-[#002D62]/5"
+            onClick={() => router.push(getDashboardHref(role))}
           >
-            Notifications
-          </h2>
-          <p
-            className={`mt-0.5 text-sm ${
-              isDispatcherShell ? "text-slate-600" : "text-[#42547A]"
-            }`}
-          >
-            Updates related to your reports, cases and incident activity.
-          </p>
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {getBackLabel(role)}
+          </Button>
         </div>
-        <div className="flex flex-wrap gap-2">
+      ) : null}
+
+      {role !== "citizen" ? (
+        <header
+          className={`flex shrink-0 flex-wrap items-start justify-between gap-3 ${
+            isDispatcherShell
+              ? ""
+              : "rounded-2xl border border-[#002D62]/10 bg-white px-5 py-4 shadow-sm shadow-[#002D62]/5"
+          }`.trim()}
+        >
+          <div className="min-w-0">
+            <h2
+              className={`text-xl font-semibold ${
+                isDispatcherShell ? "text-slate-900" : "text-[#002D62]"
+              }`}
+            >
+              Notifications
+            </h2>
+            <p
+              className={`mt-0.5 text-sm ${
+                isDispatcherShell ? "text-slate-600" : "text-[#42547A]"
+              }`}
+            >
+              Updates related to your reports, cases and incident activity.
+            </p>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -186,8 +188,8 @@ export default function NotificationsPage() {
           >
             {isLoading ? "Refreshing..." : "Refresh"}
           </Button>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
       {error ? <ErrorAlert message={error} /> : null}
 
@@ -200,6 +202,21 @@ export default function NotificationsPage() {
         isLoading={isLoading}
         error={null}
         markingReadId={markingReadId}
+        headerActions={
+          role === "citizen" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 rounded-lg px-3"
+              onClick={() => void loadNotifications()}
+              disabled={isLoading}
+              isLoading={isLoading}
+            >
+              {isLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+          ) : null
+        }
         onMarkRead={(item) => void handleMarkAsRead(item)}
       />
     </div>
