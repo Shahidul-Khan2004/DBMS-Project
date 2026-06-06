@@ -27,6 +27,7 @@ import {
   LandingNavbar,
   type LandingSectionId,
 } from "@/components/layout/LandingNavbar";
+import { NationalDisasterHeroAlert } from "@/components/NationalDisasterHeroAlert";
 
 function Container({ children }: { children: React.ReactNode }) {
   return <div className="landing-container">{children}</div>;
@@ -63,6 +64,9 @@ export default function Home() {
               "radial-gradient(ellipse 125% 115% at 50% 42%, rgba(0,45,98,0) 48%, rgba(0,45,98,0.72) 100%), rgba(0,45,98,0.44)",
           }}
         />
+        <div className="absolute left-0 right-0 top-[clamp(1.25rem,6vh,4rem)] z-20">
+          <NationalDisasterHeroAlert />
+        </div>
         <div className="relative z-10 w-full">
           <div className="landing-container">
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-[var(--landing-stack-gap)]">
