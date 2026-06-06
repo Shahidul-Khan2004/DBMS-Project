@@ -114,6 +114,29 @@ export function mapLinkReportToIncidentError(error: unknown): string {
   }
 }
 
+export function mapUnlinkReportFromIncidentError(error: unknown): string {
+  switch (getErrorCode(error)) {
+    case "FORBIDDEN":
+      return "You do not have permission to unlink reports from this incident.";
+    case "UNLINK_REASON_REQUIRED":
+    case "VALIDATION_ERROR":
+      return "Enter a reason before unlinking this report.";
+    case "INCIDENT_NOT_FOUND":
+      return "This incident could not be found.";
+    case "INCIDENT_NOT_UNLINKABLE":
+      return "Reports cannot be unlinked from a terminal incident.";
+    case "INCIDENT_REPORT_LINK_NOT_FOUND":
+    case "INCIDENT_REPORT_LINK_ALREADY_UNLINKED":
+      return "This report link is no longer active. Refresh the incident details.";
+    case "PRIMARY_REPORT_UNLINK_NOT_ALLOWED":
+      return "The primary incident report cannot be unlinked.";
+    case "ESCALATION_LINK_UNLINK_NOT_ALLOWED":
+      return "Reports linked through a service case escalation cannot be unlinked here.";
+    default:
+      return "Unable to unlink this report. Try again.";
+  }
+}
+
 export function mapResponseTimingLoadError(error: unknown): string {
   switch (getErrorCode(error)) {
     case "INCIDENT_NOT_FOUND":

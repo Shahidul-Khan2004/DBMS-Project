@@ -84,7 +84,7 @@ export function NotificationListItem({
 
   return (
     <article
-      className={`relative flex cursor-default gap-2 border-b border-slate-100 px-4 py-3 last:border-b-0 ${getDispatcherNotificationRowClasses(unread)}`}
+      className={`relative flex cursor-default gap-2 border-b border-[#002D62]/10 px-4 py-3 last:border-b-0 ${getDispatcherNotificationRowClasses(unread)}`}
     >
       <div
         className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
@@ -94,7 +94,7 @@ export function NotificationListItem({
       />
 
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#42547A]">
           {formatNotificationType(notification.notification_type)}
         </p>
         <h3

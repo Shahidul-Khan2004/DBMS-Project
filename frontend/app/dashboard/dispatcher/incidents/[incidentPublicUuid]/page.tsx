@@ -160,6 +160,32 @@ export default function IncidentCommandPage() {
     setOpsMutationGeneration((generation) => generation + 1);
   }, [refreshDetail]);
 
+  const handleReportUnlinked = useCallback(
+    async (reportPublicUuid: string) => {
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              linkedIntakeReports: current.linkedIntakeReports.filter(
+                (report) => report.intakePublicUuid !== reportPublicUuid,
+              ),
+            }
+          : current,
+      );
+
+      try {
+        const response = await getOperationsIncident(incidentPublicUuid);
+        setDetail(mapOperationsIncidentDetailResponse(response));
+        setLoadError(null);
+      } catch (err) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("Failed to refresh incident after report unlink", err);
+        }
+      }
+    },
+    [incidentPublicUuid],
+  );
+
   useEffect(() => {
     if (isChecking) return;
     void loadDetail();
@@ -328,6 +354,7 @@ export default function IncidentCommandPage() {
                 }
                 onRefreshDetail={refreshDetail}
                 onViewReportDetails={handleViewLinkedReportDetails}
+                onReportUnlinked={handleReportUnlinked}
               />
             </div>
           ) : null}

@@ -8,7 +8,11 @@ import {
   NOTIFICATION_BELL_POPOVER_ID,
 } from "@/components/notifications/NotificationBellPopover";
 import { ApiError } from "@/lib/api";
-import { NOTIFICATIONS_UPDATED_EVENT } from "@/lib/notification-utils";
+import {
+  dispatchNotificationPopoverOpened,
+  NOTIFICATIONS_UPDATED_EVENT,
+  PROFILE_POPOVER_OPENED_EVENT,
+} from "@/lib/notification-utils";
 import { getUnreadNotificationCount } from "@/lib/notifications-api";
 
 export { NOTIFICATIONS_UPDATED_EVENT };
@@ -19,6 +23,10 @@ export function NotificationBell() {
   const bellRef = useRef<HTMLButtonElement>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+
+  const handleProfileOpened = () => {
+    setOpen(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -40,11 +48,13 @@ export function NotificationBell() {
     const intervalId = window.setInterval(loadUnreadCount, 60000);
 
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, loadUnreadCount);
+    window.addEventListener(PROFILE_POPOVER_OPENED_EVENT, handleProfileOpened);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, loadUnreadCount);
+      window.removeEventListener(PROFILE_POPOVER_OPENED_EVENT, handleProfileOpened);
     };
   }, []);
 
@@ -52,7 +62,13 @@ export function NotificationBell() {
   const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
 
   const handleToggle = () => {
-    setOpen((current) => !current);
+    setOpen((current) => {
+      const nextOpen = !current;
+      if (nextOpen) {
+        dispatchNotificationPopoverOpened();
+      }
+      return nextOpen;
+    });
   };
 
   const handleClose = () => {

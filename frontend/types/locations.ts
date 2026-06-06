@@ -9,10 +9,20 @@ export interface SavedLocation {
   placeName: string | null;
   adminAreaId: number | null;
   source: IntakeLocationSource | string;
-  createdByUserId: number;
+  createdByUserId: number | null;
   createdAt: string;
   adminAreaResolved?: boolean;
   adminAreaMatchedLevel?: string | null;
+  distance_km?: number | null;
+}
+
+export interface CreateSavedLocationRequest {
+  latitude: number;
+  longitude: number;
+  address_text?: string;
+  place_name?: string;
+  admin_area_id?: number;
+  source: IntakeLocationSource;
 }
 
 export interface SavedLocationsResponse {

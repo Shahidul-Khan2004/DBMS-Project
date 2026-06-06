@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, CheckCircle2, FileText, MapPin } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import {
+  CitizenLocationPill,
+  CitizenMetaItem,
+  CitizenRecordCard,
+  CitizenSectionCard,
+  getCitizenFriendlyError,
+} from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -15,9 +21,7 @@ import { formatBangladeshTime } from "@/lib/datetime";
 import { sortNewestFirst } from "@/lib/sort";
 import {
   formatIncidentStatus,
-  isActiveIncident,
-  isFinalIncident,
-  isResolvedIncident,
+  isTerminalIncident,
 } from "@/lib/incident-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
@@ -35,11 +39,11 @@ function formatLocation(location: IntakeLocation | null | undefined) {
 
 function getIncidentResolvedLabel(incident: CitizenIncident) {
   if (incident.resolved_at) {
-    return `Resolved: ${formatBangladeshTime(incident.resolved_at)}`;
+    return formatBangladeshTime(incident.resolved_at);
   }
 
   if (incident.closed_at) {
-    return `Closed: ${formatBangladeshTime(incident.closed_at)}`;
+    return formatBangladeshTime(incident.closed_at);
   }
 
   return null;
@@ -51,16 +55,6 @@ export default function CitizenIncidentsPage() {
   const [incidents, setIncidents] = useState<CitizenIncident[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const summary = useMemo(
-    () => ({
-      total: incidents.length,
-      active: incidents.filter(isActiveIncident).length,
-      final: incidents.filter(isFinalIncident).length,
-      resolved: incidents.filter(isResolvedIncident).length,
-    }),
-    [incidents],
-  );
 
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
@@ -85,10 +79,12 @@ export default function CitizenIncidentsPage() {
           ]),
         );
       } catch (err) {
+        console.error("Failed to load citizen incidents", err);
         setError(
-          err instanceof Error
-            ? err.message
-            : "Unexpected error while loading your incidents.",
+          getCitizenFriendlyError(
+            err,
+            "We could not load your linked incidents right now. Please try again.",
+          ),
         );
       } finally {
         setIsLoading(false);
@@ -109,98 +105,20 @@ export default function CitizenIncidentsPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <Button
-            variant="secondary"
-            onClick={() => router.push("/dashboard/citizen")}
-          >
-            Back to Dashboard
-          </Button>
-          <Button onClick={() => router.push("/dashboard/citizen/report-new")}>
-            Report New Incident
-          </Button>
-        </div>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#B71C1C] text-white">
-                  <AlertTriangle className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-[#002D62]">
-                    Emergency Incident Summary
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Incidents appear here when emergency responders link them to your intake reports.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm">
-                <FileText className="h-5 w-5 text-[#002D62]" aria-hidden />
-                <div className="mt-4 text-3xl font-bold text-[#002D62]">
-                  {summary.total}
-                </div>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  Total Incidents
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm">
-                <AlertTriangle className="h-5 w-5 text-amber-700" aria-hidden />
-                <div className="mt-4 text-3xl font-bold text-[#002D62]">
-                  {summary.active}
-                </div>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  Active Incidents
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm">
-                <CheckCircle2 className="h-5 w-5 text-[#006747]" aria-hidden />
-                <div className="mt-4 text-3xl font-bold text-[#002D62]">
-                  {summary.resolved}
-                </div>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
-                  Resolved Incidents
-                </p>
-                <p className="mt-2 text-xs text-gray-600">
-                  Final incidents: {summary.final}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
-                <FileText className="h-5 w-5" aria-hidden />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#002D62]">
-                  Linked Emergency Incidents
-                </h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  Newest incident updates appear first.
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <CitizenSectionCard
+          title="Linked Emergency Incidents"
+          subtitle="Newest incident updates appear first."
+          icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
+        >
             {isLoading ? (
-              <p className="text-sm text-gray-600">Loading your incidents...</p>
+              <p className="text-sm text-[#42547A]">Loading your incidents...</p>
             ) : null}
 
             {error ? <ErrorAlert message={error} /> : null}
 
             {!isLoading && !error && incidents.length === 0 ? (
               <EmptyState
-                title="No incidents yet"
+                title="No incidents linked yet."
                 description="No emergency incidents linked to your reports yet."
                 icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
               />
@@ -214,12 +132,12 @@ export default function CitizenIncidentsPage() {
                     incident.location_text ||
                     null;
                   const resolvedLabel = getIncidentResolvedLabel(incident);
+                  const isFinal = isTerminalIncident(incident.status_code);
 
                   return (
-                    <article
+                    <CitizenRecordCard
                       id={incident.public_uuid}
                       key={incident.public_uuid}
-                      className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
@@ -234,9 +152,11 @@ export default function CitizenIncidentsPage() {
                           <Badge tone={incident.status_code}>
                             {formatIncidentStatus(incident.status_code)}
                           </Badge>
-                          <Badge tone={incident.severity_code}>
-                            {formatBadgeLabel(incident.severity_code)}
-                          </Badge>
+                          {incident.severity_code ? (
+                            <Badge tone={incident.severity_code}>
+                              {formatBadgeLabel(incident.severity_code)}
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
 
@@ -246,76 +166,57 @@ export default function CitizenIncidentsPage() {
                         </p>
                       ) : null}
 
-                      <div className="mt-4 grid gap-3 text-sm text-gray-600 sm:grid-cols-2">
-                        <p>
-                          <span className="font-medium text-gray-800">
-                            Category:
-                          </span>{" "}
-                          {formatBadgeLabel(incident.category_code)}
-                        </p>
-                        <p>
-                          <span className="font-medium text-gray-800">
-                            Origin:
-                          </span>{" "}
-                          {formatBadgeLabel(incident.origin_type)}
-                        </p>
-                        <p>
-                          <span className="font-medium text-gray-800">
-                            Linked Report:
-                          </span>{" "}
-                          {incident.intake_report_code}
-                        </p>
-                        <p>
-                          <span className="font-medium text-gray-800">
-                            Reported:
-                          </span>{" "}
-                          {formatBangladeshTime(incident.reported_at)}
-                        </p>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <CitizenMetaItem
+                          label="Category"
+                          value={formatBadgeLabel(incident.category_code)}
+                        />
+                        <CitizenMetaItem
+                          label="Origin"
+                          value={formatBadgeLabel(incident.origin_type)}
+                        />
+                        <CitizenMetaItem
+                          label="Linked Report"
+                          value={incident.intake_report_code}
+                        />
+                        <CitizenMetaItem
+                          label="Reported"
+                          value={formatBangladeshTime(incident.reported_at)}
+                        />
                         {resolvedLabel ? (
-                          <p>
-                            <span className="font-medium text-gray-800">
-                              {resolvedLabel}
-                            </span>
-                          </p>
+                          <CitizenMetaItem label="Resolved" value={resolvedLabel} />
                         ) : null}
                         <div className="sm:col-span-2">
-                          <div className="flex gap-2 rounded-2xl bg-[#EFF6FF] px-3 py-2">
-                            <MapPin
-                              className="mt-0.5 h-4 w-4 shrink-0 text-[#006747]"
-                              aria-hidden
-                            />
-                            <p>
-                              <span className="font-medium text-gray-800">
-                                Location:
-                              </span>{" "}
-                              {locationText ?? "-"}
-                            </p>
-                          </div>
+                          <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
                         </div>
                       </div>
 
-                      <div className="mt-5">
+                      <div className="mt-5 flex flex-wrap items-center gap-3">
                         <Button
                           type="button"
                           size="sm"
                           variant="secondary"
                           onClick={() =>
                             router.push(
-                              `/dashboard/citizen/reports/${incident.intake_public_uuid}`,
+                              `/dashboard/citizen/incidents/${incident.public_uuid}`,
                             )
                           }
                         >
-                          View Linked Report
+                          View Details
                           <ArrowRight className="h-4 w-4" aria-hidden />
                         </Button>
+                        {isFinal ? (
+                          <span className="rounded-xl border border-[#002D62]/10 bg-[#EFF6FF] px-3 py-2 text-sm text-[#42547A]">
+                            Final and view-only
+                          </span>
+                        ) : null}
                       </div>
-                    </article>
+                    </CitizenRecordCard>
                   );
                 })}
               </div>
             ) : null}
-          </CardContent>
-        </Card>
+        </CitizenSectionCard>
       </div>
     </DashboardLayout>
   );

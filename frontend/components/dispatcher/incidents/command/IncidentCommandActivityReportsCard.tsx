@@ -2,18 +2,28 @@
 
 
 
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+import { toast } from "sonner";
 
 import { getDispatcherClickableInsetRowClasses } from "@/components/dispatcher/listRowHoverStyles";
+import { FieldLabel } from "@/components/dispatcher/FieldLabel";
 import { AddDispatcherNoteDialog } from "@/components/dispatcher/incidents/command/AddDispatcherNoteDialog";
 
 import { LinkReportToIncidentDialog } from "@/components/dispatcher/incidents/command/LinkReportToIncidentDialog";
 
 import { CommandSectionCard } from "@/components/dispatcher/incidents/command/CommandSectionCard";
+import { triageFieldClassName } from "@/components/dispatcher/triage/triageFormStyles";
 
 import { Badge } from "@/components/ui/Badge";
 
 import { Button } from "@/components/ui/Button";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
 
 import {
 
@@ -24,6 +34,9 @@ import {
 } from "@/lib/datetime";
 
 import { sortNewestFirst } from "@/lib/sort";
+import { getAuthz } from "@/lib/auth-store";
+import { mapUnlinkReportFromIncidentError } from "@/lib/incident-command-api-errors";
+import { unlinkIntakeReportFromIncident } from "@/lib/operations-incident-api";
 
 import type {
 
@@ -78,6 +91,30 @@ function reportRowKey(report: LinkedIntakeReport) {
 function noteRowKey(note: TimelinePreviewItem) {
 
   return `${note.id}-${note.eventTime}`;
+
+}
+
+
+
+function canShowUnlinkAction(
+
+  report: LinkedIntakeReport,
+
+  canUnlinkReports: boolean,
+
+  incidentIsTerminal: boolean,
+
+) {
+
+  return (
+
+    canUnlinkReports &&
+
+    !incidentIsTerminal &&
+
+    report.linkType !== "primary_report"
+
+  );
 
 }
 
@@ -249,9 +286,13 @@ export function IncidentCommandActivityReportsCard({
 
   incidentTitle,
 
+  incidentIsTerminal,
+
   onRefreshDetail,
 
   onViewReportDetails,
+
+  onReportUnlinked,
 
   className = "",
 
@@ -267,9 +308,13 @@ export function IncidentCommandActivityReportsCard({
 
   incidentTitle: string;
 
+  incidentIsTerminal: boolean;
+
   onRefreshDetail: () => Promise<void>;
 
   onViewReportDetails: (report: LinkedIntakeReport) => void;
+
+  onReportUnlinked: (reportPublicUuid: string) => Promise<void>;
 
   className?: string;
 
@@ -284,6 +329,43 @@ export function IncidentCommandActivityReportsCard({
   const [addNoteOpen, setAddNoteOpen] = useState(false);
 
   const [linkReportOpen, setLinkReportOpen] = useState(false);
+
+  const [canUnlinkReports, setCanUnlinkReports] = useState(false);
+
+  const [unlinkTarget, setUnlinkTarget] =
+    useState<LinkedIntakeReport | null>(null);
+
+  const [unlinkReason, setUnlinkReason] = useState("");
+
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
+
+  const [unlinkingReportUuid, setUnlinkingReportUuid] = useState<string | null>(
+    null,
+  );
+
+
+
+  useEffect(() => {
+
+    setCanUnlinkReports(
+
+      Boolean(getAuthz()?.permissions?.includes("incident.update_status")),
+
+    );
+
+  }, []);
+
+
+
+  useEffect(() => {
+
+    if (!unlinkTarget) return;
+
+    setUnlinkReason("");
+
+    setUnlinkError(null);
+
+  }, [unlinkTarget]);
 
 
 
@@ -336,6 +418,92 @@ export function IncidentCommandActivityReportsCard({
     setActiveTab("linkedReports");
 
   }, [onRefreshDetail]);
+
+
+
+  const closeUnlinkDialog = useCallback(() => {
+
+    if (unlinkingReportUuid) return;
+
+    setUnlinkTarget(null);
+
+    setUnlinkReason("");
+
+    setUnlinkError(null);
+
+  }, [unlinkingReportUuid]);
+
+
+
+  const handleUnlinkReport = useCallback(
+
+    async (event: FormEvent<HTMLFormElement>) => {
+
+      event.preventDefault();
+
+      if (!unlinkTarget || unlinkingReportUuid) return;
+
+      const trimmedReason = unlinkReason.trim();
+
+      if (!trimmedReason) {
+
+        setUnlinkError("Reason is required.");
+
+        return;
+
+      }
+
+      setUnlinkingReportUuid(unlinkTarget.intakePublicUuid);
+
+      setUnlinkError(null);
+
+      try {
+
+        await unlinkIntakeReportFromIncident(
+
+          incidentPublicUuid,
+
+          unlinkTarget.intakePublicUuid,
+
+          { reason: trimmedReason },
+
+        );
+
+        toast.success("Report link removed.");
+
+        setUnlinkTarget(null);
+
+        setUnlinkReason("");
+
+        await onReportUnlinked(unlinkTarget.intakePublicUuid);
+
+      } catch (err) {
+
+        setUnlinkError(mapUnlinkReportFromIncidentError(err));
+
+      } finally {
+
+        setUnlinkingReportUuid(null);
+
+      }
+
+    },
+
+    [
+
+      incidentPublicUuid,
+
+      onReportUnlinked,
+
+      unlinkReason,
+
+      unlinkTarget,
+
+      unlinkingReportUuid,
+
+    ],
+
+  );
 
 
 
@@ -569,12 +737,22 @@ export function IncidentCommandActivityReportsCard({
 
                   {reports.map((report) => {
                     const key = reportRowKey(report);
+                    const isUnlinking =
+                      unlinkingReportUuid === report.intakePublicUuid;
+                    const showUnlink = canShowUnlinkAction(
+                      report,
+                      canUnlinkReports,
+                      incidentIsTerminal,
+                    );
 
                     return (
-                      <li key={key}>
+                      <li
+                        key={key}
+                        className="flex items-start gap-2 py-2.5 first:pt-0 last:pb-0"
+                      >
                         <button
                           type="button"
-                          className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border border-transparent px-1 py-2.5 text-left ${getDispatcherClickableInsetRowClasses()} hover:border-[#006747]/20`}
+                          className={`flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg border border-transparent px-1 py-0 text-left ${getDispatcherClickableInsetRowClasses()} hover:border-[#006747]/20`}
                           aria-label={`View intake report details for ${report.summary}, ${report.intakeReportCode}`}
                           onClick={() => onViewReportDetails(report)}
                         >
@@ -598,6 +776,17 @@ export function IncidentCommandActivityReportsCard({
                             View →
                           </span>
                         </button>
+                        {showUnlink ? (
+                          <button
+                            type="button"
+                            className="mt-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-[#002D62]/25 hover:bg-[#EFF6FF] hover:text-[#002D62] disabled:cursor-not-allowed disabled:opacity-60"
+                            aria-label={`Unlink intake report ${report.intakeReportCode} from this incident`}
+                            disabled={Boolean(unlinkingReportUuid)}
+                            onClick={() => setUnlinkTarget(report)}
+                          >
+                            {isUnlinking ? "Unlinking..." : "Unlink"}
+                          </button>
+                        ) : null}
                       </li>
                     );
                   })}
@@ -645,6 +834,75 @@ export function IncidentCommandActivityReportsCard({
         </div>
 
       </CommandSectionCard>
+
+
+
+      {unlinkTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <form
+            onSubmit={(event) => void handleUnlinkReport(event)}
+            className="flex w-full max-w-md flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Remove Report Link
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                This removes the association between{" "}
+                <span className="font-semibold text-slate-800">
+                  {unlinkTarget.intakeReportCode}
+                </span>{" "}
+                and this incident. The report itself will remain in the
+                system.
+              </p>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div>
+                <FieldLabel htmlFor="incident-report-unlink-reason" required>
+                  Reason
+                </FieldLabel>
+                <textarea
+                  id="incident-report-unlink-reason"
+                  value={unlinkReason}
+                  onChange={(event) => {
+                    setUnlinkReason(event.target.value);
+                    setUnlinkError(null);
+                  }}
+                  rows={3}
+                  maxLength={500}
+                  className={triageFieldClassName}
+                  disabled={Boolean(unlinkingReportUuid)}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Required for the incident audit trail.
+                </p>
+              </div>
+
+              {unlinkError ? <ErrorAlert message={unlinkError} /> : null}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={closeUnlinkDialog}
+                disabled={Boolean(unlinkingReportUuid)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="outline"
+                isLoading={Boolean(unlinkingReportUuid)}
+                disabled={Boolean(unlinkingReportUuid)}
+              >
+                {unlinkingReportUuid ? "Unlinking..." : "Remove Link"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
 
 

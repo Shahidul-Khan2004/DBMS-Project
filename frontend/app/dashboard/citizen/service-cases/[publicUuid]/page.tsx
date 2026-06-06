@@ -29,8 +29,10 @@ import type {
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className="text-sm font-medium text-gray-600">{label}</p>
-      <p className="mt-1 break-all text-sm text-gray-900">{value || "-"}</p>
+      <p className="text-xs font-semibold uppercase text-[#42547A]">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-gray-900">
+        {value || "-"}
+      </p>
     </div>
   );
 }
@@ -246,7 +248,7 @@ export default function CitizenServiceCaseDetailPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-start">
           <Button
             type="button"
             variant="secondary"
@@ -268,7 +270,7 @@ export default function CitizenServiceCaseDetailPage() {
           </MessageBanner>
         ) : null}
 
-        <Card className="shadow-md">
+        <Card className="!rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
@@ -296,10 +298,10 @@ export default function CitizenServiceCaseDetailPage() {
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                      Case ID
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#006747]">
+                      Case Code
                     </p>
-                    <p className="mt-0.5 text-sm text-gray-600">
+                    <p className="mt-0.5 text-sm font-semibold text-[#002D62]">
                       {serviceCase.case_code}
                     </p>
                     <h3 className="mt-1 text-xl font-semibold text-gray-900">
@@ -331,7 +333,6 @@ export default function CitizenServiceCaseDetailPage() {
                   <DetailRow label="Last Updated" value={formatBangladeshTime(serviceCase.last_updated)} />
                   <DetailRow label="Created At" value={formatBangladeshTime(serviceCase.created_at)} />
                   <DetailRow label="Updated At" value={serviceCase.updated_at ? formatBangladeshTime(serviceCase.updated_at) : null} />
-                  <DetailRow label="Public UUID" value={serviceCase.public_uuid} />
                 </dl>
 
                 <div className="rounded-2xl border border-[#002D62]/10 bg-[#EFF6FF] p-4">
@@ -349,7 +350,7 @@ export default function CitizenServiceCaseDetailPage() {
         </Card>
 
         {!loading && serviceCase ? (
-          <Card className="shadow-md">
+          <Card className="!rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
@@ -436,7 +437,7 @@ export default function CitizenServiceCaseDetailPage() {
 
         {!loading && serviceCase ? (
           <div ref={replySectionRef}>
-          <Card className="shadow-md">
+          <Card className="!rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002D62] text-white">
