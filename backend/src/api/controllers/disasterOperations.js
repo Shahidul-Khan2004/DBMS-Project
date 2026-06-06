@@ -97,6 +97,20 @@ export async function postResponsibility(req, res) {
   res.status(201).json(result);
 }
 
+export async function postRevokeResponsibility(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const result = await disasterService.revokeResponsibility({
+    disasterPublicUuid: params.disasterPublicUuid,
+    agencyPublicUuid: body.agencyPublicUuid,
+    responsibilityType: body.responsibilityType,
+    note: body.note,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json(result);
+}
+
 export async function postInitialDeclaration(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
@@ -196,7 +210,21 @@ export async function postShelterManagingAgency(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
   const activation = await disasterService.assignShelterManagingAgency({
+    disasterPublicUuid: params.disasterPublicUuid,
     shelterActivationPublicUuid: params.shelterActivationPublicUuid,
+    agencyPublicUuid: body.agencyPublicUuid,
+    actorUserId: req.actorUserId,
+    auditMeta: audit(req),
+  });
+  res.status(200).json({ activation });
+}
+
+export async function postReliefHubManagingAgency(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const activation = await disasterService.assignReliefHubManagingAgency({
+    disasterPublicUuid: params.disasterPublicUuid,
+    hubActivationPublicUuid: params.hubActivationPublicUuid,
     agencyPublicUuid: body.agencyPublicUuid,
     actorUserId: req.actorUserId,
     auditMeta: audit(req),
@@ -208,6 +236,7 @@ export async function postShelterOccupancy(req, res) {
   const params = req.validated?.params ?? req.params;
   const body = req.validated?.body ?? req.body;
   const snapshot = await disasterService.recordShelterOccupancy({
+    disasterPublicUuid: params.disasterPublicUuid,
     shelterActivationPublicUuid: params.shelterActivationPublicUuid,
     peopleCount: body.peopleCount,
     actorUserId: req.actorUserId,

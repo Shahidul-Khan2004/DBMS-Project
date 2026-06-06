@@ -34,6 +34,7 @@ const ALL_PERMISSION_CODES = [
   "shelter.record_occupancy",
   "shelter.record_occupancy_own",
   "relief.manage_inventory",
+  "relief.manage_inventory_own",
   "relief.manage_requests",
   "relief.request_own_shelter",
   "relief.distribute",
@@ -65,6 +66,7 @@ const AGENCY_REP_PERMISSION_CODES = [
   "disaster.read",
   "shelter.record_occupancy_own",
   "relief.request_own_shelter",
+  "relief.manage_inventory_own",
 ];
 
 function baseUser() {
