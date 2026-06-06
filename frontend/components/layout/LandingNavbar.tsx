@@ -92,29 +92,6 @@ export function LandingNavbar({
       }
       trailingContent={
         <>
-          <div
-            className="hidden rounded-full bg-gray-100 p-1.5 lg:flex"
-            role="group"
-            aria-label="Language"
-          >
-            <button
-              type="button"
-              className={langToggleClass("en")}
-              aria-pressed={lang === "en"}
-              onClick={() => setLang("en")}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              className={langToggleClass("bn")}
-              aria-pressed={lang === "bn"}
-              onClick={() => setLang("bn")}
-            >
-              বাংলা
-            </button>
-          </div>
-
           <div className="hidden items-center gap-[var(--nav-gap)] lg:flex">
             <Link
               href="/auth/login"
