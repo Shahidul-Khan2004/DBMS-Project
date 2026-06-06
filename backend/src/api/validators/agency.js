@@ -1,3 +1,4 @@
+import { z } from "zod";
 import validate from "./validator.js";
 import {
   agencyCreateResponseLogSchema,
@@ -10,6 +11,38 @@ import {
   paginationQuerySchema,
   unitPublicUuidParamSchema,
 } from "./validationSchemas.js";
+import {
+  validateCreateReliefRequest,
+  validateDisasterUuidParam,
+  validateOccupancySnapshot,
+  validateStockReceipt,
+} from "./disaster.js";
+
+const uuid = z.string().uuid();
+
+export const validateAgencyDisasterUuidParam = validateDisasterUuidParam;
+
+export const validateAgencyShelterActivationParam = validate(
+  "agency shelter activation",
+  z.object({
+    disasterPublicUuid: uuid,
+    shelterActivationPublicUuid: uuid,
+  }),
+  "params",
+);
+
+export const validateAgencyHubActivationParam = validate(
+  "agency relief hub activation",
+  z.object({
+    disasterPublicUuid: uuid,
+    hubActivationPublicUuid: uuid,
+  }),
+  "params",
+);
+
+export { validateOccupancySnapshot as validateAgencyOccupancySnapshot };
+export { validateCreateReliefRequest as validateAgencyCreateReliefRequest };
+export { validateStockReceipt as validateAgencyStockReceipt };
 
 export const validateAgencyListQuery = validate("agency list query", paginationQuerySchema, "query");
 export { validateAgencyUnitsListQuery } from "./geoSort.js";

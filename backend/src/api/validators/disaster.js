@@ -64,19 +64,30 @@ export const validateAffectedAreaAssessment = validate(
   }),
 );
 
+const responsibilityTypeSchema = z.enum([
+  "coordination",
+  "shelter_management",
+  "relief_management",
+  "medical_support",
+  "security_support",
+  "rescue_support",
+]);
+
 export const validateAssignResponsibility = validate(
   "assignResponsibility",
   z.object({
     agencyPublicUuid: uuid,
-    responsibilityType: z.enum([
-      "coordination",
-      "shelter_management",
-      "relief_management",
-      "medical_support",
-      "security_support",
-      "rescue_support",
-    ]),
+    responsibilityType: responsibilityTypeSchema,
     isLead: z.boolean().optional(),
+  }),
+);
+
+export const validateRevokeResponsibility = validate(
+  "revokeResponsibility",
+  z.object({
+    agencyPublicUuid: uuid,
+    responsibilityType: responsibilityTypeSchema,
+    note: z.string().max(500).optional(),
   }),
 );
 
@@ -134,6 +145,11 @@ export const validateManualHubActivation = validate(
 
 export const validateShelterManagingAgency = validate(
   "shelterManagingAgency",
+  z.object({ agencyPublicUuid: uuid }),
+);
+
+export const validateReliefHubManagingAgency = validate(
+  "reliefHubManagingAgency",
   z.object({ agencyPublicUuid: uuid }),
 );
 

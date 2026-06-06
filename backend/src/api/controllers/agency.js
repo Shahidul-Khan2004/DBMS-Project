@@ -114,3 +114,101 @@ export async function postAgencyResponseLog(req, res) {
   );
   res.status(201).json({ response_log: log });
 }
+
+export async function getAgencyDisasters(req, res) {
+  const query = req.validated?.query ?? req.query;
+  const result = await agencyService.agencyListDisasters(
+    req.agencyContext.agencyId,
+    query,
+  );
+  res.status(200).json(result);
+}
+
+export async function getAgencyDisasterDetail(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const result = await agencyService.agencyGetDisasterDetail(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+  );
+  res.status(200).json(result);
+}
+
+export async function getAgencyDisasterShelters(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const shelters = await agencyService.agencyListDisasterShelters(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+  );
+  res.status(200).json({
+    disaster_public_uuid: disasterPublicUuid,
+    shelters,
+  });
+}
+
+export async function getAgencyDisasterReliefHubs(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const reliefHubs = await agencyService.agencyListDisasterReliefHubs(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+  );
+  res.status(200).json({
+    disaster_public_uuid: disasterPublicUuid,
+    relief_hubs: reliefHubs,
+  });
+}
+
+export async function postAgencyShelterOccupancy(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const snapshot = await agencyService.agencyRecordShelterOccupancy(
+    req.agencyContext.agencyId,
+    params.disasterPublicUuid,
+    params.shelterActivationPublicUuid,
+    body,
+    req.actorUserId,
+  );
+  res.status(201).json({ snapshot });
+}
+
+export async function getAgencyDisasterReliefRequests(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const result = await agencyService.agencyListDisasterReliefRequests(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+  );
+  res.status(200).json(result);
+}
+
+export async function postAgencyDisasterReliefRequest(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const request = await agencyService.agencyCreateReliefRequest(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+    body,
+    req.actorUserId,
+  );
+  res.status(201).json({ request });
+}
+
+export async function postAgencyReliefHubStockReceipt(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const body = req.validated?.body ?? req.body;
+  const receipt = await agencyService.agencyRecordReliefHubStockReceipt(
+    req.agencyContext.agencyId,
+    params.disasterPublicUuid,
+    params.hubActivationPublicUuid,
+    body,
+    req.actorUserId,
+  );
+  res.status(201).json({ receipt });
+}
+
+export async function getAgencyDisasterIncidents(req, res) {
+  const { disasterPublicUuid } = req.validated?.params ?? req.params;
+  const result = await agencyService.agencyListDisasterIncidents(
+    req.agencyContext.agencyId,
+    disasterPublicUuid,
+  );
+  res.status(200).json(result);
+}
