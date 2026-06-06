@@ -272,6 +272,9 @@ SELECT
     sa.id AS shelter_activation_id,
     sa.public_uuid AS shelter_activation_public_uuid,
     sa.disaster_event_id,
+    sa.managing_agency_id,
+    ma.public_uuid AS managing_agency_public_uuid,
+    ma.name AS managing_agency_name,
     f.id AS facility_id,
     f.public_uuid AS facility_public_uuid,
     f.name AS facility_name,
@@ -297,6 +300,7 @@ SELECT
     END AS overflow_count
 FROM shelter_activations sa
 JOIN facilities f ON f.id = sa.facility_id
+LEFT JOIN agencies ma ON ma.id = sa.managing_agency_id
 LEFT JOIN facility_default_capacities fdc ON fdc.facility_id = f.id AND fdc.capacity_type = 'shelter_people'
 LEFT JOIN (
     SELECT sos.shelter_activation_id, sos.people_count
@@ -311,17 +315,39 @@ LEFT JOIN (
 
 CREATE VIEW vw_disaster_relief_inventory_balance AS
 SELECT
+    hub_item.relief_hub_activation_id,
     rha.disaster_event_id,
     rha.facility_id,
-    COALESCE(rsr.relief_item_id, rdi.relief_item_id) AS relief_item_id,
-    COALESCE(SUM(rsr.quantity_received), 0) AS total_received,
-    COALESCE(SUM(rdi.quantity_delivered), 0) AS total_distributed,
-    COALESCE(SUM(rsr.quantity_received), 0) - COALESCE(SUM(rdi.quantity_delivered), 0) AS quantity_on_hand
-FROM relief_hub_activations rha
-LEFT JOIN relief_stock_receipts rsr ON rsr.relief_hub_activation_id = rha.id
-LEFT JOIN relief_distributions rd ON rd.source_hub_activation_id = rha.id
-LEFT JOIN relief_distribution_items rdi ON rdi.relief_distribution_id = rd.id
-GROUP BY rha.disaster_event_id, rha.facility_id, COALESCE(rsr.relief_item_id, rdi.relief_item_id);
+    hub_item.relief_item_id,
+    COALESCE(rec.total_received, 0) AS total_received,
+    COALESCE(dist.total_distributed, 0) AS total_distributed,
+    COALESCE(rec.total_received, 0) - COALESCE(dist.total_distributed, 0) AS quantity_on_hand
+FROM (
+    SELECT relief_hub_activation_id, relief_item_id
+    FROM relief_stock_receipts
+    UNION
+    SELECT rd.source_hub_activation_id, rdi.relief_item_id
+    FROM relief_distributions rd
+    INNER JOIN relief_distribution_items rdi ON rdi.relief_distribution_id = rd.id
+) hub_item
+INNER JOIN relief_hub_activations rha ON rha.id = hub_item.relief_hub_activation_id
+LEFT JOIN (
+    SELECT relief_hub_activation_id, relief_item_id, SUM(quantity_received) AS total_received
+    FROM relief_stock_receipts
+    GROUP BY relief_hub_activation_id, relief_item_id
+) rec
+    ON rec.relief_hub_activation_id = hub_item.relief_hub_activation_id
+   AND rec.relief_item_id = hub_item.relief_item_id
+LEFT JOIN (
+    SELECT rd.source_hub_activation_id AS relief_hub_activation_id,
+           rdi.relief_item_id,
+           SUM(rdi.quantity_delivered) AS total_distributed
+    FROM relief_distributions rd
+    INNER JOIN relief_distribution_items rdi ON rdi.relief_distribution_id = rd.id
+    GROUP BY rd.source_hub_activation_id, rdi.relief_item_id
+) dist
+    ON dist.relief_hub_activation_id = hub_item.relief_hub_activation_id
+   AND dist.relief_item_id = hub_item.relief_item_id;
 
 CREATE VIEW vw_disaster_relief_shortage AS
 SELECT
@@ -356,8 +382,7 @@ SELECT
     ri.name AS item_name,
     inv.quantity_on_hand
 FROM relief_hub_activations rha
-JOIN facilities f ON f.id = rha.facility_id
-LEFT JOIN vw_disaster_relief_inventory_balance inv ON inv.disaster_event_id = rha.disaster_event_id
-    AND inv.facility_id = rha.facility_id
-LEFT JOIN relief_items ri ON ri.id = inv.relief_item_id
+INNER JOIN facilities f ON f.id = rha.facility_id
+INNER JOIN vw_disaster_relief_inventory_balance inv ON inv.relief_hub_activation_id = rha.id
+INNER JOIN relief_items ri ON ri.id = inv.relief_item_id
 WHERE rha.activation_status = 'active';

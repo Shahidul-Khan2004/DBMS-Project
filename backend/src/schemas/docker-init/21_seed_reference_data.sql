@@ -30,6 +30,7 @@ INSERT INTO permissions (permission_code, module_name, description) VALUES
 ('shelter.record_occupancy','shelter','Record shelter occupancy'),
 ('shelter.record_occupancy_own','shelter','Record occupancy for own managed shelter'),
 ('relief.manage_inventory','relief','Record verified relief stock'),
+('relief.manage_inventory_own','relief','Record verified relief stock for own managed relief hub'),
 ('relief.manage_requests','relief','Approve or reject relief requests'),
 ('relief.request_own_shelter','relief','Create relief requests for own shelter'),
 ('relief.distribute','relief','Manage relief distribution'),
