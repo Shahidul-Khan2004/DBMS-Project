@@ -213,3 +213,43 @@ html {
 .landing-text-999 {
   font-size: var(--landing-text-999);
 }
+
+@keyframes disasterTickerScroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.national-disaster-alert-track {
+  animation: disasterTickerScroll var(--disaster-alert-duration, 24s) linear
+    infinite;
+  will-change: transform;
+}
+
+.national-disaster-alert-group {
+  padding-right: 2rem;
+}
+
+.national-disaster-alert-headline + .national-disaster-alert-headline::before {
+  content: "|";
+  display: inline-block;
+  padding-inline: 1.25rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.national-disaster-alert:hover .national-disaster-alert-track,
+.national-disaster-alert:focus-within .national-disaster-alert-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .national-disaster-alert-track {
+    animation: none;
+    transform: translateX(0);
+    will-change: auto;
+  }
+}
