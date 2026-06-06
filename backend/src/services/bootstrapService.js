@@ -12,6 +12,7 @@ import {
 } from "../repositories/rbacRepo.js";
 import { ROLE_CODES } from "./rbacService.js";
 import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js";
+import { bootstrapDemoDispatcher } from "./demoDispatcherBootstrapService.js";
 import {
   ensureAgencyMembershipsPublicUuid,
   ensureUserProfilesSecondaryPhoneNumber,
@@ -283,6 +284,7 @@ export async function bootstrapDevelopmentSystemAdmin() {
   await ensureIntakeStatusUnlinkTransition();
   await migrateLegacyReportedIncidentStatus();
   await bootstrapDemoAgencyRepresentatives();
+  await bootstrapDemoDispatcher();
 
   const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);
 

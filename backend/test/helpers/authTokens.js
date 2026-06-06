@@ -47,6 +47,14 @@ export async function getAgencyRepToken(app) {
   return loginAs(app, "fire.rep@niers.test", password);
 }
 
+export async function getDispatcherToken(app) {
+  const password = process.env.DEMO_DISPATCHER_PASSWORD;
+  if (!password) {
+    throw new Error("DEMO_DISPATCHER_PASSWORD is required for dispatcher integration tests");
+  }
+  return loginAs(app, "dispatcher@niers.test", password);
+}
+
 export function clearTokenCache() {
   tokenCache.clear();
 }

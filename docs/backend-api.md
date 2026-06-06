@@ -2363,7 +2363,7 @@ Ownership: dispatches/units via `emergency_units.agency_id`; incidents via `inci
 | Demo incident | `e5000001-0000-4000-8000-000000000001` |
 | Fire demo dispatch | `f5000001-0000-4000-8000-000000000001` |
 
-Demo users (bootstrap when `DEMO_REP_PASSWORD` is set): `fire.rep@niers.test`, `police.rep@niers.test`, `medical.rep@niers.test`.
+Demo users (bootstrap when `DEMO_REP_PASSWORD` is set): `fire.rep@niers.test`, `police.rep@niers.test`, `medical.rep@niers.test`. Demo dispatcher (`DEMO_DISPATCHER_PASSWORD`): `dispatcher@niers.test`.
 
 ### GET `/agency/me`
 
@@ -3138,6 +3138,8 @@ Activates the facility (`isActive: true`). Restores eligibility for disaster act
 
 ## Development RBAC bootstrap
 
+See [demo-accounts.md](./demo-accounts.md) for the full list of bootstrap emails, roles, and password env vars.
+
 On server start, the backend seeds minimal RBAC and can bootstrap a dev **system_admin**. **Dispatcher** users receive `incident.*`, `dispatch.*`, and case permissions. **`agency_representative`** receives own-agency dispatch permissions plus `disaster.read`, `shelter.record_occupancy_own`, and `relief.request_own_shelter`. **`system_admin`** receives all bootstrap permissions including disaster, facility, shelter, and relief modules.
 
 **Env vars:**
@@ -3147,5 +3149,6 @@ On server start, the backend seeds minimal RBAC and can bootstrap a dev **system
 - `SYSTEM_ADMIN_NAME`
 - `SYSTEM_ADMIN_PHONE` (exactly 11 digits)
 - `DEMO_REP_PASSWORD` (min 8 chars; creates demo reps when missing)
+- `DEMO_DISPATCHER_PASSWORD` (min 8 chars; creates `dispatcher@niers.test` when missing)
 
 If no active `system_admin` assignment exists and these are set, the app creates or finds the user and assigns **`system_admin`**.

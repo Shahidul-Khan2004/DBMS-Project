@@ -31,6 +31,10 @@ Source and license: [third_party/bangladesh-geocode/README.md](third_party/bangl
 
 GPS-based `admin_area_id` resolution uses Barikoi when `BARIKOI_API_KEY` is set. See [docs/backend-external-dependencies.md](../docs/backend-external-dependencies.md).
 
+## Demo accounts
+
+Seeded on server start when `backend/.env` is configured. See [docs/demo-accounts.md](../docs/demo-accounts.md) for emails, roles, and password env vars.
+
 ## Testing
 
 From the repository root:
@@ -49,5 +53,6 @@ npm run test:integration
 - [`backend/.env`](.env) with `MYSQL_*`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
 - `SYSTEM_ADMIN__EMAIL` / `SYSTEM_ADMIN_PASSWORD` for admin/operations smoke tests
 - `DEMO_REP_PASSWORD` for agency rep smoke tests (`fire.rep@niers.test` seed user)
+- `DEMO_DISPATCHER_PASSWORD` for dispatcher smoke tests (`dispatcher@niers.test` seed user)
 
 Optional: `npm run test:barikoi-live` exercises the real Barikoi API when `BARIKOI_API_KEY` is set.
