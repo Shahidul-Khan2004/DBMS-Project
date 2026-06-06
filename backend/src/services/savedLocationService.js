@@ -10,6 +10,8 @@ import {
   softDeleteSavedLocationInTransaction,
 } from "../repositories/savedLocationRepo.js";
 import { mapRowToLocationResponse } from "./locationService.js";
+import { resolveGeoSortFromQuery } from "./geoSortService.js";
+import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 
 /**
  * Map a joined saved+location row to response shape.
@@ -103,12 +105,18 @@ export async function unsaveLocationForActor(actorUserId, locationPublicUuid) {
 /**
  * List active saved locations for a user.
  * @param {number} actorUserId
+ * @param {Record<string, unknown>} [query] validated query (may include sort/nearLocationId/includeDistance)
  */
-export async function listSavedLocationsForActor(actorUserId) {
+export async function listSavedLocationsForActor(actorUserId, query = {}) {
+  const { geoSort } = await resolveGeoSortFromQuery(query);
   const conn = await pool.getConnection();
   try {
-    const rows = await listActiveSavedLocationRowsForUser(conn, actorUserId);
-    return rows.map(mapSavedRowToResponse);
+    const rows = await listActiveSavedLocationRowsForUser(conn, actorUserId, { geoSort });
+    return rows.map((row) => {
+      const base = mapSavedRowToResponse(row);
+      if (!base) return null;
+      return mapRowWithOptionalDistance(base, row, geoSort);
+    });
   } finally {
     conn.release();
   }

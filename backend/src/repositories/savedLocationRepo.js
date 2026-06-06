@@ -117,9 +117,30 @@ export async function softDeleteSavedLocationInTransaction(conn, savedLocationId
  * List all active saved locations for a user, joined with location data.
  * @param {import("mysql2/promise").PoolConnection} conn
  * @param {number} userId
+ * @param {{ geoSort?: { ref: object, includeDistance: boolean } | null }} [options]
  * @returns {Promise<object[]>}
  */
-export async function listActiveSavedLocationRowsForUser(conn, userId) {
+export async function listActiveSavedLocationRowsForUser(conn, userId, options = {}) {
+  const geoSort = options.geoSort ?? null;
+  const useDistance = Boolean(geoSort?.ref);
+
+  let refJoinSql = "";
+  let joinParams = [];
+  let distanceSelect = "";
+  let orderSql = "sl.created_at DESC";
+
+  if (useDistance) {
+    const { buildReferenceJoin } = await import("../lib/geoListSql.js");
+    const { distanceKmSql, orderByDistanceAscSql } = await import("../lib/geoDistance.js");
+    const refJoin = buildReferenceJoin(geoSort.ref);
+    const refAlias = geoSort.ref.locationId != null ? "ref_loc" : "ref_geom";
+    const distanceExpr = distanceKmSql(refAlias, "l");
+    refJoinSql = refJoin.joinSql;
+    joinParams = refJoin.params;
+    distanceSelect = `, ${distanceExpr} AS distance_km_sort`;
+    orderSql = orderByDistanceAscSql(distanceExpr, "l.id");
+  }
+
   const [rows] = await conn.execute(
     `
       SELECT
@@ -137,12 +158,14 @@ export async function listActiveSavedLocationRowsForUser(conn, userId) {
         sl.public_uuid AS saved_location_public_uuid,
         sl.label       AS saved_label,
         sl.created_at  AS saved_at
+        ${distanceSelect}
       FROM saved_locations sl
       JOIN locations l ON l.id = sl.location_id
+      ${refJoinSql}
       WHERE sl.user_id = ? AND sl.is_deleted = FALSE
-      ORDER BY sl.created_at DESC
+      ORDER BY ${orderSql}
     `,
-    [userId],
+    [...joinParams, userId],
   );
   return rows;
 }
