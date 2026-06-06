@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { NotificationListItem } from "@/components/notifications/NotificationListItem";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -16,6 +17,7 @@ export type NotificationsFeedPanelProps = {
   markingReadId?: number | null;
   className?: string;
   listClassName?: string;
+  headerActions?: ReactNode;
   onRetry?: () => void;
   onMarkRead?: (notification: NotificationItem) => void;
 };
@@ -41,6 +43,7 @@ export function NotificationsFeedPanel({
   markingReadId = null,
   className = "",
   listClassName = "",
+  headerActions,
   onRetry,
   onMarkRead,
 }: NotificationsFeedPanelProps) {
@@ -51,13 +54,18 @@ export function NotificationsFeedPanel({
       className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 lg:min-h-0 ${className}`.trim()}
       aria-label={title}
     >
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#002D62]/10 px-4 py-3">
-        <h3 className="text-sm font-semibold text-[#002D62]">{title}</h3>
-        {unreadCount > 0 ? (
-          <span className="shrink-0 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
-            {unreadCount} unread
-          </span>
-        ) : null}
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#002D62]/10 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h3 className="text-sm font-semibold text-[#002D62]">{title}</h3>
+          {unreadCount > 0 ? (
+            <span className="shrink-0 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
+              {unreadCount} unread
+            </span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {headerActions}
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

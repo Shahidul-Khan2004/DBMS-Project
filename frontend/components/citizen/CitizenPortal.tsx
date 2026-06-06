@@ -1,6 +1,26 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, MapPin } from "lucide-react";
+
+export function CitizenBackButton({
+  href,
+  label,
+  className = "",
+}: {
+  href: string;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border border-[#002D62]/25 bg-white px-3 text-sm font-semibold text-[#002D62] shadow-sm shadow-[#002D62]/10 transition-colors hover:border-[#002D62]/40 hover:bg-[#E8F2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3FE8]/35 focus-visible:ring-offset-2 ${className}`}
+    >
+      <ArrowLeft className="h-4 w-4" aria-hidden />
+      {label}
+    </Link>
+  );
+}
 
 type CitizenPageHeaderProps = {
   title: string;
@@ -14,10 +34,10 @@ export function CitizenPageHeader({
   action,
 }: CitizenPageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[#002D62]/10 bg-white px-6 py-5 shadow-sm shadow-[#002D62]/5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#002D62]/10 bg-white px-4 py-4 shadow-sm shadow-[#002D62]/5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div className="min-w-0">
-        <h2 className="text-2xl font-bold text-[#002D62]">{title}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#42547A]">
+        <h2 className="text-xl font-bold text-[#002D62] sm:text-2xl">{title}</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-5 text-[#42547A]">
           {subtitle}
         </p>
       </div>
@@ -47,10 +67,10 @@ export function CitizenSectionCard({
     <section
       className={`overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 ${className}`}
     >
-      <header className="border-b border-[#002D62]/10 px-6 py-5">
+      <header className="shrink-0 border-b border-[#002D62]/10 px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-3">
           {icon ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#002D62]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#002D62]">
               {icon}
             </div>
           ) : null}
@@ -64,7 +84,7 @@ export function CitizenSectionCard({
           </div>
         </div>
       </header>
-      <div className={`p-6 ${contentClassName}`}>{children}</div>
+      <div className={`p-4 sm:p-5 ${contentClassName}`}>{children}</div>
     </section>
   );
 }
@@ -79,7 +99,7 @@ export function CitizenRecordCard({
   return (
     <article
       id={id}
-      className="rounded-2xl border border-[#002D62]/10 bg-white p-5 shadow-sm shadow-[#002D62]/5 transition-shadow hover:shadow-md"
+      className="rounded-2xl border border-[#002D62]/10 bg-white p-4 shadow-sm shadow-[#002D62]/5 transition-shadow hover:shadow-md"
     >
       {children}
     </article>

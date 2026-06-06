@@ -129,11 +129,13 @@ export default function CitizenReportsPage() {
       subtitle="Track reports you submitted to NIERS."
       onLogout={handleLogout}
     >
-      <div className="space-y-6">
+      <div className="space-y-3">
         <CitizenSectionCard
           title="Your Reports"
           subtitle="Newest reports appear first."
           icon={<FileText className="h-5 w-5" aria-hidden />}
+          className="flex max-h-[calc(100dvh-11rem)] min-h-[22rem] flex-col"
+          contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
         >
             {isLoading && (
               <p className="text-sm text-[#42547A]">Loading your reports...</p>

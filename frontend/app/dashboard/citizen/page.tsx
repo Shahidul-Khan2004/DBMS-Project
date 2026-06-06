@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, ClipboardCheck, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -294,25 +295,25 @@ function DashboardSummaryCard({
   error?: string;
 }) {
   return (
-    <Card className="flex min-h-[390px] flex-col overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-lg shadow-[#002D62]/8">
-      <CardHeader className="!border-b-0 !px-7 !pb-5 !pt-6">
-        <div className="flex items-center gap-5">
-          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
-            <Icon className="h-7 w-7" aria-hidden />
+    <Card className="flex min-h-[320px] flex-col overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-sm shadow-[#002D62]/8">
+      <CardHeader className="!border-b-0 !px-5 !pb-4 !pt-5">
+        <div className="flex items-center gap-4">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
+            <Icon className="h-6 w-6" aria-hidden />
           </div>
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-[#002D62]">{title}</h2>
-            <p className="mt-2 text-sm leading-5 text-[#42547A]">{description}</p>
+            <h2 className="text-lg font-bold text-[#002D62]">{title}</h2>
+            <p className="mt-1 text-sm leading-5 text-[#42547A]">{description}</p>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col !px-7 !pb-6 !pt-0">
+      <CardContent className="flex flex-1 flex-col !px-5 !pb-5 !pt-0">
         {error ? (
           <div className="mb-4">
             <ErrorAlert message={error} />
           </div>
         ) : null}
-        <div className="border-y border-slate-200 py-4">
+        <div className="border-y border-slate-200 py-3">
           <div className="grid grid-cols-3">
             {items.map((item, index) => (
               <div
@@ -329,7 +330,7 @@ function DashboardSummaryCard({
           </div>
         </div>
 
-        <div className="mt-5 flex flex-1 flex-col">
+        <div className="mt-4 flex flex-1 flex-col">
           <p className="text-sm font-semibold text-[#42547A]">
             {latestLabel}
           </p>
@@ -349,7 +350,7 @@ function DashboardSummaryCard({
           )}
         </div>
 
-        <div className="mt-5">{action}</div>
+        <div className="mt-4">{action}</div>
       </CardContent>
     </Card>
   );
@@ -361,7 +362,7 @@ function WelcomeCard({ userName }: { userName?: string | null }) {
   return (
     <Card className="overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-lg shadow-[#002D62]/8">
       <CardContent className="!p-0">
-        <div className="relative min-h-[214px] overflow-hidden">
+        <div className="relative min-h-[170px] overflow-hidden">
           <Image
             src="/images/citizen-dashboard-hero-clean.webp"
             alt="Bangladesh disaster response team assisting flood-affected citizens"
@@ -372,14 +373,14 @@ function WelcomeCard({ userName }: { userName?: string | null }) {
           />
           <div className="absolute inset-0 bg-[#002D62]/30 mix-blend-multiply" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff_0%,rgba(255,255,255,0.94)_24%,rgba(255,255,255,0.42)_42%,rgba(255,255,255,0)_58%)]" />
-          <div className="relative flex min-h-[214px] max-w-md flex-col justify-center px-8 py-8 sm:px-11">
+          <div className="relative flex min-h-[170px] max-w-md flex-col justify-center px-6 py-6 sm:px-9">
             <h1
-              className="max-w-[22rem] truncate text-3xl font-bold text-[#002D62]"
+              className="max-w-[22rem] truncate text-2xl font-bold text-[#002D62] sm:text-3xl"
               title={welcomeTitle}
             >
               {welcomeTitle}
             </h1>
-            <p className="mt-5 max-w-xs text-lg leading-7 text-[#42547A]">
+            <p className="mt-3 max-w-xs text-base leading-6 text-[#42547A]">
               Track your reports, incidents, and service cases from one place.
             </p>
           </div>
@@ -561,12 +562,12 @@ export default function CitizenDashboard() {
       subtitle="Report incidents and emergencies"
       onLogout={handleLogout}
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         {error && <ErrorAlert message={error} />}
 
         <WelcomeCard userName={welcomeName} />
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <DashboardSummaryCard
             title="Reports"
             description="View the status of your submitted reports."
@@ -653,13 +654,13 @@ export default function CitizenDashboard() {
         </div>
         <footer className="flex flex-wrap items-center justify-center gap-4 pb-1 text-sm text-[#42547A]">
           <span>© 2025 NIERS. All rights reserved.</span>
-          <a className="font-medium text-[#0B3FE8]" href="/">
+          <Link className="font-medium text-[#0B3FE8]" href="/">
             Privacy Policy
-          </a>
+          </Link>
           <span>•</span>
-          <a className="font-medium text-[#0B3FE8]" href="/">
+          <Link className="font-medium text-[#0B3FE8]" href="/">
             Terms of Use
-          </a>
+          </Link>
         </footer>
       </div>
     </DashboardLayout>

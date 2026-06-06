@@ -247,7 +247,7 @@ export function LocationPicker({
   syncSearchQueryToSelectedLabel = true,
   showCurrentLocation = true,
   showSelectionSummary = true,
-  scrollWheelZoom = true,
+  scrollWheelZoom = false,
   searchPlaceholder = "Search for an area, road, landmark, or address",
   sectionTitle = "Find Location",
   sectionDescription,
@@ -525,13 +525,9 @@ export function LocationPicker({
 
   const searchControls = (
     <>
-      {embedded && !showCurrentLocation ? (
+      {embedded && embeddedCompact ? (
         <div
-          className={
-            embeddedCompact
-              ? "flex flex-col gap-2 sm:flex-row sm:items-center"
-              : "flex flex-col gap-2 sm:flex-row sm:items-stretch"
-          }
+          className="flex flex-col gap-2 sm:flex-row sm:items-center"
         >
           <Input
             value={query}
@@ -540,11 +536,7 @@ export function LocationPicker({
             placeholder={searchPlaceholder}
             disabled={disabled || isSearching}
             aria-label="Search for a location"
-            className={
-              embeddedCompact
-                ? "min-w-0 flex-1 rounded-xl px-3 py-2 text-sm leading-tight"
-                : "min-w-0 flex-1"
-            }
+            className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm leading-tight"
           />
           <Button
             type="button"
@@ -552,15 +544,24 @@ export function LocationPicker({
             isLoading={isSearching}
             disabled={isSearchDisabled}
             onClick={() => void handleSearch()}
-            className={
-              embeddedCompact
-                ? "h-[44px] shrink-0 whitespace-nowrap px-4 text-sm sm:min-w-[5.5rem]"
-                : "h-auto shrink-0 self-stretch whitespace-nowrap px-4 py-2 text-sm sm:min-w-[5.5rem]"
-            }
+            className="h-[44px] shrink-0 whitespace-nowrap px-4 text-sm sm:min-w-[5.5rem]"
           >
             <Search className="h-4 w-4" aria-hidden />
             Search
           </Button>
+          {showCurrentLocation ? (
+            <Button
+              type="button"
+              variant="outline"
+              isLoading={isLocating}
+              disabled={disabled || isLocating}
+              onClick={handleCurrentLocation}
+              className="h-[44px] shrink-0 whitespace-nowrap px-4 text-sm"
+            >
+              <LocateFixed className="h-4 w-4" aria-hidden />
+              My Location
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className={embedded ? "space-y-2" : "mt-3 space-y-3"}>
@@ -706,7 +707,7 @@ export function LocationPicker({
       </div>
       {!scrollWheelZoom && !embedded ? (
         <p className="mt-1.5 text-center text-xs text-slate-500">
-          Use + / − to zoom
+          Use + / - to zoom
         </p>
       ) : null}
     </>

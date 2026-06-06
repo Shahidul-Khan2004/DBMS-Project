@@ -378,18 +378,20 @@ export default function ProfilePage() {
 
   const pageBody = (
     <div className="mx-auto w-full max-w-5xl space-y-5">
-      <div className="flex justify-start">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="h-9 !rounded-full border border-[#002D62]/15 bg-white px-3 text-[#002D62] shadow-sm shadow-[#002D62]/5"
-          onClick={() => router.push(dashboardHref)}
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          {getBackLabel(resolvedRole)}
-        </Button>
-      </div>
+      {resolvedRole !== "citizen" ? (
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-9 !rounded-full border border-[#002D62]/15 bg-white px-3 text-[#002D62] shadow-sm shadow-[#002D62]/5"
+            onClick={() => router.push(dashboardHref)}
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {getBackLabel(resolvedRole)}
+          </Button>
+        </div>
+      ) : null}
 
       {error && <ErrorAlert message={error} />}
 
@@ -462,6 +464,7 @@ export default function ProfilePage() {
                 </h3>
                 {isEditing ? (
                   <div className="grid gap-4 rounded-xl border border-[#002D62]/10 bg-[#F8FBFF] p-4 sm:grid-cols-2">
+                    <ReadOnlyField label="User ID" value={user.id} />
                     <ReadOnlyField label="Email" value={user.email} />
                     <EditableField
                       id="profile-full-name"
@@ -501,6 +504,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailItem label="User ID" value={user.id} />
                     <DetailItem label="Full Name" value={user.full_name} />
                     <DetailItem label="Email" value={user.email} />
                     <DetailItem

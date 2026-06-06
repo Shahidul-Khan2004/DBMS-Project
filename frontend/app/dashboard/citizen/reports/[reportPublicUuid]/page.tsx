@@ -6,7 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CalendarClock,
-  ClipboardList,
   Clock3,
   FileText,
   Flag,
@@ -16,6 +15,7 @@ import {
   MapPin,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { CitizenBackButton } from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -166,8 +166,8 @@ function LocationHistory({ history }: { history: IntakeLocationHistoryItem[] }) 
   }
 
   return (
-    <ul className="space-y-3">
-      {history.slice(0, 5).map((item, index) => (
+    <ul className="max-h-[min(24rem,45vh)] space-y-3 overflow-y-auto overscroll-y-contain pr-1">
+      {history.map((item, index) => (
         <li key={`${item.changed_at}-${index}`} className="relative pl-6">
           <span
             className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-[#0B3FE8]"
@@ -209,11 +209,6 @@ function LocationHistory({ history }: { history: IntakeLocationHistoryItem[] }) 
           </div>
         </li>
       ))}
-      {history.length > 5 ? (
-        <li className="pt-3 text-xs text-[#42547A]">
-          Showing latest 5 of {history.length} location changes.
-        </li>
-      ) : null}
     </ul>
   );
 }
@@ -422,17 +417,7 @@ export default function CitizenReportDetailPage() {
       subtitle={`Report ${report?.report_code ?? reportPublicUuid}`}
       onLogout={handleLogout}
     >
-      <div className="space-y-5">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="h-9 rounded-full border border-[#002D62]/15 bg-white px-3 text-[#002D62] shadow-sm shadow-[#002D62]/5"
-          onClick={() => router.push("/dashboard/citizen/reports")}
-        >
-          Back to My Reports
-        </Button>
-
+      <div className="space-y-3">
         {error && <ErrorAlert message={error} />}
         {loading ? (
           <CompactCard>
@@ -451,20 +436,27 @@ export default function CitizenReportDetailPage() {
           </CompactCard>
         ) : (
           <>
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.04fr)_minmax(420px,0.96fr)]">
-              <div className="space-y-4">
+            <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)]">
+              <div className="min-w-0 space-y-3">
                 <CompactCard>
                   <CardContent className="!p-0">
-                    <div className="flex items-start justify-between gap-4 p-5">
-                      <div className="flex min-w-0 gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#DFF2CE] text-[#2D6B1F]">
+                    <div className="border-b border-[#002D62]/10 px-4 py-3 sm:px-5">
+                      <CitizenBackButton
+                        href="/dashboard/citizen/reports"
+                        label="Back to My Reports"
+                      />
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3 p-4 sm:p-5">
+                      <div className="flex min-w-0 gap-3 sm:gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#DFF2CE] text-[#2D6B1F]">
                           <FileText className="h-6 w-6" aria-hidden />
                         </div>
                         <div className="min-w-0">
                           <h2 className="text-base font-bold text-[#002D62]">
                             Report Details
                           </h2>
-                          <p className="mt-3 text-xs font-bold uppercase tracking-wide text-[#006747]">
+                          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#006747]">
                             Report Code
                           </p>
                           <p className="mt-1 break-words text-sm font-bold text-[#002D62]">
@@ -483,12 +475,7 @@ export default function CitizenReportDetailPage() {
                       </Badge>
                     </div>
 
-                    <dl className="grid border-t border-[#002D62]/10 sm:grid-cols-2 lg:grid-cols-3">
-                      <ReportDetailMetric label="Status" value={null} icon={ClipboardList}>
-                        <Badge tone={getReportStatusTone(report.intake_status)} size="compact">
-                          {formatReportStatus(report.intake_status)}
-                        </Badge>
-                      </ReportDetailMetric>
+                    <dl className="grid border-t border-[#002D62]/10 sm:grid-cols-2 xl:grid-cols-3">
                       <ReportDetailMetric
                         label="Category"
                         value={formatBadgeLabel(report.category_code)}
@@ -499,11 +486,13 @@ export default function CitizenReportDetailPage() {
                         value={formatBadgeLabel(report.channel_code)}
                         icon={Globe2}
                       />
-                      <ReportDetailMetric
-                        label="Urgency"
-                        value={formatBadgeLabel(report.urgency_type)}
-                        icon={AlertTriangle}
-                      />
+                      {report.urgency_type ? (
+                        <ReportDetailMetric
+                          label="Urgency"
+                          value={formatBadgeLabel(report.urgency_type)}
+                          icon={AlertTriangle}
+                        />
+                      ) : null}
                       <ReportDetailMetric
                         label="Reported At"
                         value={formatBangladeshTime(report.reported_at)}
@@ -514,15 +503,17 @@ export default function CitizenReportDetailPage() {
                         value={formatBangladeshTime(report.created_at)}
                         icon={CalendarClock}
                       />
-                      <ReportDetailMetric
-                        label="Final Disposition"
-                        value={report.final_disposition}
-                        icon={Flag}
-                      />
+                      {report.final_disposition ? (
+                        <ReportDetailMetric
+                          label="Final Disposition"
+                          value={report.final_disposition}
+                          icon={Flag}
+                        />
+                      ) : null}
                     </dl>
 
                     {report.intake_status === "linked_to_incident" ? (
-                      <div className="border-t border-[#002D62]/10 p-5">
+                      <div className="border-t border-[#002D62]/10 p-4">
                         <div className="rounded-xl border border-[#DA291C]/15 bg-red-50 p-3 text-sm text-red-900">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -558,7 +549,7 @@ export default function CitizenReportDetailPage() {
                         </div>
                       </div>
                     ) : linkedIncident ? (
-                      <div className="border-t border-[#002D62]/10 p-5">
+                      <div className="border-t border-[#002D62]/10 p-4">
                         <div className="rounded-xl border border-[#002D62]/10 bg-[#EFF6FF] p-3">
                           <p className="text-sm font-semibold text-gray-900">
                             Linked Incident
@@ -574,10 +565,10 @@ export default function CitizenReportDetailPage() {
                 </CompactCard>
 
                 <CompactCard>
-                  <CardHeader className="border-b border-[#002D62]/10 !px-5 !py-4">
+                  <CardHeader className="border-b border-[#002D62]/10 !px-4 !py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EFF6FF] text-[#002D62]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EFF6FF] text-[#002D62]">
                           <History className="h-5 w-5" aria-hidden />
                         </div>
                         <h2 className="text-base font-bold text-[#002D62]">
@@ -586,18 +577,18 @@ export default function CitizenReportDetailPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="!px-5 !py-5">
+                  <CardContent className="!px-4 !py-4">
                     <LocationHistory history={history} />
                   </CardContent>
                 </CompactCard>
               </div>
 
-              <div className="space-y-4">
-                <CompactCard>
-                  <CardHeader className="border-b border-[#002D62]/10 !px-5 !py-4">
+              <div className="min-w-0">
+                <CompactCard className="overflow-hidden">
+                  <CardHeader className="border-b border-[#002D62]/10 !px-4 !py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#006747] text-white">
-                        <MapPin className="h-6 w-6" aria-hidden />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#006747] text-white">
+                        <MapPin className="h-5 w-5" aria-hidden />
                       </div>
                       <div>
                         <h2 className="text-base font-bold text-[#002D62]">
@@ -613,7 +604,7 @@ export default function CitizenReportDetailPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="!px-5 !py-4">
+                  <CardContent className="!px-4 !py-4">
                     {locationError && (
                       <div className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
                         {locationError}
@@ -635,10 +626,10 @@ export default function CitizenReportDetailPage() {
                           syncSearchQueryToSelectedLabel={false}
                           embedded
                           embeddedCompact
-                          mapClassName="h-[300px] w-full"
+                          mapClassName="h-[clamp(230px,32vh,290px)] w-full"
                           showSelectionSummary={false}
                         />
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
                           <div>
                             <label className="block text-sm font-medium text-gray-700">
                               Address Text
