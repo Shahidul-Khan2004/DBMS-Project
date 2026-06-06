@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import { postDeactivateDisasterShelter } from "@/lib/disaster-operations-api";
-import { getActiveDisasterShelters } from "@/lib/disaster-operations-format";
+import { getActiveDisasterShelters, getLeadShelterManager } from "@/lib/disaster-operations-format";
 import type { DisasterDashboardResponse, DisasterShelterActivation } from "@/types/disaster-operations";
 import type { AdminFacilityListItem, FacilityLocation } from "@/types/admin-facility";
 
@@ -54,6 +54,7 @@ export function DisasterSheltersTab({
   const [isDeactivating, setIsDeactivating] = useState(false);
 
   const activeShelters = getActiveDisasterShelters(dashboard.shelters ?? []);
+  const leadShelterManager = getLeadShelterManager(dashboard.responsibilities);
 
   const resolvedEmptyMessage =
     emptyMessage ??
@@ -123,14 +124,16 @@ export function DisasterSheltersTab({
           </div>
           {!isReadOnly && s.shelter_activation_public_uuid ? (
             <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:flex-wrap">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setManagingShelter(s)}
-              >
-                Assign agency
-              </Button>
+              {!s.managing_agency_name ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setManagingShelter(s)}
+                >
+                  Assign agency
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -175,7 +178,14 @@ export function DisasterSheltersTab({
       {embeddedInPanel ? (
         <div className="min-h-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h3 className="text-sm font-semibold text-slate-900">{sectionTitle}</h3>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{sectionTitle}</h3>
+              {leadShelterManager ? (
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Active shelters are managed by {leadShelterManager.agency_name ?? "the lead shelter agency"}.
+                </p>
+              ) : null}
+            </div>
             {activateAction ? <div className="shrink-0">{activateAction}</div> : null}
           </div>
           <div className="mt-3">{listBody}</div>

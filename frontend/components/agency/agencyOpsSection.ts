@@ -1,9 +1,13 @@
+import { isAgencyNationalDisasterRoute } from "@/lib/agency-national-disaster-routes";
+
 export const AGENCY_OPS_TABS = [
   { label: "Command Center", href: "/dashboard/agency" },
   { label: "Response Work", href: "/dashboard/agency/response-work" },
   { label: "Units", href: "/dashboard/agency/units" },
   { label: "Field Updates", href: "/dashboard/agency/field-updates" },
 ] as const;
+
+export { isAgencyNationalDisasterRoute };
 
 export function isAgencyOpsTabActive(pathname: string, href: string): boolean {
   if (href === "/dashboard/agency") {
@@ -43,6 +47,9 @@ export function getAgencyOpsSectionLabel(pathname: string): string {
   }
   if (pathname.startsWith("/dashboard/agency/units")) {
     return "Units";
+  }
+  if (isAgencyNationalDisasterRoute(pathname)) {
+    return "National Disaster";
   }
   if (pathname === "/dashboard/agency") {
     return "Command Center";

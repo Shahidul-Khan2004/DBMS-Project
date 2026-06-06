@@ -7,8 +7,14 @@ import { X } from "lucide-react";
 import { useAgencyNav } from "@/components/agency/AgencyNavContext";
 import {
   AGENCY_OPS_TABS,
+  isAgencyNationalDisasterRoute,
   isAgencyOpsTabActive,
 } from "@/components/agency/agencyOpsSection";
+import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
+import { agencyNationalDisasterLandingPath } from "@/lib/agency-national-disaster-routes";
+
+const NATIONAL_DISASTER_LINK_CLASS =
+  "flex w-full items-center justify-between rounded-lg border border-[#991B1B] bg-[#B91C1C] px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#991B1B]";
 
 const linkClass = (active: boolean) =>
   `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -93,6 +99,27 @@ export function AgencyOpsDrawer() {
               );
             })}
           </ul>
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <Link
+              href={agencyNationalDisasterLandingPath()}
+              className={`${NATIONAL_DISASTER_LINK_CLASS} ${
+                isAgencyNationalDisasterRoute(pathname)
+                  ? DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES
+                  : ""
+              }`}
+              onClick={closeMenu}
+              aria-current={
+                isAgencyNationalDisasterRoute(pathname) ? "page" : undefined
+              }
+            >
+              <span>National Disaster</span>
+              {isAgencyNationalDisasterRoute(pathname) ? (
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  Active
+                </span>
+              ) : null}
+            </Link>
+          </div>
         </nav>
       </aside>
     </div>

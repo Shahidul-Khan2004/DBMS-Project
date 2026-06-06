@@ -7,13 +7,20 @@ import { useAgencyNav } from "@/components/agency/AgencyNavContext";
 import {
   AGENCY_OPS_TABS,
   getAgencyOpsSectionLabel,
+  isAgencyNationalDisasterRoute,
   isAgencyOpsTabActive,
 } from "@/components/agency/agencyOpsSection";
+import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
+import { agencyNationalDisasterLandingPath } from "@/lib/agency-national-disaster-routes";
+
+const NATIONAL_DISASTER_LINK_CLASS =
+  "inline-flex shrink-0 cursor-pointer items-center rounded-md border border-[#991B1B] bg-[#B91C1C] px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#991B1B]";
 
 export function AgencyOpsNav() {
   const pathname = usePathname();
   const { openMenu } = useAgencyNav();
   const sectionLabel = getAgencyOpsSectionLabel(pathname);
+  const isNationalDisasterActive = isAgencyNationalDisasterRoute(pathname);
 
   return (
     <>
@@ -39,6 +46,15 @@ export function AgencyOpsNav() {
             );
           })}
         </div>
+        <Link
+          href={agencyNationalDisasterLandingPath()}
+          className={`${NATIONAL_DISASTER_LINK_CLASS} ${
+            isNationalDisasterActive ? DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES : ""
+          }`}
+          aria-current={isNationalDisasterActive ? "page" : undefined}
+        >
+          National Disaster
+        </Link>
       </nav>
 
       <div

@@ -5,6 +5,7 @@ import type {
   DisasterReliefHubActivation,
   DisasterReliefInventoryRow,
   DisasterReliefRequest,
+  DisasterResponsibility,
   DisasterShelterActivation,
 } from "@/types/disaster-operations";
 
@@ -247,6 +248,17 @@ export function getActiveDisasterShelters(shelters: DisasterShelterActivation[])
         isActiveDisasterActivation(s.activation_status),
     )
     .sort((a, b) => (a.facility_name ?? "").localeCompare(b.facility_name ?? ""));
+}
+
+export function getLeadShelterManager(
+  responsibilities: DisasterResponsibility[] | undefined,
+): DisasterResponsibility | null {
+  return (
+    responsibilities?.find(
+      (row) =>
+        row.responsibility_type === "shelter_management" && row.is_lead === true,
+    ) ?? null
+  );
 }
 
 export function getActiveDisasterShelterFacilityUuids(

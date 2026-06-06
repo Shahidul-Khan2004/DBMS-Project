@@ -216,16 +216,24 @@ export type DisasterStatusPayload = {
   note?: string;
 };
 
+export type DisasterResponsibilityType =
+  | "coordination"
+  | "shelter_management"
+  | "relief_management"
+  | "medical_support"
+  | "security_support"
+  | "rescue_support";
+
 export type AssignResponsibilityPayload = {
   agencyPublicUuid: string;
-  responsibilityType:
-    | "coordination"
-    | "shelter_management"
-    | "relief_management"
-    | "medical_support"
-    | "security_support"
-    | "rescue_support";
+  responsibilityType: DisasterResponsibilityType;
   isLead?: boolean;
+};
+
+export type RevokeResponsibilityPayload = {
+  agencyPublicUuid: string;
+  responsibilityType: DisasterResponsibilityType;
+  note?: string;
 };
 
 export type LinkIncidentPayload = {

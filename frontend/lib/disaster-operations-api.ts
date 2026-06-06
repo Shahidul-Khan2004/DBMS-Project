@@ -20,6 +20,7 @@ import type {
   LinkIncidentPayload,
   PostDisasterStatusResponse,
   ReliefRequestActionPayload,
+  RevokeResponsibilityPayload,
   ShelterManagingAgencyPayload,
   ShelterOccupancyPayload,
   StockReceiptPayload,
@@ -97,6 +98,16 @@ export function postDisasterResponsibility(
 ) {
   return apiPost<DisasterDashboardResponse, AssignResponsibilityPayload>(
     `${disasterPath(disasterPublicUuid)}/responsibilities`,
+    body,
+  );
+}
+
+export function postRevokeDisasterResponsibility(
+  disasterPublicUuid: string,
+  body: RevokeResponsibilityPayload,
+) {
+  return apiPost<DisasterDashboardResponse, RevokeResponsibilityPayload>(
+    `${disasterPath(disasterPublicUuid)}/responsibilities/revoke`,
     body,
   );
 }
