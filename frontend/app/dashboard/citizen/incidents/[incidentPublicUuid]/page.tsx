@@ -111,19 +111,23 @@ export default function CitizenIncidentDetailPage() {
       onLogout={handleLogout}
     >
       <div className="space-y-3">
-        <div className="flex justify-start">
-          <CitizenBackButton
-            href="/dashboard/citizen/incidents"
-            label="Back to My Incidents"
-          />
-        </div>
-
-        {error ? <ErrorAlert message={error} /> : null}
+        {error ? (
+          <div className="shrink-0">
+            <ErrorAlert message={error} />
+          </div>
+        ) : null}
 
         <CitizenSectionCard
           title="Incident Snapshot"
           subtitle="View the incident information linked to your report."
           icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
+          topBar={
+            <CitizenBackButton
+              href="/dashboard/citizen/incidents"
+              label="Back to My Incidents"
+            />
+          }
+          contentClassName="!p-4"
         >
           {isLoading ? (
             <p className="text-sm text-[#42547A]">Loading incident details...</p>
@@ -134,7 +138,7 @@ export default function CitizenIncidentDetailPage() {
               icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
             />
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-wide text-[#B71C1C]">
@@ -169,7 +173,7 @@ export default function CitizenIncidentDetailPage() {
                 </p>
               ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 <CitizenMetaItem
                   label="Status"
                   value={formatIncidentStatus(incident.status_code)}
@@ -204,7 +208,7 @@ export default function CitizenIncidentDetailPage() {
                     value={finalTime.value}
                   />
                 ) : null}
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 xl:col-span-3">
                   <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
                 </div>
               </div>

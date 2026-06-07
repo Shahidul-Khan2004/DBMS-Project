@@ -338,7 +338,7 @@ export function ProfileMenu() {
         aria-expanded={open}
         aria-controls={PROFILE_POPOVER_ID}
         aria-haspopup="dialog"
-        className={`inline-flex h-12 items-center gap-2 rounded-xl border-2 bg-white px-5 text-sm font-bold text-[#002D62] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62] ${
+        className={`inline-flex h-10 w-[6.5rem] items-center justify-center gap-2 rounded-xl border bg-white px-3 text-sm font-bold text-[#002D62] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62] ${
           isOnProfilePage
             ? "border-[#002D62] bg-[#002D62]/10 ring-2 ring-[#002D62]/20 hover:bg-[#002D62]/15"
             : "border-[#0B3FE8] hover:bg-[#EFF6FF]"

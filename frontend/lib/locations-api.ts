@@ -5,6 +5,7 @@ import type {
   SavedLocation,
   SavedLocationResponse,
   SavedLocationsResponse,
+  SaveLocationResponse,
 } from "@/types/locations";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -117,5 +118,28 @@ export async function createSavedLocation(
     message:
       typeof data.message === "string" ? data.message : "Location created",
     location: normalizeSavedLocation(data.location),
+  };
+}
+
+export async function saveLocationForCurrentUser(
+  publicUuid: string,
+): Promise<SaveLocationResponse> {
+  const data = await apiPost<unknown, Record<string, never>>(
+    `/locations/${encodeURIComponent(publicUuid)}/save`,
+    {},
+  );
+
+  if (!isObject(data)) {
+    throw new Error("Save location response is invalid.");
+  }
+
+  return {
+    message:
+      typeof data.message === "string" ? data.message : "Location saved",
+    savedLocationPublicUuid: requiredString(
+      data.savedLocationPublicUuid,
+      "savedLocationPublicUuid",
+    ),
+    label: nullableString(data.label),
   };
 }

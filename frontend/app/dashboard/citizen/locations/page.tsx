@@ -21,6 +21,7 @@ import { formatBangladeshTime } from "@/lib/datetime";
 import {
   createSavedLocation,
   getMySavedLocations,
+  saveLocationForCurrentUser,
 } from "@/lib/locations-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { SavedLocation } from "@/types/locations";
@@ -77,7 +78,9 @@ export default function CitizenLocationsPage() {
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
-  const [showAllLocations, setShowAllLocations] = useState(true);
+  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [selectedLocationDetails, setSelectedLocationDetails] =
+    useState<LocationPickerSelectionDetails>({});
   const [form, setForm] = useState({
     latitude: "",
     longitude: "",
@@ -96,10 +99,7 @@ export default function CitizenLocationsPage() {
     } catch (err) {
       console.error("Failed to load saved locations", err);
       setLoadError(
-        getCitizenFriendlyError(
-          err,
-          "We could not load your saved locations right now.",
-        ),
+        "We couldn’t load your saved locations. You can still add a location manually.",
       );
       return [];
     } finally {
@@ -123,13 +123,21 @@ export default function CitizenLocationsPage() {
       location: LocationPickerValue,
       details?: LocationPickerSelectionDetails,
     ) => {
-      setForm((current) => ({
-        ...current,
-        latitude: location.latitude.toString(),
-        longitude: location.longitude.toString(),
-        addressText: details?.addressText ?? "",
-        placeName: details?.placeName ?? "",
-      }));
+      setSelectedLocationDetails(details ?? {});
+      setForm((current) => {
+        const latitude = location.latitude.toString();
+        const longitude = location.longitude.toString();
+        const locationChanged =
+          current.latitude !== latitude || current.longitude !== longitude;
+
+        return {
+          ...current,
+          latitude,
+          longitude,
+          addressText: locationChanged ? "" : current.addressText,
+          placeName: locationChanged ? "" : current.placeName,
+        };
+      });
       setError("");
       setMessage("");
     },
@@ -149,16 +157,20 @@ export default function CitizenLocationsPage() {
 
     setSaving(true);
     try {
-      const data = await createSavedLocation({
+      const created = await createSavedLocation({
         latitude: selectedLocation.latitude,
         longitude: selectedLocation.longitude,
         address_text: form.addressText.trim() || undefined,
         place_name: form.placeName.trim() || undefined,
         source: "user_shared",
       });
+      const saved = await saveLocationForCurrentUser(
+        created.location.publicUuid,
+      );
 
       setForm({ latitude: "", longitude: "", addressText: "", placeName: "" });
-      setMessage(data.message || "Location saved.");
+      setSelectedLocationDetails({});
+      setMessage(saved.message || "Location saved.");
       await loadLocations();
     } catch (err) {
       console.error("Failed to save location", err);
@@ -180,12 +192,14 @@ export default function CitizenLocationsPage() {
   const formSelectedLocation = getFormLocation(form);
   const selectedLocationLabel =
     form.addressText.trim() ||
+    selectedLocationDetails.addressText?.trim() ||
     form.placeName.trim() ||
+    selectedLocationDetails.placeName?.trim() ||
     "Selected map point";
+  const selectedPlaceName =
+    form.placeName.trim() || selectedLocationDetails.placeName?.trim() || "";
   const showDistinctPlaceName =
-    Boolean(form.placeName.trim()) &&
-    form.placeName.trim() !== form.addressText.trim() &&
-    form.placeName.trim() !== selectedLocationLabel;
+    Boolean(selectedPlaceName) && selectedPlaceName !== selectedLocationLabel;
   const locationsByNewest = getLocationsByNewest(locations);
   const displayedLocations = showAllLocations
     ? locationsByNewest
@@ -203,8 +217,8 @@ export default function CitizenLocationsPage() {
           title="Add Location"
           subtitle="Search or place a marker for the location you want to save."
           icon={<PlusCircle className="h-5 w-5" aria-hidden />}
-          className="flex flex-col xl:h-[calc(100dvh-11rem)] xl:min-h-[34rem] xl:max-h-[46rem] [&_header]:px-4 [&_header]:py-3"
-          contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain !p-4"
+          className="self-start [&_header]:px-4 [&_header]:py-3"
+          contentClassName="!p-4"
         >
             {error && <ErrorAlert message={error} />}
             {message && (
@@ -242,7 +256,7 @@ export default function CitizenLocationsPage() {
                     </p>
                     {showDistinctPlaceName ? (
                       <p className="text-xs text-slate-500">
-                        {form.placeName.trim()}
+                        {selectedPlaceName}
                       </p>
                     ) : null}
                     <button
@@ -254,6 +268,7 @@ export default function CitizenLocationsPage() {
                           addressText: "",
                           placeName: "",
                         });
+                        setSelectedLocationDetails({});
                         setError("");
                         setMessage("");
                       }}
@@ -341,52 +356,48 @@ export default function CitizenLocationsPage() {
 
         <CitizenSectionCard
           title="My Recent Locations"
+          subtitle="Saved places are listed newest first."
           icon={<MapPin className="h-5 w-5" aria-hidden />}
-          className="flex flex-col xl:h-[calc(100dvh-11rem)] xl:min-h-[34rem] xl:max-h-[46rem] [&_header]:px-4 [&_header]:py-3"
-          contentClassName="flex min-h-0 flex-1 flex-col !p-0"
-        >
-          <div className="border-b border-[#002D62]/10 px-4 py-3">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <p className="text-sm leading-5 text-[#42547A]">
-                Saved places are listed newest first.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                {!loading && locations.length > 0 ? (
-                  <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
-                    Showing {displayedLocations.length} of {locations.length}
-                  </span>
-                ) : null}
-                {!loading && locations.length > 3 ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 px-3"
-                    onClick={() => setShowAllLocations((current) => !current)}
-                  >
-                    {showAllLocations ? "Show Recent" : "View All"}
-                  </Button>
-                ) : null}
+          className="self-start [&_header]:px-4 [&_header]:py-3 xl:flex xl:max-h-[calc(100dvh-9rem)] xl:min-h-0 xl:flex-col"
+          contentClassName="!p-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col"
+          headerAction={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {!loading && locations.length > 0 ? (
+                <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
+                  Showing {displayedLocations.length} of {locations.length}
+                </span>
+              ) : null}
+              {!loading && locations.length > 5 ? (
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
                   className="h-8 px-3"
-                  onClick={() => void loadLocations()}
-                  disabled={loading}
+                  onClick={() => setShowAllLocations((current) => !current)}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                  Refresh
+                  {showAllLocations ? "Show Recent" : "View All"}
                 </Button>
-              </div>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3"
+                onClick={() => void loadLocations()}
+                disabled={loading}
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                Refresh
+              </Button>
             </div>
-          </div>
-            {loading ? (
-              <div className="flex flex-1 items-center justify-center px-6 py-10 text-center text-sm text-gray-500">
+          }
+        >
+          {loading ? (
+              <div className="flex min-h-48 items-center justify-center px-6 py-10 text-center text-sm text-gray-500">
                 Loading locations...
               </div>
             ) : loadError ? (
-              <div className="flex flex-1 flex-col justify-center space-y-3 px-6 py-6">
+              <div className="flex min-h-48 flex-col justify-center space-y-3 px-6 py-6">
                 <ErrorAlert message={loadError} />
                 <Button
                   type="button"
@@ -398,7 +409,7 @@ export default function CitizenLocationsPage() {
                 </Button>
               </div>
             ) : locations.length === 0 ? (
-              <div className="flex flex-1 items-center p-6">
+              <div className="flex min-h-48 items-center p-6">
                 <EmptyState
                   title="No saved locations yet."
                   description="Add your home, workplace, school, or another place you report from often."
@@ -406,7 +417,13 @@ export default function CitizenLocationsPage() {
                 />
               </div>
             ) : (
-              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain p-4">
+              <ul
+                className={`space-y-3 p-4 ${
+                  showAllLocations
+                    ? "max-h-[34rem] overflow-y-auto overscroll-y-contain"
+                    : ""
+                } xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain`}
+              >
                 {displayedLocations.map((location) => (
                   <li
                     key={location.publicUuid}
