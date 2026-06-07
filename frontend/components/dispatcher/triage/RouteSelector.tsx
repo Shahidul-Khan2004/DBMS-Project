@@ -33,6 +33,9 @@ interface RouteSelectorProps {
   title?: string;
   subtitle?: string;
   required?: boolean;
+  showDisasterRoute?: boolean;
+  onOpenDisasterDialog?: () => void;
+  disasterRouteDisabled?: boolean;
 }
 
 export function RouteSelector({
@@ -42,6 +45,9 @@ export function RouteSelector({
   title = "Route Report",
   subtitle = "Choose the appropriate routing decision.",
   required = false,
+  showDisasterRoute = false,
+  onOpenDisasterDialog,
+  disasterRouteDisabled = false,
 }: RouteSelectorProps) {
   const activeChoice = routeModeToChoice(routeMode);
 
@@ -71,7 +77,23 @@ export function RouteSelector({
             </button>
           );
         })}
+        {showDisasterRoute && onOpenDisasterDialog ? (
+          <button
+            type="button"
+            disabled={disabled || disasterRouteDisabled}
+            onClick={onOpenDisasterDialog}
+            className="rounded-lg border border-[#006747] bg-white px-2.5 py-1 text-sm font-medium text-[#006747] transition-colors hover:border-[#00543A] hover:bg-[#F0F7F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006747] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Add to National Disaster
+          </button>
+        ) : null}
       </div>
+      {showDisasterRoute && onOpenDisasterDialog ? (
+        <p className="mt-1.5 text-xs text-slate-600">
+          Route this report through an emergency incident and attach it to an
+          active disaster protocol.
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -6,12 +6,18 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 import { useDispatcherNav } from "@/components/dispatcher/DispatcherNavContext";
 import {
+  getDisasterPrimaryButtonClasses,
+} from "@/components/dispatcher/disasters/disasterColors";
+import {
   DISPATCHER_OPS_TABS,
+  isDispatcherNationalDisasterRoute,
   isDispatcherOpsTabActive,
   isGateway999Route,
 } from "@/components/dispatcher/dispatcherOpsSection";
 import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
 import { Button } from "@/components/ui/Button";
+import { dispatcherNationalDisasterLandingPath } from "@/lib/dispatcher-national-disaster-routes";
+import { useDispatcherActiveDisasters } from "@/lib/hooks/use-dispatcher-active-disasters";
 
 const linkClass = (active: boolean) =>
   `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -25,6 +31,9 @@ export function DispatcherOpsDrawer() {
   const router = useRouter();
   const { menuOpen, closeMenu } = useDispatcherNav();
   const is999Active = isGateway999Route(pathname);
+  const isNationalDisasterActive = isDispatcherNationalDisasterRoute(pathname);
+  const { totalCount, fetchFailed, loading } = useDispatcherActiveDisasters();
+  const showDisasterCount = !loading && !fetchFailed && totalCount > 0;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -99,7 +108,7 @@ export function DispatcherOpsDrawer() {
             })}
           </ul>
 
-          <div className="mt-6 border-t border-[#002D62]/10 pt-6">
+          <div className="mt-6 space-y-2 border-t border-[#002D62]/10 pt-6">
             <Button
               type="button"
               variant="emergency"
@@ -121,6 +130,22 @@ export function DispatcherOpsDrawer() {
                 </span>
               ) : null}
             </Button>
+            <Link
+              href={dispatcherNationalDisasterLandingPath()}
+              className={`${getDisasterPrimaryButtonClasses(isNationalDisasterActive)} w-full justify-between rounded-lg px-3 py-2.5`}
+              aria-current={isNationalDisasterActive ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              <span>
+                National Disaster
+                {showDisasterCount ? ` (${totalCount})` : ""}
+              </span>
+              {isNationalDisasterActive ? (
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  Active
+                </span>
+              ) : null}
+            </Link>
           </div>
         </nav>
       </aside>

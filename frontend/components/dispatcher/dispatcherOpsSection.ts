@@ -17,9 +17,29 @@ export function isGateway999Route(pathname: string): boolean {
   return pathname.startsWith("/dashboard/dispatcher/gateway-999");
 }
 
+export function isDispatcherNationalDisasterRoute(pathname: string): boolean {
+  return pathname.startsWith("/dashboard/dispatcher/disasters");
+}
+
+export function isDispatcherNationalDisasterDetailRoute(pathname: string): boolean {
+  return (
+    pathname.startsWith("/dashboard/dispatcher/disasters/") &&
+    pathname !== "/dashboard/dispatcher/disasters"
+  );
+}
+
 export function getDispatcherOpsSectionLabel(pathname: string): string {
   if (isGateway999Route(pathname)) {
     return "Start 999 Intake";
+  }
+  if (isDispatcherNationalDisasterDetailRoute(pathname)) {
+    if (pathname.endsWith("/link-reports")) {
+      return "Link Reports";
+    }
+    return "Disaster Command";
+  }
+  if (isDispatcherNationalDisasterRoute(pathname)) {
+    return "National Disaster";
   }
   if (pathname.startsWith("/dashboard/dispatcher/intake-reports")) {
     return "Triage Queue";

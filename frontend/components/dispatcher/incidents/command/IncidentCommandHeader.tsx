@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { getDisasterOutlineButtonClasses } from "@/components/dispatcher/disasters/disasterColors";
 import { Button } from "@/components/ui/Button";
+
 export function IncidentCommandHeader({
   isTerminalIncident = false,
   onResolve,
   onClose,
   onCancel,
+  onAttachToDisaster,
 }: {
   isTerminalIncident?: boolean;
   onResolve: () => void;
   onClose: () => void;
   onCancel: () => void;
+  onAttachToDisaster?: () => void;
 }) {
   return (
     <header className="shrink-0">
@@ -33,6 +37,15 @@ export function IncidentCommandHeader({
         </nav>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {onAttachToDisaster && !isTerminalIncident ? (
+            <button
+              type="button"
+              onClick={onAttachToDisaster}
+              className={`${getDisasterOutlineButtonClasses()} !px-2.5 !py-1.5 !text-xs`}
+            >
+              Attach to Disaster
+            </button>
+          ) : null}
           <Button
             type="button"
             variant="secondary"

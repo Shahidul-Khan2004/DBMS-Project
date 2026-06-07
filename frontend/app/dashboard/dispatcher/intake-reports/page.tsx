@@ -201,7 +201,7 @@ function TriageQueuePageContent() {
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
         <div className="flex min-h-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:min-h-0 lg:grid-cols-[0.89fr_1fr] lg:items-stretch lg:overflow-hidden">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden lg:min-h-0 lg:grid-cols-[0.89fr_1fr] lg:items-stretch lg:overflow-hidden">
             <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
               <div className="shrink-0 space-y-3">
                 <header>
@@ -238,8 +238,9 @@ function TriageQueuePageContent() {
               />
             </div>
 
-            <div className="min-h-0 min-w-0 lg:overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-col lg:overflow-hidden">
               <TriageReviewRouteWorkspace
+                className="h-full min-h-0 flex-1"
                 reportId={selectedId || null}
                 enabled={Boolean(selectedId)}
                 queueEmpty={queueEmpty}

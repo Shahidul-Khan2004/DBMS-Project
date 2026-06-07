@@ -10,6 +10,7 @@ import { RouteSuccessHandoff } from "@/components/dispatcher/triage/RouteSuccess
 import { SelectedIntakeHeader } from "@/components/dispatcher/triage/SelectedIntakeHeader";
 import { ServiceCaseRouteForm } from "@/components/dispatcher/triage/ServiceCaseRouteForm";
 import { WorkflowContextHeader } from "@/components/dispatcher/triage/WorkflowContextHeader";
+import { DisasterLinkSelector } from "@/components/dispatcher/disasters/DisasterLinkSelector";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { Button } from "@/components/ui/Button";
@@ -59,6 +60,12 @@ interface ReviewRoutePanelProps {
   onOpenDetail: () => void;
   showHeader?: boolean;
   continueLabel?: string;
+  selectedDisasterPublicUuid?: string | null;
+  onDisasterChange?: (uuid: string | null) => void;
+  showDisasterRoute?: boolean;
+  onOpenDisasterDialog?: () => void;
+  disasterRouteDisabled?: boolean;
+  embedded?: boolean;
 }
 
 function isFormRouteMode(mode: RouteMode): boolean {
@@ -169,6 +176,12 @@ export function ReviewRoutePanel({
   onOpenDetail,
   showHeader = true,
   continueLabel,
+  selectedDisasterPublicUuid = null,
+  onDisasterChange,
+  showDisasterRoute = false,
+  onOpenDisasterDialog,
+  disasterRouteDisabled = false,
+  embedded = false,
 }: ReviewRoutePanelProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
@@ -199,38 +212,27 @@ export function ReviewRoutePanel({
     }
   }, [displayItem?.id, routeMode, isFormMode]);
 
-  return (
-    <section className="w-full min-w-0 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-      {showHeader ? (
-        <header className="border-b border-slate-100 px-4 py-2">
-          <h3 className="text-sm font-semibold text-slate-900">Review & Route</h3>
-        </header>
-      ) : null}
+  const showContextHeader =
+    Boolean(displayItem) &&
+    !detailLoading &&
+    !detailError &&
+    (isDefaultReview || isFormMode || isSuccessMode);
 
-      {!displayItem && !isSuccessMode ? (
-        <div className="px-4 py-6 text-center text-sm text-slate-500">
-          {queueEmpty ? (
-            <>
-              <p className="font-medium text-slate-700">No intake selected</p>
-              <p className="mt-1">
-                New pending reports will appear here for review.
-              </p>
-            </>
-          ) : (
-            <p>Select a pending report to review and route.</p>
-          )}
-        </div>
-      ) : detailLoading && !isSuccessMode ? (
-        <div className="px-4 py-3">
-          <LoadingSkeleton lines={4} />
-        </div>
-      ) : detailError && !isSuccessMode ? (
-        <div className="px-4 py-3">
-          <ErrorAlert message={detailError} />
-        </div>
-      ) : displayItem ? (
-        <div className="space-y-3 px-4 py-3">
-          {isDefaultReview ? (
+  const showFixedHeader = showHeader || showContextHeader;
+
+  const scrollBodyClassName = embedded
+    ? "min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-5 py-4 pb-6"
+    : "min-h-0 flex-1 space-y-3 px-5 py-4 pb-6 lg:overflow-y-auto lg:overscroll-y-contain";
+
+  return (
+    <section className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
+      {showFixedHeader ? (
+        <header className="shrink-0 space-y-3 border-b border-slate-100 px-5 py-4">
+          {showHeader ? (
+            <h3 className="text-sm font-semibold text-slate-900">Review & Route</h3>
+          ) : null}
+
+          {showContextHeader && displayItem && isDefaultReview ? (
             <>
               <SelectedIntakeHeader item={displayItem} />
 
@@ -238,94 +240,149 @@ export function ReviewRoutePanel({
                 <LocationRequiredNotice onEditLocation={onEditLocation} />
               ) : null}
 
-              <RouteSelector routeMode={routeMode} onSelect={onSelectRoute} />
-
-              <ReportedLocationDisplay
-                location={displayItem.location}
-                previewKey={displayItem.id}
-                onEditLocation={onEditLocation}
-                onViewHistory={onViewHistory}
+              <RouteSelector
+                routeMode={routeMode}
+                onSelect={onSelectRoute}
+                showDisasterRoute={showDisasterRoute}
+                onOpenDisasterDialog={onOpenDisasterDialog}
+                disasterRouteDisabled={disasterRouteDisabled}
               />
-
-              <OriginalDescriptionSection description={displayItem.description} />
             </>
           ) : null}
 
-          {isFormMode ? (
-            <div className="space-y-3">
-              <WorkflowContextHeader
-                item={displayItem}
-                detailsExpanded={detailsExpanded}
-                onToggleDetails={() => setDetailsExpanded((open) => !open)}
-                onBackToRouteOptions={onBackToOptions}
-              />
+          {showContextHeader && displayItem && isFormMode ? (
+            <WorkflowContextHeader
+              item={displayItem}
+              detailsExpanded={detailsExpanded}
+              onToggleDetails={() => setDetailsExpanded((open) => !open)}
+              onBackToRouteOptions={onBackToOptions}
+            />
+          ) : null}
 
-              {locationMissing ? (
-                <LocationRequiredNotice onEditLocation={onEditLocation} />
-              ) : null}
+          {showContextHeader && displayItem && isSuccessMode ? (
+            <WorkflowContextHeader
+              item={displayItem}
+              detailsExpanded={false}
+              onToggleDetails={() => {}}
+              onBackToRouteOptions={onContinueTriage}
+              showActions={false}
+            />
+          ) : null}
+        </header>
+      ) : null}
 
-              {detailsExpanded ? (
-                <IntakeReportDetailsCollapsible
-                  item={displayItem}
+      <div className={scrollBodyClassName}>
+        {!displayItem && !isSuccessMode ? (
+          <div className="py-6 text-center text-sm text-slate-500">
+            {queueEmpty ? (
+              <>
+                <p className="font-medium text-slate-700">No intake selected</p>
+                <p className="mt-1">
+                  New pending reports will appear here for review.
+                </p>
+              </>
+            ) : (
+              <p>Select a pending report to review and route.</p>
+            )}
+          </div>
+        ) : detailLoading && !isSuccessMode ? (
+          <LoadingSkeleton lines={4} />
+        ) : detailError && !isSuccessMode ? (
+          <ErrorAlert message={detailError} />
+        ) : displayItem ? (
+          <>
+            {isDefaultReview ? (
+              <>
+                <ReportedLocationDisplay
+                  location={displayItem.location}
+                  previewKey={displayItem.id}
                   onEditLocation={onEditLocation}
                   onViewHistory={onViewHistory}
                 />
-              ) : null}
 
-              {routeMode === "service_case" ? (
-                <ServiceCaseRouteForm
-                  draft={serviceCaseDraft}
-                  onChange={onServiceCaseDraftChange}
-                  onBack={onBackToOptions}
-                  onSubmit={onSubmitServiceCase}
-                  submitError={formRouteError}
-                  isSubmitting={submittingRoute === "service_case"}
-                  submitDisabled={routeSubmitDisabled}
-                />
-              ) : null}
+                <OriginalDescriptionSection description={displayItem.description} />
+              </>
+            ) : null}
 
-              {routeMode === "emergency_incident" ? (
-                <EmergencyIncidentRouteForm
-                  item={displayItem}
-                  draft={emergencyDraft}
-                  onChange={onEmergencyDraftChange}
-                  onBack={onBackToOptions}
-                  onSubmit={onSubmitEmergency}
-                  onEditReportedLocation={onEditLocation}
-                  submitError={formRouteError}
-                  isSubmitting={submittingRoute === "emergency"}
-                  submitDisabled={routeSubmitDisabled}
-                />
-              ) : null}
+            {isFormMode ? (
+              <div className="space-y-3">
+                {locationMissing ? (
+                  <LocationRequiredNotice onEditLocation={onEditLocation} />
+                ) : null}
 
-              {routeMode === "existing_incident" ? (
-                <ExistingIncidentRouteForm
-                  intakeLocation={displayItem.location}
-                  draft={linkDraft}
-                  incidents={activeIncidents}
-                  incidentsLoading={incidentsLoading}
-                  incidentsError={incidentsError}
-                  onRetryIncidents={onRetryIncidents}
-                  onChange={onLinkDraftChange}
-                  onBack={onBackToOptions}
-                  onSubmit={onSubmitLink}
-                  submitError={formRouteError}
-                  isSubmitting={submittingRoute === "link"}
-                  submitDisabled={routeSubmitDisabled}
-                />
-              ) : null}
-            </div>
-          ) : null}
+                {detailsExpanded ? (
+                  <IntakeReportDetailsCollapsible
+                    item={displayItem}
+                    onEditLocation={onEditLocation}
+                    onViewHistory={onViewHistory}
+                  />
+                ) : null}
 
-          {isSuccessMode && routeResult && displayItem ? (
-            <div className="space-y-3">
-              <WorkflowContextHeader
-                item={displayItem}
-                detailsExpanded={false}
-                onToggleDetails={() => {}}
-                onBackToRouteOptions={onContinueTriage}
-                showActions={false}
-              />
+                {routeMode === "service_case" ? (
+                  <ServiceCaseRouteForm
+                    draft={serviceCaseDraft}
+                    onChange={onServiceCaseDraftChange}
+                    onBack={onBackToOptions}
+                    onSubmit={onSubmitServiceCase}
+                    submitError={formRouteError}
+                    isSubmitting={submittingRoute === "service_case"}
+                    submitDisabled={routeSubmitDisabled}
+                  />
+                ) : null}
+
+                {routeMode === "emergency_incident" ? (
+                  <>
+                    <EmergencyIncidentRouteForm
+                      item={displayItem}
+                      draft={emergencyDraft}
+                      onChange={onEmergencyDraftChange}
+                      onBack={onBackToOptions}
+                      onSubmit={onSubmitEmergency}
+                      onEditReportedLocation={onEditLocation}
+                      submitError={formRouteError}
+                      isSubmitting={submittingRoute === "emergency"}
+                      submitDisabled={routeSubmitDisabled}
+                    />
+                    {onDisasterChange ? (
+                      <DisasterLinkSelector
+                        selectedDisasterPublicUuid={selectedDisasterPublicUuid}
+                        onChange={onDisasterChange}
+                        disabled={
+                          submittingRoute === "emergency" || routeSubmitDisabled
+                        }
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+
+                {routeMode === "existing_incident" ? (
+                  <ExistingIncidentRouteForm
+                    intakeLocation={displayItem.location}
+                    draft={linkDraft}
+                    incidents={activeIncidents}
+                    incidentsLoading={incidentsLoading}
+                    incidentsError={incidentsError}
+                    onRetryIncidents={onRetryIncidents}
+                    onChange={onLinkDraftChange}
+                    onBack={onBackToOptions}
+                    onSubmit={onSubmitLink}
+                    submitError={formRouteError}
+                    isSubmitting={submittingRoute === "link"}
+                    submitDisabled={routeSubmitDisabled}
+                  />
+                ) : null}
+
+                {routeMode === "existing_incident" && onDisasterChange ? (
+                  <DisasterLinkSelector
+                    selectedDisasterPublicUuid={selectedDisasterPublicUuid}
+                    onChange={onDisasterChange}
+                    disabled={submittingRoute === "link" || routeSubmitDisabled}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+
+            {isSuccessMode && routeResult ? (
               <RouteSuccessHandoff
                 item={displayItem}
                 routeResult={routeResult}
@@ -333,10 +390,10 @@ export function ReviewRoutePanel({
                 onContinueTriage={onContinueTriage}
                 continueLabel={continueLabel}
               />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </section>
   );
 }

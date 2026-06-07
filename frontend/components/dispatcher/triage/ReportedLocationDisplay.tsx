@@ -8,7 +8,7 @@ import {
 } from "@/components/dispatcher/triage/reportedLocationCoords";
 import { Button } from "@/components/ui/Button";
 
-const MAP_PREVIEW_HEIGHT_CLASS = "h-[180px]";
+const MAP_PREVIEW_HEIGHT_CLASS = "h-48 max-h-56 min-h-40";
 
 const ReportedLocationMapPreview = dynamic(
   () =>

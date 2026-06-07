@@ -87,6 +87,12 @@ export function formatDisasterSeverityLabel(level: string | null | undefined) {
   return match?.label ?? formatBadgeLabel(level);
 }
 
+export function formatDisasterImpactLevel(level: string | null | undefined) {
+  if (!level?.trim()) return "-";
+  const match = DISASTER_IMPACT_LEVEL_OPTIONS.find((o) => o.value === level);
+  return match?.label ?? formatBadgeLabel(level);
+}
+
 export function formatDisasterStatusLabel(statusCode: string | null | undefined) {
   if (!statusCode?.trim()) return "-";
   const key = statusCode.trim().toLowerCase();
@@ -315,4 +321,49 @@ export function hasInitialDeclaration(
   declarations: Array<{ declaration_kind?: string }>,
 ) {
   return declarations.some((d) => d.declaration_kind === "initial");
+}
+
+const DISPATCHER_ACTIVE_DISASTER_STATUSES = new Set(["monitoring", "declared"]);
+
+const DISPATCHER_DISASTER_SORT_ORDER: Record<string, number> = {
+  monitoring: 0,
+  declared: 1,
+  resolved: 2,
+  closed: 3,
+  cancelled: 4,
+};
+
+export function isDispatcherActiveDisasterStatus(
+  statusCode: string | null | undefined,
+): boolean {
+  if (!statusCode?.trim()) return false;
+  return DISPATCHER_ACTIVE_DISASTER_STATUSES.has(
+    statusCode.trim().toLowerCase(),
+  );
+}
+
+export function countDispatcherActiveDisasters(
+  disasters: DisasterListItem[],
+): number {
+  return disasters.filter((d) => isDispatcherActiveDisasterStatus(d.status_code))
+    .length;
+}
+
+export function sortOperationsDisastersForDispatcher(
+  disasters: DisasterListItem[],
+): DisasterListItem[] {
+  return [...disasters].sort((a, b) => {
+    const aOrder =
+      DISPATCHER_DISASTER_SORT_ORDER[a.status_code?.toLowerCase() ?? ""] ?? 99;
+    const bOrder =
+      DISPATCHER_DISASTER_SORT_ORDER[b.status_code?.toLowerCase() ?? ""] ?? 99;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return (a.title ?? "").localeCompare(b.title ?? "");
+  });
+}
+
+export function filterDispatcherActiveDisasters(
+  disasters: DisasterListItem[],
+): DisasterListItem[] {
+  return disasters.filter((d) => isDispatcherActiveDisasterStatus(d.status_code));
 }

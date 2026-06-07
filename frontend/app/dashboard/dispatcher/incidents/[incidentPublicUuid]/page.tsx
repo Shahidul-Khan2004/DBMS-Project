@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { AttachIncidentToDisasterDialog } from "@/components/dispatcher/disasters/AttachIncidentToDisasterDialog";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { AssignParticipatingAgencyDialog } from "@/components/dispatcher/incidents/command/AssignParticipatingAgencyDialog";
 import { DispatchStatusActionDialog } from "@/components/dispatcher/incidents/command/DispatchStatusActionDialog";
@@ -93,6 +94,7 @@ export default function IncidentCommandPage() {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [attachDisasterDialogOpen, setAttachDisasterDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
@@ -339,6 +341,7 @@ export default function IncidentCommandPage() {
                 onResolve={() => setResolveDialogOpen(true)}
                 onClose={() => setCloseDialogOpen(true)}
                 onCancel={() => setCancelDialogOpen(true)}
+                onAttachToDisaster={() => setAttachDisasterDialogOpen(true)}
               />
               <IncidentCommandWorkspace
                 detail={detail}
@@ -435,6 +438,12 @@ export default function IncidentCommandPage() {
             open={cancelDialogOpen}
             incidentPublicUuid={incidentPublicUuid}
             onClose={() => setCancelDialogOpen(false)}
+            onSuccess={refreshDetail}
+          />
+          <AttachIncidentToDisasterDialog
+            open={attachDisasterDialogOpen}
+            incidentPublicUuid={incidentPublicUuid}
+            onClose={() => setAttachDisasterDialogOpen(false)}
             onSuccess={refreshDetail}
           />
         </>

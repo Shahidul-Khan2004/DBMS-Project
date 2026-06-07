@@ -1,5 +1,9 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type {
+  OperationsDisasterDashboard,
+  OperationsDisasterSummary,
+} from "@/lib/disaster-operations-types";
+import type {
   ActivateReliefHubPayload,
   ActivateShelterPayload,
   ActivationDeactivationPayload,
@@ -42,6 +46,54 @@ export async function listDisasters(): Promise<DisasterListResponse> {
 
 export function getDisasterDashboard(disasterPublicUuid: string) {
   return apiGet<DisasterDashboardResponse>(disasterPath(disasterPublicUuid));
+}
+
+export type GetOperationsDisasterOptions = {
+  sort?: "distance_asc";
+  nearDisasterAffectedAreaPublicUuid?: string;
+  includeDistance?: boolean;
+};
+
+function buildDisasterDashboardQuery(options?: GetOperationsDisasterOptions) {
+  if (!options) return "";
+  const params = new URLSearchParams();
+  if (options.sort) params.set("sort", options.sort);
+  if (options.nearDisasterAffectedAreaPublicUuid) {
+    params.set(
+      "nearDisasterAffectedAreaPublicUuid",
+      options.nearDisasterAffectedAreaPublicUuid,
+    );
+  }
+  if (options.includeDistance) params.set("includeDistance", "true");
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function listOperationsDisasters(): Promise<
+  OperationsDisasterSummary[]
+> {
+  const data = await listDisasters();
+  return data.disasters ?? [];
+}
+
+export function getOperationsDisaster(
+  disasterPublicUuid: string,
+  options?: GetOperationsDisasterOptions,
+) {
+  const query = buildDisasterDashboardQuery(options);
+  return apiGet<OperationsDisasterDashboard>(
+    `${disasterPath(disasterPublicUuid)}${query}`,
+  );
+}
+
+export async function linkIncidentToDisaster(
+  disasterPublicUuid: string,
+  incidentPublicUuid: string,
+) {
+  const response = await postLinkDisasterIncident(disasterPublicUuid, {
+    incidentPublicUuid,
+  });
+  return response.link;
 }
 
 export function createDisaster(body: CreateDisasterPayload) {
