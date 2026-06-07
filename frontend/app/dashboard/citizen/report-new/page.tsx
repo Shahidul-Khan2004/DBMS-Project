@@ -12,6 +12,7 @@ import {
   MapPin,
 } from "lucide-react";
 import {
+  CitizenPageContent,
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
@@ -118,6 +119,7 @@ export default function CitizenNewReportPage() {
   } | null>(null);
   const [submittedReport, setSubmittedReport] =
     useState<SubmittedReport | null>(null);
+  const [step, setStep] = useState<"form" | "review">("form");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [selectedLocationDetails, setSelectedLocationDetails] =
     useState<LocationPickerSelectionDetails>({});
@@ -291,6 +293,26 @@ export default function CitizenNewReportPage() {
     return "";
   };
 
+  const handleContinueToReview = () => {
+    const detailsValidationMessage = getDetailsValidationMessage();
+    if (detailsValidationMessage) {
+      setFormError(detailsValidationMessage);
+      setMessage(null);
+      return;
+    }
+
+    const locationValidationMessage = getLocationValidationMessage();
+    if (locationValidationMessage) {
+      setFormError(locationValidationMessage);
+      setMessage(null);
+      return;
+    }
+
+    setFormError("");
+    setMessage(null);
+    setStep("review");
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmittedReport(null);
@@ -415,6 +437,7 @@ export default function CitizenNewReportPage() {
       });
       setSelectedLocationDetails({});
       setFormError("");
+      setStep("form");
     } catch (err) {
       console.error("Failed to submit citizen report", err);
       setMessage({
@@ -463,13 +486,12 @@ export default function CitizenNewReportPage() {
   return (
     <DashboardLayout
       title="Report New Incident"
-      subtitle="Create a report with accurate details so responders can review it quickly."
+      subtitle="Share what happened so NIERS can review your report."
       onLogout={handleLogout}
-      contentClassName="xl:h-[calc(100dvh-9rem)] xl:min-h-0 xl:overflow-hidden"
     >
-      <div className="space-y-3 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+      <CitizenPageContent>
         {formError ? (
-          <div className="shrink-0 rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
             <div className="flex gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
               <p className="font-medium">{formError}</p>
@@ -477,39 +499,200 @@ export default function CitizenNewReportPage() {
           </div>
         ) : null}
 
-        <form
-          className="grid items-start gap-3 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-3 xl:items-stretch"
-          onSubmit={handleSubmit}
-        >
-          <CitizenSectionCard
-            title="Incident Details"
-            subtitle="Use clear details so NIERS can review the report quickly."
-            icon={<ClipboardList className="h-5 w-5" aria-hidden />}
-            className="[&_header]:px-4 [&_header]:py-3 xl:flex xl:min-h-0 xl:flex-col"
-            contentClassName="!p-4 space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain"
-          >
-                  <div>
+        {step === "review" ? (
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <CitizenSectionCard
+              title="Review Your Report"
+              subtitle="Review your report before sending it to NIERS."
+              icon={<CheckCircle2 className="h-5 w-5" aria-hidden />}
+            >
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200/80 bg-[#F6F9FE] p-4">
+                  <h3 className="text-sm font-semibold text-[#002D62]">
+                    Incident Details
+                  </h3>
+                  <dl className="mt-3 space-y-3">
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                      <dt className="text-xs font-semibold uppercase text-[#42547A]">
                         Category
-                      </label>
-                      <select
-                        name="categoryCode"
-                        value={form.categoryCode}
-                        onChange={handleChange}
-                        required
-                        className="block h-[46px] w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
-                      >
-                        <option value="" disabled>
-                          Select category
-                        </option>
-                        {CATEGORY_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium text-slate-900">
+                        {selectedCategoryLabel}
+                      </dd>
                     </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                        Summary
+                      </dt>
+                      <dd className="mt-1 break-words text-sm font-medium text-slate-900">
+                        {form.summary.trim()}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                        Description
+                      </dt>
+                      <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                        {form.description.trim() || "No description provided."}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                        Reported Time
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium text-slate-900">
+                        {form.reportedAt || "-"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="rounded-xl border border-slate-200/80 bg-[#F6F9FE] p-4">
+                  <h3 className="text-sm font-semibold text-[#002D62]">
+                    Reported Location
+                  </h3>
+                  <dl className="mt-3 space-y-3">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                        Location
+                      </dt>
+                      <dd className="mt-1 break-words text-sm font-medium text-slate-900">
+                        {selectedSavedLocation
+                          ? formatSavedLocation(selectedSavedLocation)
+                          : selectedLocationLabel}
+                      </dd>
+                    </div>
+                    {form.locationAddress.trim() ? (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                          Address
+                        </dt>
+                        <dd className="mt-1 break-words text-sm text-slate-700">
+                          {form.locationAddress.trim()}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {form.locationPlaceName.trim() ? (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
+                          Place
+                        </dt>
+                        <dd className="mt-1 break-words text-sm text-slate-700">
+                          {form.locationPlaceName.trim()}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </div>
+              </div>
+
+              {message ? (
+                <div
+                  className={`mt-4 rounded-xl border p-3 text-sm ${
+                    message.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-[#DA291C]/20 bg-red-50 text-red-700"
+                  }`}
+                  aria-live="polite"
+                >
+                  <div className="flex gap-3">
+                    {message.type === "success" ? (
+                      <CheckCircle2
+                        className="mt-0.5 h-5 w-5 shrink-0"
+                        aria-hidden
+                      />
+                    ) : (
+                      <AlertCircle
+                        className="mt-0.5 h-5 w-5 shrink-0"
+                        aria-hidden
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium">{message.text}</p>
+                      {message.type === "success" ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {submittedReport?.publicUuid ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/citizen/reports/${submittedReport.publicUuid}`,
+                                )
+                              }
+                            >
+                              View Report Status
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              router.push("/dashboard/citizen/reports")
+                            }
+                          >
+                            My Reports
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex flex-wrap gap-3 border-t border-slate-200/80 pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setStep("form");
+                    setMessage(null);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </Button>
+                <Button type="submit" isLoading={isSubmitting} disabled={!canSubmit}>
+                  Submit Report
+                </Button>
+              </div>
+            </CitizenSectionCard>
+          </form>
+        ) : (
+          <form
+            className="space-y-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleContinueToReview();
+            }}
+          >
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,52fr)_minmax(0,48fr)]">
+              <CitizenSectionCard
+                title="Incident Details"
+                icon={<ClipboardList className="h-5 w-5" aria-hidden />}
+              >
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                      Category
+                    </label>
+                    <select
+                      name="categoryCode"
+                      value={form.categoryCode}
+                      onChange={handleChange}
+                      required
+                      className="block h-[46px] w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                    >
+                      <option value="" disabled>
+                        Select category
+                      </option>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <Input
@@ -529,40 +712,30 @@ export default function CitizenNewReportPage() {
                       name="description"
                       value={form.description}
                       onChange={handleChange}
-                      rows={3}
+                      rows={4}
                       placeholder="Add nearby landmarks, risks, affected people, or anything responders should know"
                       className="w-full rounded-xl border border-[#002D62]/20 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-500 transition-colors focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
                     />
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                    <Input
-                      type="datetime-local"
-                      name="reportedAt"
-                      label="Reported Time"
-                      value={form.reportedAt}
-                      onChange={handleChange}
-                      icon={<CalendarClock className="h-4 w-4" aria-hidden />}
-                      helpText="Defaults to the current time; adjust if needed."
-                    />
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                        Channel
-                      </label>
-                      <div className="flex h-[46px] items-center rounded-xl border border-[#002D62]/20 bg-white px-4 text-sm font-medium text-gray-900">
-                        Web Portal
-                      </div>
-                    </div>
-                  </div>
-          </CitizenSectionCard>
+                  <Input
+                    type="datetime-local"
+                    name="reportedAt"
+                    label="Reported Time"
+                    value={form.reportedAt}
+                    onChange={handleChange}
+                    icon={<CalendarClock className="h-4 w-4" aria-hidden />}
+                    helpText="Defaults to the current time; adjust if needed."
+                  />
+                </div>
+              </CitizenSectionCard>
 
-          <CitizenSectionCard
-              title="Reported Location *"
-              subtitle="Search or place a marker for where this incident was reported."
-              icon={<MapPin className="h-5 w-5" aria-hidden />}
-              className="flex max-h-[calc(100dvh-11rem)] min-h-0 flex-col [&_header]:px-4 [&_header]:py-3 xl:max-h-none"
-              contentClassName="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain !p-4"
-            >
+              <CitizenSectionCard
+                title="Reported Location"
+                subtitle="Choose where this incident happened."
+                icon={<MapPin className="h-5 w-5" aria-hidden />}
+              >
+                <div className="space-y-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Saved Location
@@ -616,7 +789,7 @@ export default function CitizenNewReportPage() {
                     embedded
                     embeddedCompact
                     searchPlaceholder="Search address, place, or landmark..."
-                    mapClassName="h-[clamp(190px,25vh,240px)] w-full"
+                    mapClassName="h-[clamp(220px,32vh,280px)] w-full"
                     embeddedMapSectionClassName="mt-3 w-full shrink-0"
                     showSelectionSummary={false}
                   />
@@ -625,7 +798,7 @@ export default function CitizenNewReportPage() {
                     className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
                     aria-live="polite"
                   >
-                    {selectedCoordinates ? (
+                    {selectedCoordinates || form.savedLocationId ? (
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-slate-900">
                           Selected location
@@ -649,16 +822,16 @@ export default function CitizenNewReportPage() {
                     ) : (
                       <div className="space-y-0.5">
                         <p className="text-xs font-semibold text-slate-900">
-                          No map point selected
+                          No location selected
                         </p>
                         <p className="text-xs leading-snug text-slate-600">
-                          Choose a report location before submitting.
+                          Search, choose a saved location, or select a map point.
                         </p>
                       </div>
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-3">
                     <p className="text-xs font-medium text-slate-700">
                       Optional location details
                     </p>
@@ -697,155 +870,25 @@ export default function CitizenNewReportPage() {
                       </div>
                     </div>
                   </div>
-          </CitizenSectionCard>
-
-          <CitizenSectionCard
-              title="Review and Submit"
-              subtitle="Confirm the backend-supported report details before sending."
-              icon={<CheckCircle2 className="h-5 w-5" aria-hidden />}
-              className="lg:col-span-2 xl:col-span-1 xl:flex xl:min-h-0 xl:flex-col [&_header]:px-4 [&_header]:py-3"
-              contentClassName="!p-4 space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain"
-            >
-                <div className="grid gap-3">
-                  <div className="rounded-xl border border-[#002D62]/10 bg-[#F6F9FE] p-3">
-                    <h3 className="text-sm font-semibold text-[#002D62]">
-                      Details
-                    </h3>
-                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Category
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium text-slate-900">
-                          {selectedCategoryLabel}
-                        </dd>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Summary
-                        </dt>
-                        <dd className="mt-1 break-words text-sm font-medium text-slate-900">
-                          {form.summary.trim()}
-                        </dd>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Description
-                        </dt>
-                        <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                          {form.description.trim() || "No description provided."}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div className="rounded-xl border border-[#002D62]/10 bg-[#F0F7F4] p-3">
-                    <h3 className="text-sm font-semibold text-[#002D62]">
-                      Location
-                    </h3>
-                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Saved Location
-                        </dt>
-                        <dd className="mt-1 break-words text-sm font-medium text-slate-900">
-                          {selectedSavedLocation
-                            ? formatSavedLocation(selectedSavedLocation)
-                            : "Map point"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Reported Time
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium text-slate-900">
-                          {form.reportedAt || "-"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Address
-                        </dt>
-                        <dd className="mt-1 break-words text-sm text-slate-700">
-                          {form.locationAddress.trim() || "-"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase text-[#42547A]">
-                          Place
-                        </dt>
-                        <dd className="mt-1 break-words text-sm text-slate-700">
-                          {form.locationPlaceName.trim() || "-"}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
                 </div>
+              </CitizenSectionCard>
+            </div>
+
+            <div className="flex flex-wrap gap-3 border-t border-slate-200/80 pt-2">
               <Button
-                type="submit"
-                isLoading={isSubmitting}
-                disabled={!canSubmit}
-                className="w-full sm:w-auto"
+                type="button"
+                variant="secondary"
+                onClick={() => router.push("/dashboard/citizen")}
               >
-                Submit Report
+                Cancel
               </Button>
-              {message ? (
-                <div
-                  className={`rounded-xl border p-3 text-sm ${
-                    message.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-[#DA291C]/20 bg-red-50 text-red-700"
-                  }`}
-                  aria-live="polite"
-                >
-                  <div className="flex gap-3">
-                    {message.type === "success" ? (
-                      <CheckCircle2
-                        className="mt-0.5 h-5 w-5 shrink-0"
-                        aria-hidden
-                      />
-                    ) : (
-                      <AlertCircle
-                        className="mt-0.5 h-5 w-5 shrink-0"
-                        aria-hidden
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium">{message.text}</p>
-                      {message.type === "success" ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {submittedReport?.publicUuid ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() =>
-                                router.push(
-                                  `/dashboard/citizen/reports/${submittedReport.publicUuid}`,
-                                )
-                              }
-                            >
-                              View Report Details
-                            </Button>
-                          ) : null}
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() =>
-                              router.push("/dashboard/citizen/reports")
-                            }
-                          >
-                            My Reports
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </CitizenSectionCard>
-        </form>
-      </div>
+              <Button type="submit" disabled={!canSubmit}>
+                Continue to Review
+              </Button>
+            </div>
+          </form>
+        )}
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }

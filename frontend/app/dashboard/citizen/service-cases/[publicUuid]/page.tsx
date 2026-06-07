@@ -1,17 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ExternalLink,
   FileText,
   Headphones,
   MapPin,
-  MessageSquare,
   RefreshCw,
   Send,
 } from "lucide-react";
-import { CitizenBackButton } from "@/components/citizen/CitizenPortal";
+import { getValidReportedCoordinates } from "@/components/dispatcher/triage/reportedLocationCoords";
+import {
+  CitizenBackButton,
+  CitizenPageContent,
+} from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -35,6 +38,19 @@ import type {
   ServiceCaseMessageResponse,
 } from "@/types/service-case";
 
+const ReportedLocationMapPreview = dynamic(
+  () =>
+    import("@/components/dispatcher/triage/ReportedLocationMapPreview").then(
+      (mod) => ({ default: mod.ReportedLocationMapPreview }),
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[220px] w-full animate-pulse rounded-lg bg-slate-100" />
+    ),
+  },
+);
+
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
@@ -53,7 +69,7 @@ function formatLocation(location: CitizenServiceCase["location"] | null | undefi
 
 function messageAuthor(message: ServiceCaseMessageResult) {
   if (message.message_type === "admin_reply") {
-    return message.sender?.full_name?.trim() || "Dispatcher/Admin";
+    return message.sender?.full_name?.trim() || "Operations team";
   }
   if (message.message_type === "user_message") return "You";
   if (message.message_type === "system_note") return "System";
@@ -61,7 +77,7 @@ function messageAuthor(message: ServiceCaseMessageResult) {
 }
 
 function fallbackSubject(messageType: string | null | undefined) {
-  if (messageType === "admin_reply") return "Dispatcher/Admin message";
+  if (messageType === "admin_reply") return "Operations team message";
   if (messageType === "user_message") return "Your message";
   if (messageType === "system_note") return "System update";
   return "Message";
@@ -121,8 +137,9 @@ export default function CitizenServiceCaseDetailPage() {
   const [messageTitle, setMessageTitle] = useState("");
   const [messageDescription, setMessageDescription] = useState("");
   const [sending, setSending] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [desktopMapOpen, setDesktopMapOpen] = useState(false);
 
   const statusCode = serviceCase?.status_code ?? "";
   const isTerminal = useMemo(() => terminalStatuses.has(statusCode), [statusCode]);
@@ -132,6 +149,16 @@ export default function CitizenServiceCaseDetailPage() {
     [isTerminal, statusCode],
   );
   const needsReply = statusCode === "awaiting_user_response";
+  const locationCoordinates = useMemo(() => {
+    if (!serviceCase?.location) return null;
+    return getValidReportedCoordinates(
+      serviceCase.location.latitude,
+      serviceCase.location.longitude,
+    );
+  }, [serviceCase?.location]);
+  const hasLocation = Boolean(
+    serviceCase && (serviceCase.location || serviceCase.location_text),
+  );
 
   const loadMessages = useCallback(async () => {
     setMessagesLoading(true);
@@ -192,16 +219,25 @@ export default function CitizenServiceCaseDetailPage() {
     void loadMessages();
   }, [isChecking, loadMessages, loadServiceCase]);
 
+  useEffect(() => {
+    setDesktopMapOpen(false);
+  }, [publicUuid]);
+
   const handleLogout = () => {
     sessionStorage.removeItem("loggedInUser");
     clearAuthSession();
     router.push("/");
   };
 
+  function closeSendMessageModal() {
+    if (sending) return;
+    setSendMessageOpen(false);
+    setMessageError(null);
+  }
+
   async function handleSubmitMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessageError(null);
-    setSuccessMessage("");
 
     const nextTitle = messageTitle.trim();
     const nextDescription = messageDescription.trim();
@@ -226,9 +262,10 @@ export default function CitizenServiceCaseDetailPage() {
         },
       );
 
-      setSuccessMessage(data.message || "Reply sent successfully.");
       setMessageTitle("");
       setMessageDescription("");
+      setSendMessageOpen(false);
+      setMessageError(null);
       if (data.case_message) {
         setMessages((current) => [...current, data.case_message as ServiceCaseMessageResult]);
       }
@@ -251,349 +288,353 @@ export default function CitizenServiceCaseDetailPage() {
   return (
     <DashboardLayout
       title="Service Case Details"
-      subtitle={`Case ${serviceCase?.case_code ?? publicUuid}`}
+      subtitle={serviceCase?.title ?? "Track your service case and messages."}
       onLogout={handleLogout}
-      contentClassName="h-[calc(100dvh-9rem)] min-h-0 overflow-hidden"
+      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-12rem)] lg:overflow-hidden"
     >
-      <div className="grid h-full min-h-0 items-start gap-3 overflow-y-auto overscroll-y-contain lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)] lg:overflow-hidden">
-        <div className="min-w-0 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain lg:pr-1">
-          <Card className="shrink-0 !overflow-hidden !rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
-            <div className="border-b border-[#002D62]/10 px-4 py-3 sm:px-5">
-              <CitizenBackButton
-                href="/dashboard/citizen/service-cases"
-                label="Back to Service Cases"
-              />
-            </div>
-            <CardContent className="!p-4">
-              {error ? <ErrorAlert message={error} /> : null}
-              {needsReply && serviceCase ? (
-                <MessageBanner tone="info" className="mb-3">
-                  Dispatcher is awaiting your reply.
-                </MessageBanner>
-              ) : null}
-              {isEscalated && serviceCase ? (
-                <MessageBanner tone="info" className="mb-3">
-                  This service case has been escalated to an emergency incident.
-                </MessageBanner>
-              ) : null}
+      <CitizenPageContent className="flex min-h-0 flex-1 flex-col !space-y-3 !py-0 sm:!space-y-3 lg:min-h-0 lg:overflow-hidden">
+        <CitizenBackButton
+          href="/dashboard/citizen/service-cases"
+          label="Back to Service Cases"
+        />
 
-              {loading ? (
-                <LoadingSkeleton lines={6} />
-              ) : !serviceCase ? (
-                <EmptyState
-                  title="Service case not found"
-                  description="This case may no longer be available or may not belong to your account."
-                />
-              ) : (
-                <>
-                  <div className="flex flex-col gap-2 border-b border-[#002D62]/10 pb-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#002D62] text-white">
-                        <FileText className="h-5 w-5" aria-hidden />
-                      </div>
-                      <h2 className="text-lg font-bold text-[#002D62]">
-                        Service Case Snapshot
-                      </h2>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {needsReply ? (
-                        <Badge tone="awaiting_user_response">
-                          Needs your reply
-                        </Badge>
-                      ) : null}
-                      <Badge tone={serviceCase.status_code}>
-                        {getServiceCaseStatusLabel(serviceCase.status_code)}
-                      </Badge>
-                      <Badge tone={serviceCase.priority_level}>
-                        {formatBadgeLabel(serviceCase.priority_level)}
-                      </Badge>
-                    </div>
-                  </div>
+        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-stretch xl:overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-col gap-4 xl:h-full xl:overflow-hidden">
+            <Card
+              className={`overflow-hidden !rounded-2xl !border-slate-200/80 !bg-white shadow-sm ${
+                hasLocation
+                  ? "shrink-0"
+                  : "flex min-h-[240px] flex-1 flex-col xl:min-h-0"
+              }`}
+            >
+              <CardContent
+                className={`!p-4 ${
+                  hasLocation
+                    ? ""
+                    : "min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+                }`}
+              >
+                {error ? <ErrorAlert message={error} /> : null}
+                {needsReply && serviceCase ? (
+                  <MessageBanner tone="info" className="mb-3">
+                    The operations team is awaiting your reply.
+                  </MessageBanner>
+                ) : null}
+                {isEscalated && serviceCase ? (
+                  <MessageBanner tone="info" className="mb-3">
+                    This service case has been escalated to an emergency response.
+                  </MessageBanner>
+                ) : null}
 
-                  <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailRow label="Case Code" value={serviceCase.case_code} />
-                    <DetailRow label="Title" value={serviceCase.title} />
-                    <DetailRow
-                      label="Category"
-                      value={formatBadgeLabel(serviceCase.category_code)}
-                    />
-                    <DetailRow
-                      label="Priority"
-                      value={formatBadgeLabel(serviceCase.priority_level)}
-                    />
-                    <DetailRow
-                      label="Intake Report"
-                      value={serviceCase.intake_report_code}
-                    />
-                    <DetailRow
-                      label="Status"
-                      value={getServiceCaseStatusLabel(serviceCase.status_code)}
-                    />
-                    <DetailRow
-                      label="Created At"
-                      value={formatBangladeshTime(serviceCase.created_at)}
-                    />
-                    <DetailRow
-                      label="Last Updated"
-                      value={formatBangladeshTime(serviceCase.last_updated)}
-                    />
-                  </dl>
-
-                  <div className="mt-3">
-                    <DetailRow
-                      label="Description"
-                      value={serviceCase.description || "No description provided."}
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-xs font-semibold uppercase text-[#42547A]">
-                      Location
-                    </p>
-                    <div className="mt-2 flex items-start gap-2 text-sm text-gray-800">
-                      <MapPin
-                        className="mt-0.5 h-4 w-4 shrink-0 text-[#0B3FE8]"
-                        aria-hidden
-                      />
-                      <p className="break-words">
-                        {formatLocation(serviceCase.location)}
-                        {serviceCase.location_text &&
-                        serviceCase.location_text !==
-                          formatLocation(serviceCase.location)
-                          ? `, ${serviceCase.location_text}`
-                          : ""}
-                      </p>
-                    </div>
-                    {serviceCase.location ? (
-                      <a
-                        href={`https://www.openstreetmap.org/?mlat=${serviceCase.location.latitude}&mlon=${serviceCase.location.longitude}#map=16/${serviceCase.location.latitude}/${serviceCase.location.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#0B3FE8] hover:text-[#002D62]"
-                      >
-                        View on Map
-                        <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                      </a>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {!loading && serviceCase ? (
-            <Card className="!overflow-hidden !rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
-              <CardHeader className="shrink-0 !px-4 !py-3 sm:!px-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#002D62] text-white">
-                      <MessageSquare className="h-5 w-5" aria-hidden />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-lg font-bold text-[#002D62]">
-                        Conversation
-                      </h2>
-                      <p className="text-sm text-[#42547A]">
-                        Messages between you and the operations team.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void loadMessages()}
-                    disabled={messagesLoading}
-                    className="shrink-0 rounded-xl"
-                  >
-                    <RefreshCw className="h-4 w-4" aria-hidden />
-                    Refresh
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="!p-3 sm:!p-4">
-                {messagesLoading ? (
-                  <LoadingSkeleton lines={4} />
-                ) : messagesError ? (
-                  <ErrorAlert message={messagesError} />
-                ) : messages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#002D62]/15 bg-[#F8FBFF] px-4 py-5 text-center">
-                    <p className="text-sm font-semibold text-[#002D62]">
-                      No messages yet
-                    </p>
-                    <p className="mt-1 text-sm text-[#42547A]">
-                      Case messages from you and the operations team will appear here.
-                    </p>
-                  </div>
+                {loading ? (
+                  <LoadingSkeleton lines={6} />
+                ) : !serviceCase ? (
+                  <EmptyState
+                    title="Service case not found"
+                    description="This case may no longer be available or may not belong to your account."
+                  />
                 ) : (
-                  <ul className="max-h-[13rem] space-y-3 overflow-y-auto overscroll-y-contain pr-1">
-                    {messages.map((message) => {
-                      const parsed = normalizeMessage(message);
-                      const fromCitizen =
-                        message.message_type === "user_message";
+                  <>
+                    <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#002D62] text-white">
+                          <FileText className="h-4 w-4" aria-hidden />
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="text-base font-bold text-[#002D62]">
+                            Service Case Overview
+                          </h2>
+                          <p className="mt-0.5 break-words text-sm font-medium text-slate-900">
+                            {serviceCase.title}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {needsReply ? (
+                          <Badge tone="awaiting_user_response">Needs your reply</Badge>
+                        ) : null}
+                        <Badge tone={serviceCase.status_code}>
+                          {getServiceCaseStatusLabel(serviceCase.status_code)}
+                        </Badge>
+                        <Badge tone={serviceCase.priority_level}>
+                          {formatBadgeLabel(serviceCase.priority_level)}
+                        </Badge>
+                      </div>
+                    </div>
 
-                      return (
-                        <li
-                          key={message.id}
-                          className={`flex gap-2 ${
-                            fromCitizen ? "justify-end" : "justify-start"
-                          }`}
-                        >
-                          {!fromCitizen ? (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-white">
-                              <Headphones className="h-5 w-5" aria-hidden />
-                            </div>
-                          ) : null}
-                          <div
-                            className={`max-w-[min(78%,36rem)] rounded-2xl px-4 py-3 ${
-                              fromCitizen
-                                ? "bg-[#EFF6FF]"
-                                : "bg-[#F6F9FE]"
-                            }`}
-                          >
-                            <p className="text-sm font-bold text-[#002D62]">
-                              {messageAuthor(message)}
-                            </p>
-                            {parsed.subject &&
-                            parsed.subject !== fallbackSubject(message.message_type) ? (
-                              <p className="mt-1 text-sm font-semibold text-gray-900">
-                                {parsed.subject}
-                              </p>
-                            ) : null}
-                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                              {parsed.body || "No additional message body."}
-                            </p>
-                            <p className="mt-2 text-xs text-[#60739A]">
-                              {formatBangladeshTime(message.created_at)}
-                            </p>
-                          </div>
-                          {fromCitizen ? (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-sm font-bold text-white">
-                              You
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                    <dl className="mt-3 grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
+                      <DetailRow
+                        label="Category"
+                        value={formatBadgeLabel(serviceCase.category_code)}
+                      />
+                      <DetailRow
+                        label="Created"
+                        value={formatBangladeshTime(serviceCase.created_at)}
+                      />
+                      <DetailRow
+                        label="Last Updated"
+                        value={formatBangladeshTime(serviceCase.last_updated)}
+                      />
+                    </dl>
+
+                    {serviceCase.description ? (
+                      <div className="mt-3">
+                        <DetailRow label="Description" value={serviceCase.description} />
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </CardContent>
             </Card>
-          ) : null}
-        </div>
 
-        {!loading && serviceCase ? (
-          <Card className="min-w-0 self-start !overflow-hidden !rounded-2xl !bg-white shadow-sm shadow-[#002D62]/5">
-            <CardHeader className="shrink-0 !px-4 !py-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#002D62] text-white">
-                  <Send className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[#002D62]">
-                    Send a Message
-                  </h2>
-                  <p className="mt-1 text-sm text-[#42547A]">
-                    Share an update or ask a question.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="!p-4">
-              {isTerminal || !canReply ? (
-                <MessageBanner tone="info">
-                  {isEscalated
-                    ? "This service case has been escalated to an emergency incident and cannot receive new replies."
-                    : isTerminal
-                      ? "This service case is final and cannot receive new replies."
-                      : "Replies are not available for this service case status."}
-                </MessageBanner>
-              ) : (
-                <>
-                  {messageError ? (
-                    <div className="mb-3">
-                      <ErrorAlert message={messageError} />
+            {!loading && hasLocation ? (
+              <Card className="flex min-h-[200px] flex-1 flex-col overflow-hidden !rounded-2xl !border-slate-200/80 !bg-white shadow-sm xl:min-h-0">
+                <CardHeader className="!border-b !border-slate-200/80 !px-4 !py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <MapPin className="h-4 w-4 shrink-0 text-[#002D62]" aria-hidden />
+                      <h2 className="text-sm font-semibold text-[#002D62]">Location</h2>
                     </div>
-                  ) : null}
-                  {successMessage ? (
-                    <MessageBanner tone="success" className="mb-3">
-                      {successMessage}
-                    </MessageBanner>
-                  ) : null}
-                  <form
-                    onSubmit={handleSubmitMessage}
-                    className="space-y-3"
-                  >
-                    <div className="shrink-0">
-                      <label
-                        htmlFor="service-case-message-subject"
-                        className="block text-sm font-semibold text-[#002D62]"
-                      >
-                        Subject <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="service-case-message-subject"
-                        value={messageTitle}
-                        onChange={(event) =>
-                          setMessageTitle(event.target.value)
-                        }
-                        className="mt-2 h-12 w-full rounded-xl border border-[#002D62]/20 bg-white px-4 text-sm text-gray-900 placeholder:text-[#7890BD] focus:border-[#0B3FE8] focus:outline-none focus:ring-2 focus:ring-[#0B3FE8]/20"
-                        placeholder="Brief subject"
-                        maxLength={255}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="service-case-message-body"
-                        className="block shrink-0 text-sm font-semibold text-[#002D62]"
-                      >
-                        Message <span className="text-red-600">*</span>
-                      </label>
-                      <textarea
-                        id="service-case-message-body"
-                        value={messageDescription}
-                        onChange={(event) =>
-                          setMessageDescription(event.target.value)
-                        }
-                        className="mt-2 h-44 w-full resize-none rounded-xl border border-[#002D62]/20 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-[#7890BD] focus:border-[#0B3FE8] focus:outline-none focus:ring-2 focus:ring-[#0B3FE8]/20"
-                        placeholder="Type your message here..."
-                        required
-                      />
-                      <p className="mt-2 shrink-0 text-xs text-[#60739A]">
-                        {messageDescription.length} characters
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-3">
-                      <Button
-                        type="submit"
-                        isLoading={sending}
-                        className="rounded-xl"
-                      >
-                        <Send className="h-4 w-4" aria-hidden />
-                        Send Message
-                      </Button>
+                    {locationCoordinates ? (
                       <Button
                         type="button"
                         variant="secondary"
-                        className="rounded-xl"
-                        onClick={() => {
-                          setMessageTitle("");
-                          setMessageDescription("");
-                          setMessageError(null);
-                          setSuccessMessage("");
-                        }}
+                        size="sm"
+                        className="hidden shrink-0 xl:inline-flex"
+                        onClick={() => setDesktopMapOpen((open) => !open)}
+                        aria-expanded={desktopMapOpen}
                       >
-                        Cancel
+                        {desktopMapOpen ? "Hide map" : "View map"}
                       </Button>
+                    ) : null}
+                  </div>
+                </CardHeader>
+                <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain !p-4">
+                  <p className="break-words text-sm text-gray-800">
+                    {formatLocation(serviceCase!.location)}
+                    {serviceCase!.location_text &&
+                    serviceCase!.location_text !== formatLocation(serviceCase!.location)
+                      ? `, ${serviceCase!.location_text}`
+                      : ""}
+                  </p>
+                  {locationCoordinates ? (
+                    <>
+                      <div className="mt-3 xl:hidden">
+                        <ReportedLocationMapPreview
+                          previewKey={serviceCase!.public_uuid}
+                          latitude={locationCoordinates.latitude}
+                          longitude={locationCoordinates.longitude}
+                          addressText={serviceCase!.location?.address_text ?? undefined}
+                          placeName={serviceCase!.location?.place_name ?? undefined}
+                          heightClassName="h-[180px]"
+                        />
+                      </div>
+                      {desktopMapOpen ? (
+                        <div className="mt-3 hidden xl:block">
+                          <ReportedLocationMapPreview
+                            previewKey={serviceCase!.public_uuid}
+                            latitude={locationCoordinates.latitude}
+                            longitude={locationCoordinates.longitude}
+                            addressText={serviceCase!.location?.address_text ?? undefined}
+                            placeName={serviceCase!.location?.place_name ?? undefined}
+                            heightClassName="h-[180px]"
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          {!loading && serviceCase ? (
+            <div className="flex min-h-0 min-w-0 flex-col xl:h-full">
+              <div className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm xl:min-h-0">
+                <div className="shrink-0 border-b border-slate-200/80 px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-slate-900">Conversation</h2>
+                      <p className="mt-0.5 text-xs text-slate-600">
+                        Messages between you and the operations team.
+                      </p>
                     </div>
-                  </form>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void loadMessages()}
+                        disabled={messagesLoading}
+                      >
+                        <RefreshCw className="h-4 w-4" aria-hidden />
+                        Refresh
+                      </Button>
+                      {canReply ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setMessageError(null);
+                            setSendMessageOpen(true);
+                          }}
+                        >
+                          <Send className="h-4 w-4" aria-hidden />
+                          Send Message
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {!canReply ? (
+                    <MessageBanner tone="info" className="mt-2">
+                      {isEscalated
+                        ? "This service case has been escalated to an emergency response and cannot receive new replies."
+                        : isTerminal
+                          ? "This service case is final and cannot receive new replies."
+                          : "Replies are not available for this service case status."}
+                    </MessageBanner>
+                  ) : null}
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3">
+                  {messagesLoading ? (
+                    <LoadingSkeleton lines={4} />
+                  ) : messagesError ? (
+                    <ErrorAlert message={messagesError} />
+                  ) : messages.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#002D62]/15 bg-[#F8FBFF] px-4 py-5 text-center">
+                      <p className="text-sm font-semibold text-[#002D62]">
+                        No messages yet
+                      </p>
+                      <p className="mt-1 text-sm text-[#42547A]">
+                        Case messages from you and the operations team will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {messages.map((message) => {
+                        const parsed = normalizeMessage(message);
+                        const fromCitizen = message.message_type === "user_message";
+
+                        return (
+                          <li
+                            key={message.id}
+                            className={`flex gap-2 ${
+                              fromCitizen ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            {!fromCitizen ? (
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-white">
+                                <Headphones className="h-5 w-5" aria-hidden />
+                              </div>
+                            ) : null}
+                            <div
+                              className={`max-w-[min(78%,36rem)] rounded-2xl px-4 py-3 ${
+                                fromCitizen ? "bg-[#EFF6FF]" : "bg-[#F6F9FE]"
+                              }`}
+                            >
+                              <p className="text-sm font-bold text-[#002D62]">
+                                {messageAuthor(message)}
+                              </p>
+                              {parsed.subject &&
+                              parsed.subject !== fallbackSubject(message.message_type) ? (
+                                <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  {parsed.subject}
+                                </p>
+                              ) : null}
+                              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                                {parsed.body || "No additional message body."}
+                              </p>
+                              <p className="mt-2 text-xs text-[#60739A]">
+                                {formatBangladeshTime(message.created_at)}
+                              </p>
+                            </div>
+                            {fromCitizen ? (
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-sm font-bold text-white">
+                                You
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </CitizenPageContent>
+
+      {sendMessageOpen && canReply ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={closeSendMessageModal}
+          role="presentation"
+        >
+          <form
+            onSubmit={handleSubmitMessage}
+            onClick={(event) => event.stopPropagation()}
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl"
+          >
+            <div className="shrink-0 border-b border-slate-200/80 px-5 py-4">
+              <h2 className="text-lg font-semibold text-[#002D62]">Send a Message</h2>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              {messageError ? <ErrorAlert message={messageError} /> : null}
+              <div>
+                <label
+                  htmlFor="service-case-message-subject"
+                  className="block text-sm font-semibold text-[#002D62]"
+                >
+                  Subject <span className="text-[#B91C1C]">*</span>
+                </label>
+                <input
+                  id="service-case-message-subject"
+                  value={messageTitle}
+                  onChange={(event) => setMessageTitle(event.target.value)}
+                  className="mt-2 h-11 w-full rounded-xl border border-[#002D62]/20 bg-white px-4 text-sm text-gray-900 placeholder:text-[#7890BD] focus:border-[#0B3FE8] focus:outline-none focus:ring-2 focus:ring-[#0B3FE8]/20"
+                  placeholder="Brief subject"
+                  maxLength={255}
+                  required
+                  disabled={sending}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="service-case-message-body"
+                  className="block text-sm font-semibold text-[#002D62]"
+                >
+                  Message <span className="text-[#B91C1C]">*</span>
+                </label>
+                <textarea
+                  id="service-case-message-body"
+                  value={messageDescription}
+                  onChange={(event) => setMessageDescription(event.target.value)}
+                  className="mt-2 min-h-[140px] w-full resize-none rounded-xl border border-[#002D62]/20 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-[#7890BD] focus:border-[#0B3FE8] focus:outline-none focus:ring-2 focus:ring-[#0B3FE8]/20"
+                  placeholder="Type your message here..."
+                  required
+                  disabled={sending}
+                />
+              </div>
+            </div>
+            <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200/80 px-5 py-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={closeSendMessageModal}
+                disabled={sending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={sending} disabled={sending}>
+                <Send className="h-4 w-4" aria-hidden />
+                Send Message
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </DashboardLayout>
   );
 }

@@ -1,71 +1,37 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, PlusCircle, RefreshCw } from "lucide-react";
+import { MapPin, RefreshCw } from "lucide-react";
 import {
+  CitizenPageContent,
   CitizenSectionCard,
-  getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
-import type {
-  LocationPickerSelectionDetails,
-  LocationPickerValue,
-} from "@/components/location/LocationPicker";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
-import {
-  createSavedLocation,
-  getMySavedLocations,
-  saveLocationForCurrentUser,
-} from "@/lib/locations-api";
+import { getMySavedLocations } from "@/lib/locations-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { SavedLocation } from "@/types/locations";
 
-const LocationPicker = dynamic(
-  () =>
-    import("@/components/location/LocationPicker").then((mod) => ({
-      default: mod.LocationPicker,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[210px] animate-pulse rounded-2xl bg-slate-100" />
-    ),
-  },
-);
-
-function formatLocation(location: SavedLocation) {
-  return (
-    location.placeName ||
-    location.addressText ||
-    "Map location selected"
-  );
+function formatLocationName(location: SavedLocation) {
+  return location.placeName || location.addressText || "Saved location";
 }
 
-function getFormLocation(form: { latitude: string; longitude: string }) {
-  if (!form.latitude.trim() || !form.longitude.trim()) {
-    return null;
+function formatLocationAddress(location: SavedLocation) {
+  if (location.addressText && location.placeName && location.addressText !== location.placeName) {
+    return location.addressText;
   }
 
-  const latitude = Number(form.latitude);
-  const longitude = Number(form.longitude);
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return null;
-  }
-
-  return { latitude, longitude };
+  return location.addressText || location.placeName || "-";
 }
 
 function getLocationsByNewest(locations: SavedLocation[]) {
   return [...locations].sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 }
 
@@ -74,34 +40,18 @@ export default function CitizenLocationsPage() {
   const isChecking = useAuthGuard(["citizen"]);
   const [locations, setLocations] = useState<SavedLocation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [message, setMessage] = useState("");
-  const [showAllLocations, setShowAllLocations] = useState(false);
-  const [selectedLocationDetails, setSelectedLocationDetails] =
-    useState<LocationPickerSelectionDetails>({});
-  const [form, setForm] = useState({
-    latitude: "",
-    longitude: "",
-    addressText: "",
-    placeName: "",
-  });
 
   const loadLocations = useCallback(async () => {
     setLoading(true);
     setLoadError("");
     try {
       const data = await getMySavedLocations();
-      const nextLocations = data.locations;
-      setLocations(nextLocations);
-      return nextLocations;
+      setLocations(data.locations);
     } catch (err) {
       console.error("Failed to load saved locations", err);
-      setLoadError(
-        "We couldn’t load your saved locations. You can still add a location manually.",
-      );
-      return [];
+      setLoadError("We couldn’t load your saved locations. Please try again.");
+      setLocations([]);
     } finally {
       setLoading(false);
     }
@@ -118,266 +68,24 @@ export default function CitizenLocationsPage() {
     router.push("/");
   };
 
-  const handleLocationChange = useCallback(
-    (
-      location: LocationPickerValue,
-      details?: LocationPickerSelectionDetails,
-    ) => {
-      setSelectedLocationDetails(details ?? {});
-      setForm((current) => {
-        const latitude = location.latitude.toString();
-        const longitude = location.longitude.toString();
-        const locationChanged =
-          current.latitude !== latitude || current.longitude !== longitude;
-
-        return {
-          ...current,
-          latitude,
-          longitude,
-          addressText: locationChanged ? "" : current.addressText,
-          placeName: locationChanged ? "" : current.placeName,
-        };
-      });
-      setError("");
-      setMessage("");
-    },
-    [],
-  );
-
-  async function handleSaveLocation() {
-    setError("");
-    setMessage("");
-
-    const selectedLocation = getFormLocation(form);
-
-    if (!selectedLocation) {
-      setError("Search for a place or click the map to choose a location.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const created = await createSavedLocation({
-        latitude: selectedLocation.latitude,
-        longitude: selectedLocation.longitude,
-        address_text: form.addressText.trim() || undefined,
-        place_name: form.placeName.trim() || undefined,
-        source: "user_shared",
-      });
-      const saved = await saveLocationForCurrentUser(
-        created.location.publicUuid,
-      );
-
-      setForm({ latitude: "", longitude: "", addressText: "", placeName: "" });
-      setSelectedLocationDetails({});
-      setMessage(saved.message || "Location saved.");
-      await loadLocations();
-    } catch (err) {
-      console.error("Failed to save location", err);
-      setError(
-        getCitizenFriendlyError(
-          err,
-          "We could not save this location right now. Please try again.",
-        ),
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (isChecking) {
     return <PageLoading label="Loading saved locations" />;
   }
 
-  const formSelectedLocation = getFormLocation(form);
-  const selectedLocationLabel =
-    form.addressText.trim() ||
-    selectedLocationDetails.addressText?.trim() ||
-    form.placeName.trim() ||
-    selectedLocationDetails.placeName?.trim() ||
-    "Selected map point";
-  const selectedPlaceName =
-    form.placeName.trim() || selectedLocationDetails.placeName?.trim() || "";
-  const showDistinctPlaceName =
-    Boolean(selectedPlaceName) && selectedPlaceName !== selectedLocationLabel;
   const locationsByNewest = getLocationsByNewest(locations);
-  const displayedLocations = showAllLocations
-    ? locationsByNewest
-    : locationsByNewest.slice(0, 5);
 
   return (
     <DashboardLayout
       title="Saved Locations"
-      subtitle="Manage your saved locations for faster reporting."
+      subtitle="Places you have saved for faster reporting."
       onLogout={handleLogout}
     >
-      <div className="space-y-3">
-       <div className="grid items-start gap-3 xl:grid-cols-[minmax(420px,1.15fr)_minmax(340px,0.85fr)]">
+      <CitizenPageContent>
         <CitizenSectionCard
-          title="Add Location"
-          subtitle="Search or place a marker for the location you want to save."
-          icon={<PlusCircle className="h-5 w-5" aria-hidden />}
-          className="self-start [&_header]:px-4 [&_header]:py-3"
-          contentClassName="!p-4 space-y-3"
-        >
-            {error && <ErrorAlert message={error} />}
-            {message && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                {message}
-              </div>
-            )}
-            <div className="flex flex-col gap-3">
-              <LocationPicker
-                value={formSelectedLocation}
-                onChange={handleLocationChange}
-                selectedAddress={form.addressText}
-                selectedPlaceName={form.placeName}
-                syncSearchQueryToSelectedLabel={false}
-                embedded
-                embeddedCompact
-                searchPlaceholder="Search address, place, or landmark..."
-                mapClassName="h-[clamp(210px,30vh,250px)] w-full"
-                mapWrapperClassName="w-full"
-                embeddedMapSectionClassName="mt-3 w-full shrink-0"
-                showSelectionSummary={false}
-              />
-
-              <div
-                className="shrink-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
-                aria-live="polite"
-              >
-                {formSelectedLocation ? (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-900">
-                      Selected location
-                    </p>
-                    <p className="text-sm font-medium leading-snug text-slate-900">
-                      {selectedLocationLabel}
-                    </p>
-                    {showDistinctPlaceName ? (
-                      <p className="text-xs text-slate-500">
-                        {selectedPlaceName}
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm({
-                          latitude: "",
-                          longitude: "",
-                          addressText: "",
-                          placeName: "",
-                        });
-                        setSelectedLocationDetails({});
-                        setError("");
-                        setMessage("");
-                      }}
-                      disabled={saving}
-                      className="text-xs font-medium text-[#006747] underline-offset-2 transition hover:text-[#002D62] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006747]/30 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                      Clear Location
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-semibold text-slate-900">
-                      No map point selected
-                    </p>
-                    <p className="text-xs leading-snug text-slate-600">
-                      Choose a map point before saving this location.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-3">
-                <p className="text-xs font-medium text-slate-700">
-                  Optional location details
-                </p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="saved-location-address"
-                      className="block text-xs font-semibold text-slate-700"
-                    >
-                      Location Name or Address
-                    </label>
-                    <input
-                      id="saved-location-address"
-                      value={form.addressText}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          addressText: event.target.value,
-                        }))
-                      }
-                      disabled={saving}
-                      placeholder="Building, road, or landmark description"
-                      className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35 disabled:bg-slate-50"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="saved-location-place"
-                      className="block text-xs font-semibold text-slate-700"
-                    >
-                      Place Name
-                    </label>
-                    <input
-                      id="saved-location-place"
-                      value={form.placeName}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          placeName: event.target.value,
-                        }))
-                      }
-                      disabled={saving}
-                      placeholder="Optional landmark or place name"
-                      className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35 disabled:bg-slate-50"
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3">
-                  <Button
-                    type="button"
-                    isLoading={saving}
-                    onClick={() => void handleSaveLocation()}
-                    disabled={!formSelectedLocation}
-                    size="sm"
-                    className="whitespace-nowrap"
-                  >
-                    Save Location
-                  </Button>
-                </div>
-              </div>
-            </div>
-        </CitizenSectionCard>
-
-        <CitizenSectionCard
-          title="My Recent Locations"
-          subtitle="Saved places are listed newest first."
+          title="My Saved Locations"
           icon={<MapPin className="h-5 w-5" aria-hidden />}
-          className="self-start [&_header]:px-4 [&_header]:py-3 xl:flex xl:max-h-[calc(100dvh-9rem)] xl:min-h-0 xl:flex-col"
-          contentClassName="!p-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col"
           headerAction={
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {!loading && locations.length > 0 ? (
-                <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#002D62]">
-                  Showing {displayedLocations.length} of {locations.length}
-                </span>
-              ) : null}
-              {!loading && locations.length > 5 ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 px-3"
-                  onClick={() => setShowAllLocations((current) => !current)}
-                >
-                  {showAllLocations ? "Show Recent" : "View All"}
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 variant="secondary"
@@ -393,73 +101,61 @@ export default function CitizenLocationsPage() {
           }
         >
           {loading ? (
-              <div className="flex min-h-48 items-center justify-center px-6 py-10 text-center text-sm text-gray-500">
-                Loading locations...
-              </div>
-            ) : loadError ? (
-              <div className="flex min-h-48 flex-col justify-center space-y-3 px-6 py-6">
-                <ErrorAlert message={loadError} />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void loadLocations()}
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : locations.length === 0 ? (
-              <div className="flex min-h-48 items-center p-6">
-                <EmptyState
-                  title="No saved locations yet."
-                  description="Add your home, workplace, school, or another place you report from often."
-                  icon={<MapPin className="h-6 w-6" aria-hidden />}
-                  className="w-full"
-                />
-              </div>
-            ) : (
-              <ul
-                className={`space-y-3 p-4 ${
-                  showAllLocations
-                    ? "max-h-[34rem] overflow-y-auto overscroll-y-contain"
-                    : ""
-                } xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain`}
+            <p className="text-sm text-[#42547A]">Loading saved locations...</p>
+          ) : loadError ? (
+            <div className="space-y-3">
+              <ErrorAlert message={loadError} />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void loadLocations()}
               >
-                {displayedLocations.map((location) => (
-                  <li
-                    key={location.publicUuid}
-                    className="rounded-2xl border border-[#002D62]/10 bg-white p-4 shadow-sm"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold text-gray-900">
-                          {formatLocation(location)}
-                        </h3>
-                        <p className="mt-1 line-clamp-1 text-xs text-[#42547A]">
-                          {location.addressText || location.placeName || "-"}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Saved {formatBangladeshTime(location.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 sm:justify-end">
-                        <a
-                          href={`https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=16/${location.latitude}/${location.longitude}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center whitespace-nowrap rounded-full border border-[#002D62]/20 bg-[#E8F2FF] px-3 text-xs font-semibold text-[#002D62] shadow-sm transition-colors hover:border-[#002D62]/30 hover:bg-[#DCEBFF]"
-                        >
-                          Open map
-                        </a>
-                      </div>
+                Retry
+              </Button>
+            </div>
+          ) : locations.length === 0 ? (
+            <EmptyState
+              title="No saved locations yet."
+              description="Locations you use while reporting incidents will appear here."
+              icon={<MapPin className="h-6 w-6" aria-hidden />}
+            />
+          ) : (
+            <ul className="space-y-3">
+              {locationsByNewest.map((location) => (
+                <li
+                  key={location.publicUuid}
+                  className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                >
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-slate-900">
+                        {formatLocationName(location)}
+                      </h3>
+                      <p className="mt-1 line-clamp-2 text-sm text-[#42547A]">
+                        {formatLocationAddress(location)}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Saved {formatBangladeshTime(location.createdAt)}
+                      </p>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <div className="flex shrink-0 sm:justify-end">
+                      <a
+                        href={`https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=16/${location.latitude}/${location.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-full border border-[#002D62]/20 bg-[#EFF6FF] px-4 text-xs font-semibold text-[#002D62] transition-colors hover:border-[#002D62]/30 hover:bg-[#DCEBFF]"
+                      >
+                        Open map
+                      </a>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CitizenSectionCard>
-        </div>
-      </div>
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }

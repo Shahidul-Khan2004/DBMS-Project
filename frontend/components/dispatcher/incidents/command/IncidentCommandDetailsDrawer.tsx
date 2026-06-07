@@ -11,6 +11,7 @@ export function IncidentCommandDetailsDrawer({
   detail,
   sourceLabel,
   canEditLocation = false,
+  canViewLocationHistory = false,
   onEditLocation,
   onViewLocationHistory,
 }: {
@@ -19,6 +20,7 @@ export function IncidentCommandDetailsDrawer({
   detail: IncidentDetailResponse;
   sourceLabel: string;
   canEditLocation?: boolean;
+  canViewLocationHistory?: boolean;
   onEditLocation?: () => void;
   onViewLocationHistory?: () => void;
 }) {
@@ -77,6 +79,7 @@ export function IncidentCommandDetailsDrawer({
             detail={detail}
             sourceLabel={sourceLabel}
             canEditLocation={canEditLocation}
+            canViewLocationHistory={canViewLocationHistory}
             onEditLocation={onEditLocation}
             onViewLocationHistory={onViewLocationHistory}
           />

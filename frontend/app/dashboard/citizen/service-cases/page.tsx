@@ -6,6 +6,7 @@ import { ArrowRight, ClipboardCheck } from "lucide-react";
 import {
   CitizenLocationPill,
   CitizenMetaItem,
+  CitizenPageContent,
   CitizenRecordCard,
   CitizenSectionCard,
   getCitizenFriendlyError,
@@ -90,12 +91,12 @@ export default function CitizenServiceCasesPage() {
       subtitle="Follow up on non-emergency cases created from your reports."
       onLogout={handleLogout}
     >
-      <div className="space-y-3">
+      <CitizenPageContent className="flex min-h-0 flex-1 flex-col">
         <CitizenSectionCard
           title="Your Service Cases"
           subtitle="Service cases opened from your reports will appear here."
           icon={<ClipboardCheck className="h-5 w-5" aria-hidden />}
-          className="flex max-h-[calc(100dvh-11rem)] min-h-[22rem] flex-col"
+          className="flex min-h-[22rem] flex-col lg:max-h-[calc(100dvh-13rem)]"
           contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
         >
             {isLoading && (
@@ -172,6 +173,7 @@ export default function CitizenServiceCasesPage() {
                       <Button
                         type="button"
                         size="sm"
+                        className="w-full justify-between sm:w-auto sm:justify-center"
                         onClick={() =>
                           router.push(
                             `/dashboard/citizen/service-cases/${serviceCase.public_uuid}`,
@@ -187,7 +189,7 @@ export default function CitizenServiceCasesPage() {
               </div>
             )}
         </CitizenSectionCard>
-      </div>
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }

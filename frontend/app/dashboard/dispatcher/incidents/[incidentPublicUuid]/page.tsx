@@ -213,7 +213,9 @@ export default function IncidentCommandPage() {
     () => (detail ? getLocationSourceReportUuid(detail) : null),
     [detail],
   );
-  const canEditLocation = Boolean(locationSourceReportUuid);
+  const canViewLocationHistory = Boolean(locationSourceReportUuid);
+  const canEditLocation =
+    canViewLocationHistory && !isTerminalIncident(detail?.status);
   const locationEditItem = useMemo(
     () => (detail ? mapIncidentDetailToLocationEditItem(detail) : null),
     [detail],
@@ -257,9 +259,9 @@ export default function IncidentCommandPage() {
   }, [canEditLocation]);
 
   const handleViewLocationHistory = useCallback(() => {
-    if (!canEditLocation) return;
+    if (!canViewLocationHistory) return;
     setHistoryDialogOpen(true);
-  }, [canEditLocation]);
+  }, [canViewLocationHistory]);
 
   const refreshAfterLocationUpdate = useCallback(() => {
     void refreshDetail();
@@ -372,6 +374,7 @@ export default function IncidentCommandPage() {
             detail={detail}
             sourceLabel={sourceLabel}
             canEditLocation={canEditLocation}
+            canViewLocationHistory={canViewLocationHistory}
             onEditLocation={handleEditLocation}
             onViewLocationHistory={handleViewLocationHistory}
           />
