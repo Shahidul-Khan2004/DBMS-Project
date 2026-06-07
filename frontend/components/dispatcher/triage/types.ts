@@ -42,9 +42,13 @@ export type RouteMode =
   | "service_case"
   | "emergency_incident"
   | "existing_incident"
+  | "duplicate"
+  | "false_report"
   | "success_service_case"
   | "success_emergency_incident"
-  | "success_existing_incident";
+  | "success_existing_incident"
+  | "success_duplicate"
+  | "success_false_report";
 
 export type ActiveIncidentOption = {
   id: string;
@@ -81,6 +85,10 @@ export type LinkDraft = {
   note: string;
 };
 
+export type DismissDraft = {
+  note: string;
+};
+
 export type RouteResult =
   | {
       kind: "service_case";
@@ -104,4 +112,10 @@ export type RouteResult =
       incidentCode: string;
       incidentTitle: string;
       linkType: LinkType;
+    }
+  | {
+      kind: "duplicate" | "false_report";
+      reportCode: string;
+      intakeStatus: string;
+      note?: string;
     };

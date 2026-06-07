@@ -6,8 +6,13 @@ import { useForm } from "react-hook-form";
 import { loginSchema, LoginInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { MessageBanner } from "@/components/ui/StatusState";
 import { ApiError, publicPost } from "@/lib/api";
+import {
+  formatLoginError,
+  formatLoginFallbackMessage,
+  type LoginErrorDisplay,
+} from "@/lib/login-errors";
 import type { LoginResponse } from "@/types/auth";
 
 interface LoginFormProps {
@@ -48,7 +53,8 @@ function loginInputClass(hasError: boolean) {
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<LoginErrorDisplay | null>(null);
+  const [genericError, setGenericError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [showPassword, setShowPassword] = useState(false);
 
@@ -77,12 +83,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       }
 
       setFieldErrors(nextErrors);
-      setApiError(null);
+      setLoginError(null);
+      setGenericError(null);
       return;
     }
 
     setIsLoading(true);
-    setApiError(null);
+    setLoginError(null);
+    setGenericError(null);
     setFieldErrors({});
 
     try {
@@ -100,11 +108,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           setFieldErrors(backendFieldErrors);
           return;
         }
+
+        const formatted = formatLoginError(err);
+        if (formatted) {
+          setLoginError(formatted);
+          return;
+        }
       }
 
-      setApiError(
-        err instanceof Error ? err.message : "Login failed. Please try again.",
-      );
+      setGenericError(formatLoginFallbackMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -129,9 +141,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {apiError && (
-        <ErrorAlert message={apiError} />
-      )}
+      {loginError ? (
+        <MessageBanner tone="error" title={loginError.title} description={loginError.description}>
+          {loginError.details.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {loginError.details.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          ) : null}
+        </MessageBanner>
+      ) : null}
+
+      {genericError ? (
+        <MessageBanner tone="error" title="Something went wrong" description={genericError} />
+      ) : null}
 
       <Input
         label="Email Address"

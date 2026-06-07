@@ -20,6 +20,7 @@ import {
 } from "@/components/dispatcher/triage/triageReviewRouteUtils";
 import type {
   ActiveIncidentOption,
+  DismissDraft,
   EmergencyDraft,
   IntakeQueueItem,
   LinkDraft,
@@ -30,6 +31,7 @@ import type {
 import { tryLinkIncidentToDisaster } from "@/lib/disaster-incident-link";
 import {
   classifyIntakeAsServiceCase,
+  dismissIntakeReport,
   fetchIntakeReportDetail,
   getOperationsIncidents,
   linkIntakeToIncident,
@@ -37,6 +39,8 @@ import {
   mapApiErrorToTriageMessage,
   promoteIntakeToEmergencyIncident,
 } from "@/lib/operations-intake-triage";
+import { fetchIntakeReporterRisk } from "@/lib/reporter-risk-api";
+import type { ReporterRiskSummary } from "@/types/reporter-risk";
 
 export type UseTriageReviewRouteOptions = {
   reportId: string | null;
@@ -69,11 +73,12 @@ export function useTriageReviewRoute({
     description: "",
   });
   const [linkDraft, setLinkDraft] = useState<LinkDraft>(() => createLinkDraft());
+  const [dismissDraft, setDismissDraft] = useState<DismissDraft>({ note: "" });
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [handoffItem, setHandoffItem] = useState<IntakeQueueItem | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [submittingRoute, setSubmittingRoute] = useState<
-    "service_case" | "emergency" | "link" | null
+    "service_case" | "emergency" | "link" | "duplicate" | "false_report" | null
   >(null);
   const [activeIncidents, setActiveIncidents] = useState<ActiveIncidentOption[]>(
     [],
@@ -85,6 +90,11 @@ export function useTriageReviewRoute({
   const [selectedDisasterPublicUuid, setSelectedDisasterPublicUuid] = useState<
     string | null
   >(null);
+  const [reporterRisk, setReporterRisk] = useState<ReporterRiskSummary | null>(
+    null,
+  );
+  const [reporterRiskLoading, setReporterRiskLoading] = useState(false);
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
 
   const clearRouteMutationState = useCallback(() => {
     setRouteError(null);
@@ -108,11 +118,15 @@ export function useTriageReviewRoute({
     setServiceCaseDraft({ title: "", description: "", priority: "medium" });
     setEmergencyDraft({ severity: "high", title: "", description: "" });
     setLinkDraft(createLinkDraft());
+    setDismissDraft({ note: "" });
     setActiveIncidents([]);
     setIncidentsError(null);
     setLocationDialogOpen(false);
     setHistoryDialogOpen(false);
     setSelectedDisasterPublicUuid(null);
+    setReporterRisk(null);
+    setReporterRiskLoading(false);
+    setVerificationModalOpen(false);
   }, [clearRouteMutationState]);
 
   const loadDetail = useCallback(
@@ -125,9 +139,17 @@ export function useTriageReviewRoute({
 
       setDetailLoading(true);
       setDetailError(null);
+      setReporterRiskLoading(true);
 
       try {
-        const report = await fetchIntakeReportDetail(reportPublicUuid);
+        const [report, riskData] = await Promise.all([
+          fetchIntakeReportDetail(reportPublicUuid),
+          fetchIntakeReporterRisk(reportPublicUuid).catch(() => ({
+            reporter_risk: null,
+            recent_verifications: [],
+          })),
+        ]);
+        setReporterRisk(riskData.reporter_risk);
         const mapped = mapOperationsIntakeToQueueItem(report);
         if (!mapped) {
           setDetailError("This intake report is no longer pending triage.");
@@ -142,8 +164,10 @@ export function useTriageReviewRoute({
         }
         setDetailError(mapApiErrorToTriageMessage(err, "detail"));
         setSelectedDetail(null);
+        setReporterRisk(null);
       } finally {
         setDetailLoading(false);
+        setReporterRiskLoading(false);
       }
     },
     [applyDraftsForItem],
@@ -189,8 +213,10 @@ export function useTriageReviewRoute({
         setServiceCaseDraft(createServiceCaseDraft(selectedDetail));
       } else if (mode === "emergency_incident") {
         setEmergencyDraft(createEmergencyDraft(selectedDetail));
-      } else {
+      } else if (mode === "existing_incident") {
         setLinkDraft(createLinkDraft());
+      } else {
+        setDismissDraft({ note: "" });
       }
     },
     [selectedDetail],
@@ -199,6 +225,7 @@ export function useTriageReviewRoute({
   const handleBackToOptions = useCallback(() => {
     setRouteMode("options");
     setRouteError(null);
+    setDismissDraft({ note: "" });
     if (selectedDetail) {
       applyDraftsForItem(selectedDetail);
     }
@@ -400,6 +427,46 @@ export function useTriageReviewRoute({
     selectedDisasterPublicUuid,
   ]);
 
+  const handleSubmitDismiss = useCallback(async () => {
+    if (!selectedDetail || !reportId) return;
+    if (routeMode !== "duplicate" && routeMode !== "false_report") return;
+
+    setSubmittingRoute(routeMode);
+    setRouteError(null);
+
+    try {
+      const data = await dismissIntakeReport(reportId, {
+        disposition: routeMode,
+        note: dismissDraft.note.trim() || undefined,
+      });
+
+      const intakeReport = data.intake_report;
+      const successMode =
+        routeMode === "duplicate" ? "success_duplicate" : "success_false_report";
+
+      await completeRouteSuccess(successMode, {
+        kind: routeMode,
+        reportCode:
+          intakeReport?.report_code?.trim() || selectedDetail.reportCode,
+        intakeStatus: intakeReport?.intake_status?.trim() || routeMode,
+        note: dismissDraft.note.trim() || undefined,
+      });
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Intake dismiss failed", err);
+      }
+      setRouteError(mapApiErrorToRouteMessage(err, routeMode));
+    } finally {
+      setSubmittingRoute(null);
+    }
+  }, [
+    completeRouteSuccess,
+    dismissDraft.note,
+    reportId,
+    routeMode,
+    selectedDetail,
+  ]);
+
   const clearSuccessAndResetOptions = useCallback(() => {
     clearRouteMutationState();
     setRouteMode("options");
@@ -470,6 +537,7 @@ export function useTriageReviewRoute({
     routeResult,
     routeError,
     submittingRoute,
+    dismissDraft,
     activeIncidents,
     incidentsLoading,
     incidentsError,
@@ -482,6 +550,7 @@ export function useTriageReviewRoute({
     setSelectedDisasterPublicUuid,
     setEmergencyDraft,
     setLinkDraft,
+    setDismissDraft,
     setLocationDialogOpen,
     setHistoryDialogOpen,
     loadActiveIncidents,
@@ -491,7 +560,13 @@ export function useTriageReviewRoute({
     handleSubmitServiceCase,
     handleSubmitEmergency,
     handleSubmitLink,
+    handleSubmitDismiss,
     clearSuccessAndResetOptions,
     handleOpenDetail,
+    reporterRisk,
+    reporterRiskLoading,
+    verificationModalOpen,
+    setVerificationModalOpen,
+    setReporterRisk,
   };
 }
