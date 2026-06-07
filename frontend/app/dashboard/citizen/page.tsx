@@ -5,10 +5,20 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, ClipboardCheck, FileText } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ClipboardCheck,
+  FileText,
+  MapPin,
+  Shield,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import {
+  CitizenPageContent,
+  ReportIncidentLink,
+} from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PageLoading } from "@/components/ui/StatusState";
@@ -29,6 +39,7 @@ import {
   isPendingReport,
   mapServiceCasesByIntakeUuid,
 } from "@/lib/report-status";
+import { LANDING_HERO_OVERLAY_STYLE } from "@/lib/landing-hero-overlay";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { LoginResponse } from "@/types/auth";
 import type { CitizenIncident } from "@/types/citizen-incident";
@@ -184,7 +195,7 @@ function getLatestReport(reports: IntakeReport[]): LatestItem | null {
   if (!latest) return null;
 
   return {
-    primary: latest.report_code,
+    primary: latest.summary,
     secondary: latest.summary,
     occurredAt: latest.reported_at ?? latest.created_at,
   };
@@ -202,8 +213,8 @@ function getLatestIncident(incidents: CitizenIncident[]): LatestItem | null {
   if (!latest) return null;
 
   return {
-    primary: latest.incident_code,
-    secondary: latest.title ?? latest.description ?? "Linked emergency incident",
+    primary: latest.title ?? latest.description ?? "Emergency response",
+    secondary: latest.title ?? latest.description ?? "Emergency response",
     occurredAt: latest.last_updated ?? latest.created_at,
   };
 }
@@ -220,7 +231,7 @@ function getLatestServiceCase(serviceCases: CitizenServiceCase[]): LatestItem | 
   if (!latest) return null;
 
   return {
-    primary: latest.case_code,
+    primary: latest.title,
     secondary: latest.title,
     occurredAt: latest.last_updated ?? latest.created_at,
   };
@@ -262,11 +273,11 @@ function DashboardMetric({
       : "text-[#002D62]";
 
   return (
-    <div className="min-w-0 px-4 py-1 text-center">
-      <p className="text-sm font-medium text-[#1F3768]">
-        {label}
+    <div className="min-w-0 px-2 py-1 text-center sm:px-4">
+      <p className="text-xs font-medium text-[#1F3768] sm:text-sm">{label}</p>
+      <p className={`mt-1 text-2xl font-bold leading-none sm:mt-2 sm:text-3xl ${toneClass}`}>
+        {value}
       </p>
-      <p className={`mt-2 text-3xl font-bold leading-none ${toneClass}`}>{value}</p>
     </div>
   );
 }
@@ -295,64 +306,62 @@ function DashboardSummaryCard({
   error?: string;
 }) {
   return (
-    <Card className="flex min-h-[270px] flex-col overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-sm shadow-[#002D62]/8">
-      <CardHeader className="!border-b-0 !px-5 !pb-3 !pt-4">
-        <div className="flex items-center gap-4">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
-            <Icon className="h-6 w-6" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold text-[#002D62]">{title}</h2>
-            <p className="mt-1 text-sm leading-5 text-[#42547A]">{description}</p>
-          </div>
+    <div className="flex min-h-[240px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:min-h-[260px] sm:p-6">
+      <div className="flex items-start gap-4">
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClassName}`}
+        >
+          <Icon className="h-6 w-6" aria-hidden />
         </div>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col !px-5 !pb-4 !pt-0">
-        {error ? (
-          <div className="mb-4">
-            <ErrorAlert message={error} />
-          </div>
-        ) : null}
-        <div className="border-y border-slate-200 py-3">
-          <div className="grid grid-cols-3">
-            {items.map((item, index) => (
-              <div
-                key={item.label}
-                className={index > 0 ? "border-l border-slate-200" : ""}
-              >
-                <DashboardMetric
-                  label={item.label}
-                  value={item.value}
-                  tone={item.tone}
-                />
-              </div>
-            ))}
-          </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-[#002D62]">{title}</h2>
+          <p className="mt-1 text-sm leading-5 text-[#42547A]">{description}</p>
         </div>
+      </div>
 
-        <div className="mt-4 flex flex-1 flex-col">
-          <p className="text-sm font-semibold text-[#42547A]">
-            {latestLabel}
-          </p>
-          {latestItem ? (
-            <div className="mt-2 min-w-0">
-              <p className="truncate text-base font-bold text-slate-950">
-                {latestItem.secondary || latestItem.primary}
-              </p>
-              {latestItem.occurredAt ? (
-                <p className="mt-2 text-sm text-[#42547A]">
-                  {formatLatestTime(latestItem.occurredAt)}
-                </p>
-              ) : null}
+      {error ? (
+        <div className="mt-4">
+          <ErrorAlert message={error} />
+        </div>
+      ) : null}
+
+      <div className="mt-5 border-y border-slate-200 py-4">
+        <div className="grid grid-cols-3">
+          {items.map((item, index) => (
+            <div
+              key={item.label}
+              className={index > 0 ? "border-l border-slate-200" : ""}
+            >
+              <DashboardMetric
+                label={item.label}
+                value={item.value}
+                tone={item.tone}
+              />
             </div>
-          ) : (
-            <p className="mt-2 text-sm leading-6 text-[#42547A]">{emptyState}</p>
-          )}
+          ))}
         </div>
+      </div>
 
-        <div className="mt-4">{action}</div>
-      </CardContent>
-    </Card>
+      <div className="mt-4 flex flex-1 flex-col">
+        <p className="text-sm font-semibold text-[#42547A]">{latestLabel}</p>
+        {latestItem ? (
+          <div className="mt-2 min-w-0">
+            <p className="line-clamp-2 text-base font-bold text-slate-950">
+              {latestItem.secondary || latestItem.primary}
+            </p>
+            {latestItem.occurredAt ? (
+              <p className="mt-2 text-sm text-[#42547A]">
+                {formatLatestTime(latestItem.occurredAt)}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm leading-6 text-[#42547A]">{emptyState}</p>
+        )}
+      </div>
+
+      <div className="mt-5">{action}</div>
+    </div>
   );
 }
 
@@ -360,33 +369,212 @@ function WelcomeCard({ userName }: { userName?: string | null }) {
   const welcomeTitle = userName ? `Welcome, ${userName}` : "Welcome back";
 
   return (
-    <Card className="overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-lg shadow-[#002D62]/8">
-      <CardContent className="!p-0">
-        <div className="relative min-h-[135px] overflow-hidden">
-          <Image
-            src="/images/citizen-dashboard-hero-clean.webp"
-            alt="Bangladesh disaster response team assisting flood-affected citizens"
-            fill
-            sizes="100vw"
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-[#002D62]/30 mix-blend-multiply" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff_0%,rgba(255,255,255,0.94)_24%,rgba(255,255,255,0.42)_42%,rgba(255,255,255,0)_58%)]" />
-          <div className="relative flex min-h-[135px] max-w-md flex-col justify-center px-6 py-4 sm:px-9">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="relative min-h-[200px] overflow-hidden sm:min-h-[220px] lg:min-h-[240px]">
+        <Image
+          src="/images/citizen-dashboard-hero-clean.webp"
+          alt="Bangladesh disaster response team assisting flood-affected citizens"
+          fill
+          sizes="(max-width: 1600px) 100vw, 1600px"
+          className="object-cover"
+          priority
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden
+          style={LANDING_HERO_OVERLAY_STYLE}
+        />
+        <div className="relative flex min-h-[200px] items-center px-4 py-6 sm:min-h-[220px] sm:px-8 sm:py-8 lg:min-h-[240px] lg:px-10">
+          <div className="w-full max-w-[620px] rounded-2xl border border-white/20 bg-[#002D62]/95 p-6 shadow-xl sm:p-8 lg:p-10">
             <h1
-              className="max-w-[22rem] truncate text-2xl font-bold text-[#002D62] sm:text-3xl"
+              className="truncate text-2xl font-bold text-white sm:text-3xl"
               title={welcomeTitle}
             >
               {welcomeTitle}
             </h1>
-            <p className="mt-3 max-w-xs text-base leading-6 text-[#42547A]">
-              Track your reports, incidents, and service cases from one place.
+            <p className="mt-3 text-base leading-6 text-white/90">
+              Track your reports, emergency incidents, and service cases from one
+              place.
             </p>
+            <div className="mt-5">
+              <ReportIncidentLink className="w-fit" />
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+interface RecentActivityItem {
+  id: string;
+  label: string;
+  title: string;
+  time: string | null;
+  href: string;
+}
+
+function buildRecentActivity(
+  reports: IntakeReport[],
+  incidents: CitizenIncident[],
+  serviceCases: CitizenServiceCase[],
+): RecentActivityItem[] {
+  const items: RecentActivityItem[] = [];
+
+  for (const report of reports.slice(0, 3)) {
+    items.push({
+      id: `report-${report.public_uuid}`,
+      label: "Report",
+      title: report.summary,
+      time: report.reported_at ?? report.created_at,
+      href: `/dashboard/citizen/reports/${report.public_uuid}`,
+    });
+  }
+
+  for (const incident of incidents.slice(0, 3)) {
+    items.push({
+      id: `incident-${incident.public_uuid}`,
+      label: "Emergency response",
+      title: incident.title ?? incident.description ?? "Emergency response update",
+      time: incident.last_updated ?? incident.reported_at ?? incident.created_at,
+      href: `/dashboard/citizen/incidents/${incident.public_uuid}`,
+    });
+  }
+
+  for (const serviceCase of serviceCases.slice(0, 3)) {
+    items.push({
+      id: `case-${serviceCase.public_uuid}`,
+      label: "Service case",
+      title: serviceCase.title,
+      time: serviceCase.last_updated ?? serviceCase.created_at,
+      href: `/dashboard/citizen/service-cases/${serviceCase.public_uuid}`,
+    });
+  }
+
+  return items
+    .sort((a, b) => getTimestamp(b.time) - getTimestamp(a.time))
+    .slice(0, 6);
+}
+
+function RecentActivityPanel({
+  items,
+  onNavigate,
+}: {
+  items: RecentActivityItem[];
+  onNavigate: (href: string) => void;
+}) {
+  return (
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-slate-200/80 px-4 py-4 sm:px-6">
+        <h2 className="text-lg font-bold text-[#002D62]">Recent Activity</h2>
+        <p className="mt-1 text-sm text-[#42547A]">
+          Latest updates across your reports and responses.
+        </p>
+      </div>
+      <div className="max-h-[22rem] overflow-y-auto overscroll-y-contain px-4 py-4 sm:px-6">
+        {items.length === 0 ? (
+          <p className="text-sm text-[#42547A]">
+            Activity from your reports, emergency responses, and service cases
+            will appear here.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(item.href)}
+                  className="flex w-full min-w-0 items-start gap-3 rounded-xl border border-slate-200/80 bg-[#F6F9FE] px-4 py-3 text-left transition-colors hover:border-[#002D62]/20 hover:bg-[#EFF6FF]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#42547A]">
+                      {item.label}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900">
+                      {item.title}
+                    </p>
+                    {item.time ? (
+                      <p className="mt-1 text-xs text-[#60739A]">
+                        {formatLatestTime(item.time)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <ArrowRight
+                    className="mt-1 h-4 w-4 shrink-0 text-[#0B3FE8]"
+                    aria-hidden
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuickActionsPanel({ onNavigate }: { onNavigate: (href: string) => void }) {
+  const actions = [
+    {
+      label: "Report New Incident",
+      href: "/dashboard/citizen/report-new",
+      variant: "emergency" as const,
+    },
+    {
+      label: "View My Reports",
+      href: "/dashboard/citizen/reports",
+      variant: "outline" as const,
+    },
+    {
+      label: "Manage Locations",
+      href: "/dashboard/citizen/locations",
+      variant: "outline" as const,
+    },
+    {
+      label: "View Safety & National Disaster Guidelines",
+      href: "/#national-disaster",
+      variant: "outline" as const,
+    },
+  ];
+
+  return (
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-slate-200/80 px-4 py-4 sm:px-6">
+        <h2 className="text-lg font-bold text-[#002D62]">Quick Actions</h2>
+        <p className="mt-1 text-sm text-[#42547A]">
+          Common tasks to report, review, and stay prepared.
+        </p>
+      </div>
+      <div className="space-y-3 px-4 py-5 sm:px-6">
+        {actions.map((action) => (
+          <Button
+            key={action.href}
+            type="button"
+            variant={action.variant}
+            className="h-auto min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left"
+            onClick={() => {
+              if (action.href.includes("#")) {
+                window.location.href = action.href;
+                return;
+              }
+              onNavigate(action.href);
+            }}
+          >
+            <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+              {action.href === "/dashboard/citizen/locations" ? (
+                <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+              ) : action.href === "/#national-disaster" ? (
+                <Shield className="h-4 w-4 shrink-0" aria-hidden />
+              ) : null}
+              <span className="whitespace-normal text-base leading-snug lg:text-sm lg:leading-relaxed">
+                {action.label}
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 self-center" aria-hidden />
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -555,6 +743,7 @@ export default function CitizenDashboard() {
   const latestIncident = getLatestIncident(incidents);
   const latestServiceCase = getLatestServiceCase(serviceCases);
   const welcomeName = getCitizenWelcomeName(user);
+  const recentActivity = buildRecentActivity(reports, incidents, serviceCases);
 
   return (
     <DashboardLayout
@@ -562,12 +751,12 @@ export default function CitizenDashboard() {
       subtitle="Report incidents and emergencies"
       onLogout={handleLogout}
     >
-      <div className="space-y-3">
+      <CitizenPageContent>
         {error && <ErrorAlert message={error} />}
 
         <WelcomeCard userName={welcomeName} />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <DashboardSummaryCard
             title="Reports"
             description="View the status of your submitted reports."
@@ -582,7 +771,7 @@ export default function CitizenDashboard() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-12 w-56 max-w-full justify-between !rounded-lg border-[#0B3FE8] px-6 text-sm text-[#0B3FE8]"
+                className="h-11 w-full max-w-xs justify-between px-5 text-sm text-[#002D62]"
                 onClick={() => router.push("/dashboard/citizen/reports")}
               >
                 View My Reports
@@ -598,22 +787,22 @@ export default function CitizenDashboard() {
 
           <DashboardSummaryCard
             title="Incidents"
-            description="See incidents that are linked to you."
+            description="Track emergency responses linked to your reports."
             icon={AlertTriangle}
-            iconClassName="bg-orange-600 text-white"
+            iconClassName="bg-[#B91C1C] text-white"
             latestItem={latestIncident}
-            latestLabel="Latest Incident"
-            emptyState="No linked emergency incidents yet."
+            latestLabel="Latest Response"
+            emptyState="No linked emergency responses yet."
             error={incidentStatsError}
             action={
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-12 w-56 max-w-full justify-between !rounded-lg border-[#0B3FE8] px-6 text-sm text-[#0B3FE8]"
+                className="h-11 w-full max-w-xs justify-between px-5 text-sm text-[#002D62]"
                 onClick={() => router.push("/dashboard/citizen/incidents")}
               >
-                View My Incidents
+                View Emergency Responses
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Button>
             }
@@ -628,7 +817,7 @@ export default function CitizenDashboard() {
             title="Service Cases"
             description="Track service cases that need follow-up."
             icon={ClipboardCheck}
-            iconClassName="bg-[#0AA64B] text-white"
+            iconClassName="bg-[#002D62] text-white"
             latestItem={latestServiceCase}
             latestLabel="Latest Case"
             emptyState="No service cases have been opened yet."
@@ -638,7 +827,7 @@ export default function CitizenDashboard() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-12 w-56 max-w-full justify-between !rounded-lg border-[#0B3FE8] px-6 text-sm text-[#0B3FE8]"
+                className="h-11 w-full max-w-xs justify-between px-5 text-sm text-[#002D62]"
                 onClick={() => router.push("/dashboard/citizen/service-cases")}
               >
                 View Service Cases
@@ -652,7 +841,16 @@ export default function CitizenDashboard() {
             ]}
           />
         </div>
-        <footer className="flex flex-wrap items-center justify-center gap-3 text-xs text-[#42547A]">
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+          <RecentActivityPanel
+            items={recentActivity}
+            onNavigate={(href) => router.push(href)}
+          />
+          <QuickActionsPanel onNavigate={(href) => router.push(href)} />
+        </div>
+
+        <footer className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs text-[#42547A]">
           <span>© 2025 NIERS. All rights reserved.</span>
           <Link className="font-medium text-[#0B3FE8]" href="/">
             Privacy Policy
@@ -662,7 +860,7 @@ export default function CitizenDashboard() {
             Terms of Use
           </Link>
         </footer>
-      </div>
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }

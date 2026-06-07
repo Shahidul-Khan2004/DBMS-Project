@@ -7,24 +7,26 @@ import {
   CitizenBackButton,
   CitizenLocationPill,
   CitizenMetaItem,
+  CitizenPageContent,
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { clearAuthSession } from "@/lib/auth-store";
 import { getMyIncidents } from "@/lib/citizen-incidents-api";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { apiGet } from "@/lib/api";
 import {
+  formatIncidentCategory,
   formatIncidentStatus,
   isTerminalIncident,
 } from "@/lib/incident-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
-import type { IntakeLocation } from "@/types/intake";
+import type { IntakeLocation, IntakeReportListResponse } from "@/types/intake";
 
 function formatLocation(location: IntakeLocation | null | undefined) {
   if (!location) return null;
@@ -48,12 +50,25 @@ function getFinalTimeLabel(incident: CitizenIncident) {
   return null;
 }
 
+function getWhatHappensNext(statusCode: string) {
+  if (isTerminalIncident(statusCode)) {
+    return "This emergency response is complete. No further action is needed from you.";
+  }
+
+  if (statusCode === "in_progress" || statusCode === "dispatched") {
+    return "Responders are actively working on this emergency. Check back here for status updates.";
+  }
+
+  return "Your report is being reviewed and coordinated. Updates will appear here as the response progresses.";
+}
+
 export default function CitizenIncidentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const incidentPublicUuid = params.incidentPublicUuid as string;
   const isChecking = useAuthGuard(["citizen"]);
   const [incident, setIncident] = useState<CitizenIncident | null>(null);
+  const [linkedReportSummary, setLinkedReportSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,21 +77,39 @@ export default function CitizenIncidentDetailPage() {
     setError(null);
 
     try {
-      const data = await getMyIncidents();
-      setIncident(
-        data.incidents?.find(
+      const [incidentsResult, reportsResult] = await Promise.allSettled([
+        getMyIncidents(),
+        apiGet<IntakeReportListResponse>("/intake/reports/my"),
+      ]);
+
+      if (incidentsResult.status === "rejected") {
+        throw incidentsResult.reason;
+      }
+
+      const found =
+        incidentsResult.value.incidents?.find(
           (item) => item.public_uuid === incidentPublicUuid,
-        ) ?? null,
-      );
+        ) ?? null;
+      setIncident(found);
+
+      if (reportsResult.status === "fulfilled" && found) {
+        const linkedReport = reportsResult.value.reports?.find(
+          (report) => report.public_uuid === found.intake_public_uuid,
+        );
+        setLinkedReportSummary(linkedReport?.summary ?? null);
+      } else {
+        setLinkedReportSummary(null);
+      }
     } catch (err) {
       console.error("Failed to load citizen incident details", err);
       setError(
         getCitizenFriendlyError(
           err,
-          "We could not load this incident right now. Please try again.",
+          "We could not load this emergency response right now. Please try again.",
         ),
       );
       setIncident(null);
+      setLinkedReportSummary(null);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +127,7 @@ export default function CitizenIncidentDetailPage() {
   };
 
   if (isChecking) {
-    return <PageLoading label="Loading incident details" />;
+    return <PageLoading label="Loading emergency response" />;
   }
 
   const isFinal = incident ? isTerminalIncident(incident.status_code) : false;
@@ -106,131 +139,118 @@ export default function CitizenIncidentDetailPage() {
 
   return (
     <DashboardLayout
-      title="Incident Details"
-      subtitle={`Incident ${incident?.incident_code ?? ""}`.trim()}
+      title="Emergency Response Details"
+      subtitle="Status and information for your linked emergency response."
       onLogout={handleLogout}
     >
-      <div className="space-y-3">
-        {error ? (
-          <div className="shrink-0">
-            <ErrorAlert message={error} />
-          </div>
-        ) : null}
+      <CitizenPageContent>
+        <CitizenBackButton
+          href="/dashboard/citizen/incidents"
+          label="Back to Emergency Responses"
+        />
 
-        <CitizenSectionCard
-          title="Incident Snapshot"
-          subtitle="View the incident information linked to your report."
-          icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
-          topBar={
-            <CitizenBackButton
-              href="/dashboard/citizen/incidents"
-              label="Back to My Incidents"
-            />
-          }
-          contentClassName="!p-4"
-        >
-          {isLoading ? (
-            <p className="text-sm text-[#42547A]">Loading incident details...</p>
-          ) : !incident ? (
-            <EmptyState
-              title="Incident not found"
-              description="This incident is not available to your account."
-              icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
-            />
-          ) : (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#B71C1C]">
-                    {incident.incident_code}
-                  </p>
-                  <h2 className="mt-1 break-words text-xl font-semibold text-gray-900">
-                    {incident.title || "Emergency incident"}
-                  </h2>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge tone={incident.status_code}>
-                    {formatIncidentStatus(incident.status_code)}
-                  </Badge>
-                  {incident.severity_code ? (
-                    <Badge tone={incident.severity_code}>
-                      {formatBadgeLabel(incident.severity_code)}
+        {error ? <ErrorAlert message={error} /> : null}
+
+        {isLoading ? (
+          <p className="text-sm text-[#42547A]">Loading emergency response...</p>
+        ) : !incident ? (
+          <EmptyState
+            title="Emergency response not found"
+            description="This emergency response is not available to your account."
+            icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <CitizenSectionCard
+              title="Emergency Response Status"
+              icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
+            >
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-xl font-semibold text-slate-950">
+                      {incident.title || "Emergency response"}
+                    </h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge tone={incident.status_code}>
+                      {formatIncidentStatus(incident.status_code)}
                     </Badge>
+                    {incident.severity_code ? (
+                      <Badge tone={incident.severity_code}>
+                        {formatBadgeLabel(incident.severity_code)}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+
+                {incident.description ? (
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-[#42547A]">
+                    {incident.description}
+                  </p>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <CitizenMetaItem
+                    label="Response status"
+                    value={formatIncidentStatus(incident.status_code)}
+                  />
+                  <CitizenMetaItem
+                    label="Category"
+                    value={formatIncidentCategory(incident.category_code)}
+                  />
+                  <CitizenMetaItem
+                    label="Reported"
+                    value={formatBangladeshTime(incident.reported_at)}
+                  />
+                  <CitizenMetaItem
+                    label="Last updated"
+                    value={formatBangladeshTime(incident.last_updated)}
+                  />
+                  {finalTime ? (
+                    <CitizenMetaItem
+                      label={finalTime.label}
+                      value={finalTime.value}
+                    />
                   ) : null}
                 </div>
-              </div>
 
-              {isFinal ? (
-                <div className="rounded-xl border border-[#002D62]/10 bg-[#EFF6FF] px-4 py-3 text-sm text-[#42547A]">
-                  This incident is final and view-only. No location, report, or
-                  incident update actions are available.
-                </div>
-              ) : null}
-
-              {incident.description ? (
-                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                  {incident.description}
-                </p>
-              ) : null}
-
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                <CitizenMetaItem
-                  label="Status"
-                  value={formatIncidentStatus(incident.status_code)}
-                />
-                <CitizenMetaItem
-                  label="Severity"
-                  value={formatBadgeLabel(incident.severity_code)}
-                />
-                <CitizenMetaItem
-                  label="Category"
-                  value={formatBadgeLabel(incident.category_code)}
-                />
-                <CitizenMetaItem
-                  label="Origin"
-                  value={formatBadgeLabel(incident.origin_type)}
-                />
-                <CitizenMetaItem
-                  label="Linked Report"
-                  value={incident.intake_report_code}
-                />
-                <CitizenMetaItem
-                  label="Reported"
-                  value={formatBangladeshTime(incident.reported_at)}
-                />
-                <CitizenMetaItem
-                  label="Last Updated"
-                  value={formatBangladeshTime(incident.last_updated)}
-                />
-                {finalTime ? (
-                  <CitizenMetaItem
-                    label={finalTime.label}
-                    value={finalTime.value}
-                  />
+                {isFinal ? (
+                  <p className="rounded-xl border border-slate-200/80 bg-[#F6F9FE] px-4 py-3 text-sm text-[#42547A]">
+                    This emergency response is complete and view-only.
+                  </p>
                 ) : null}
-                <div className="sm:col-span-2 xl:col-span-3">
-                  <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
-                </div>
               </div>
+            </CitizenSectionCard>
 
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() =>
-                    router.push(
-                      `/dashboard/citizen/reports/${incident.intake_public_uuid}`,
-                    )
-                  }
-                >
-                  <FileText className="h-4 w-4" aria-hidden />
-                  View Linked Report
-                </Button>
-              </div>
-            </div>
-          )}
-        </CitizenSectionCard>
-      </div>
+            <CitizenSectionCard
+              title="Current Status"
+              subtitle="What happens next"
+            >
+              <p className="text-sm leading-6 text-[#42547A]">
+                {getWhatHappensNext(incident.status_code)}
+              </p>
+            </CitizenSectionCard>
+
+            <CitizenSectionCard
+              title="Original Report Summary"
+              icon={<FileText className="h-5 w-5" aria-hidden />}
+            >
+              <p className="text-sm leading-6 text-slate-900">
+                {linkedReportSummary || "Your submitted report summary is not available."}
+              </p>
+              <p className="mt-3 text-xs text-[#60739A]">
+                This is the report you submitted that was connected to this emergency
+                response.
+              </p>
+            </CitizenSectionCard>
+
+            <CitizenSectionCard title="Location">
+              <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
+            </CitizenSectionCard>
+          </div>
+        )}
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }

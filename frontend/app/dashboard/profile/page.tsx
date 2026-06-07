@@ -27,6 +27,8 @@ import {
   ADMIN_DASHBOARD_TITLE,
 } from "@/lib/admin-dashboard";
 import {
+  formatPhoneOrNotAdded,
+  getSecondaryPhoneNumberFromUser,
   updateMyProfile,
   type UpdateMyProfilePayload,
 } from "@/lib/profile-api";
@@ -97,7 +99,7 @@ function getProfileFormValues(user: LoginResponse["user"]): ProfileFormValues {
   return {
     fullName: user.full_name ?? "",
     phoneNumber: user.phone_number ?? "",
-    secondaryPhoneNumber: user.secondary_phone_number ?? "",
+    secondaryPhoneNumber: getSecondaryPhoneNumberFromUser(user),
   };
 }
 
@@ -146,14 +148,14 @@ function validateProfileUpdate(
     typeof payload.secondaryPhoneNumber === "string" &&
     !PHONE_NUMBER_PATTERN.test(payload.secondaryPhoneNumber)
   ) {
-    return "Secondary phone number must be exactly 11 digits, or left blank.";
+    return "Secondary phone must be exactly 11 digits.";
   }
 
   const finalPhoneNumber = payload.phoneNumber ?? user.phone_number;
   const finalSecondaryPhoneNumber =
     payload.secondaryPhoneNumber !== undefined
       ? payload.secondaryPhoneNumber
-      : user.secondary_phone_number;
+      : getSecondaryPhoneNumberFromUser(user) || null;
 
   if (
     finalPhoneNumber &&
@@ -237,8 +239,14 @@ function EditableField({
       </label>
       <input
         id={id}
+        type="text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          event.currentTarget.form?.requestSubmit();
+        }}
         disabled={disabled}
         autoComplete={autoComplete}
         inputMode={inputMode}
@@ -512,8 +520,10 @@ export default function ProfilePage() {
                       value={user.phone_number}
                     />
                     <DetailItem
-                      label="Secondary Phone"
-                      value={user.secondary_phone_number}
+                      label="SECONDARY PHONE"
+                      value={formatPhoneOrNotAdded(
+                        getSecondaryPhoneNumberFromUser(user),
+                      )}
                     />
                   </dl>
                 )}

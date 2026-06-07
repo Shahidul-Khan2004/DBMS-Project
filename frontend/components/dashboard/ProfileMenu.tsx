@@ -15,6 +15,10 @@ import { User, X } from "lucide-react";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { apiJson } from "@/lib/api";
+import {
+  formatPhoneOrNotAdded,
+  getSecondaryPhoneNumberFromUser,
+} from "@/lib/profile-api";
 import { getAuthz } from "@/lib/auth-store";
 import {
   computeNotificationPopoverPosition,
@@ -75,7 +79,7 @@ function SummaryItem({
   );
 }
 
-export function ProfileMenu() {
+export function ProfileMenu({ compactOnMobile = false }: { compactOnMobile?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -300,6 +304,12 @@ export function ProfileMenu() {
               <SummaryItem label="Full Name" value={user.full_name} />
               <SummaryItem label="Email" value={user.email} />
               <SummaryItem label="Phone" value={user.phone_number} />
+              <SummaryItem
+                label="SECONDARY PHONE"
+                value={formatPhoneOrNotAdded(
+                  getSecondaryPhoneNumberFromUser(user),
+                )}
+              />
               <SummaryItem label="Role" value={roleLabel} />
               {user.account_status ? (
                 <SummaryItem label="Account Status">
@@ -338,14 +348,20 @@ export function ProfileMenu() {
         aria-expanded={open}
         aria-controls={PROFILE_POPOVER_ID}
         aria-haspopup="dialog"
-        className={`inline-flex h-10 w-[6.5rem] items-center justify-center gap-2 rounded-xl border bg-white px-3 text-sm font-bold text-[#002D62] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62] ${
+        className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border bg-white text-sm font-bold text-[#002D62] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002D62] ${
+          compactOnMobile
+            ? "w-10 px-0 min-[480px]:w-[6.5rem] min-[480px]:px-3"
+            : "w-[6.5rem] px-3"
+        } ${
           isOnProfilePage
             ? "border-[#002D62] bg-[#002D62]/10 ring-2 ring-[#002D62]/20 hover:bg-[#002D62]/15"
             : "border-[#0B3FE8] hover:bg-[#EFF6FF]"
         }`}
       >
         <User className="h-4 w-4" aria-hidden />
-        Profile
+        <span className={compactOnMobile ? "sr-only min-[480px]:not-sr-only" : ""}>
+          Profile
+        </span>
       </button>
       {content ? createPortal(content, document.body) : null}
     </div>

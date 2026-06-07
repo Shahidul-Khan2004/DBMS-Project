@@ -464,9 +464,9 @@ export default function CitizenReportDetailPage() {
       title="Report Details"
       subtitle={`Report ${report?.report_code ?? reportPublicUuid}`}
       onLogout={handleLogout}
-      contentClassName="h-[calc(100dvh-10rem)] min-h-0 overflow-hidden"
+      contentClassName="min-h-0 lg:h-[calc(100dvh-14rem)] lg:overflow-hidden"
     >
-      <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex min-h-0 flex-col gap-3 lg:h-full">
         {error && <ErrorAlert message={error} />}
         {loading ? (
           <CompactCard>
@@ -484,7 +484,7 @@ export default function CitizenReportDetailPage() {
             </CardContent>
           </CompactCard>
         ) : (
-          <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-y-contain lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)] lg:overflow-hidden">
+          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)]">
               <div className="min-w-0 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain lg:pr-1">
                 <CompactCard>
                   <CardContent className="!p-0">

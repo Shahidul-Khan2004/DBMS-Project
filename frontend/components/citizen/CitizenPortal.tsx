@@ -14,7 +14,7 @@ export function CitizenBackButton({
   return (
     <Link
       href={href}
-      className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border border-[#002D62]/25 bg-white px-3 text-sm font-semibold text-[#002D62] shadow-sm shadow-[#002D62]/10 transition-colors hover:border-[#002D62]/40 hover:bg-[#E8F2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3FE8]/35 focus-visible:ring-offset-2 ${className}`}
+      className={`inline-flex shrink-0 items-center gap-2 text-sm font-medium text-[#002D62] transition-colors hover:text-[#001F45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3FE8]/35 focus-visible:ring-offset-2 ${className}`}
     >
       <ArrowLeft className="h-4 w-4" aria-hidden />
       {label}
@@ -27,6 +27,22 @@ type CitizenPageHeaderProps = {
   subtitle: string;
   action?: ReactNode;
 };
+
+export function CitizenPageContent({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`mx-auto w-full max-w-[1600px] space-y-4 py-2 sm:space-y-6 sm:py-4 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function CitizenPageHeader({
   title,
@@ -41,7 +57,9 @@ export function CitizenPageHeader({
           {subtitle}
         </p>
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? (
+        <div className="w-full shrink-0 sm:w-auto">{action}</div>
+      ) : null}
     </div>
   );
 }
@@ -149,7 +167,7 @@ export function ReportIncidentLink({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/dashboard/citizen/report-new"
-      className={`inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#B91C1C] px-5 text-sm font-bold text-white shadow-sm shadow-[#B91C1C]/20 transition-colors hover:bg-[#991B1B] ${className}`}
+      className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#B91C1C] px-5 text-sm font-bold text-white shadow-sm shadow-[#B91C1C]/20 transition-colors hover:bg-[#991B1B] min-[400px]:h-12 min-[400px]:w-fit ${className}`}
     >
       Report New Incident
       <ArrowRight className="h-4 w-4" aria-hidden />

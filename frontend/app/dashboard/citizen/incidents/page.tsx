@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import {
   CitizenLocationPill,
   CitizenMetaItem,
+  CitizenPageContent,
   CitizenRecordCard,
   CitizenSectionCard,
   getCitizenFriendlyError,
@@ -18,14 +19,16 @@ import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { getMyIncidents } from "@/lib/citizen-incidents-api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { apiGet } from "@/lib/api";
 import { sortNewestFirst } from "@/lib/sort";
 import {
+  formatIncidentCategory,
   formatIncidentStatus,
   isTerminalIncident,
 } from "@/lib/incident-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
-import type { IntakeLocation } from "@/types/intake";
+import type { IntakeLocation, IntakeReportListResponse } from "@/types/intake";
 
 function formatLocation(location: IntakeLocation | null | undefined) {
   if (!location) return null;
@@ -37,22 +40,21 @@ function formatLocation(location: IntakeLocation | null | undefined) {
   );
 }
 
-function getIncidentResolvedLabel(incident: CitizenIncident) {
-  if (incident.resolved_at) {
-    return formatBangladeshTime(incident.resolved_at);
+function getResponseSummary(incident: CitizenIncident) {
+  if (incident.description?.trim()) {
+    return incident.description.trim();
   }
 
-  if (incident.closed_at) {
-    return formatBangladeshTime(incident.closed_at);
-  }
-
-  return null;
+  return `Emergency response status: ${formatIncidentStatus(incident.status_code)}.`;
 }
 
 export default function CitizenIncidentsPage() {
   const router = useRouter();
   const isChecking = useAuthGuard(["citizen"]);
   const [incidents, setIncidents] = useState<CitizenIncident[]>([]);
+  const [reportSummariesByIntakeUuid, setReportSummariesByIntakeUuid] = useState<
+    Map<string, string>
+  >(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,20 +72,38 @@ export default function CitizenIncidentsPage() {
       setError(null);
 
       try {
-        const data = await getMyIncidents();
-        setIncidents(
-          sortNewestFirst(data.incidents ?? [], (incident) => [
-            incident.last_updated,
-            incident.reported_at,
-            incident.created_at,
-          ]),
-        );
+        const [incidentsResult, reportsResult] = await Promise.allSettled([
+          getMyIncidents(),
+          apiGet<IntakeReportListResponse>("/intake/reports/my"),
+        ]);
+
+        if (incidentsResult.status === "fulfilled") {
+          setIncidents(
+            sortNewestFirst(incidentsResult.value.incidents ?? [], (incident) => [
+              incident.last_updated,
+              incident.reported_at,
+              incident.created_at,
+            ]),
+          );
+        } else {
+          throw incidentsResult.reason;
+        }
+
+        if (reportsResult.status === "fulfilled") {
+          const nextMap = new Map<string, string>();
+          for (const report of reportsResult.value.reports ?? []) {
+            nextMap.set(report.public_uuid, report.summary);
+          }
+          setReportSummariesByIntakeUuid(nextMap);
+        } else {
+          setReportSummariesByIntakeUuid(new Map());
+        }
       } catch (err) {
         console.error("Failed to load citizen incidents", err);
         setError(
           getCitizenFriendlyError(
             err,
-            "We could not load your linked incidents right now. Please try again.",
+            "We could not load your emergency responses right now. Please try again.",
           ),
         );
       } finally {
@@ -94,132 +114,136 @@ export default function CitizenIncidentsPage() {
     void loadIncidents();
   }, [isChecking]);
 
+  const incidentsWithSummaries = useMemo(
+    () =>
+      incidents.map((incident) => ({
+        incident,
+        linkedReportSummary:
+          reportSummariesByIntakeUuid.get(incident.intake_public_uuid) ??
+          "Your submitted report",
+      })),
+    [incidents, reportSummariesByIntakeUuid],
+  );
+
   if (isChecking) {
-    return <PageLoading label="Loading incidents" />;
+    return <PageLoading label="Loading emergency responses" />;
   }
 
   return (
     <DashboardLayout
-      title="My Incidents"
-      subtitle="Emergency incidents linked to your reports"
+      title="Emergency Response"
+      subtitle="Track emergency responses linked to your reports."
       onLogout={handleLogout}
     >
-      <div className="space-y-3">
+      <CitizenPageContent>
         <CitizenSectionCard
-          title="Linked Emergency Incidents"
-          subtitle="Newest incident updates appear first."
+          title="Your Emergency Responses"
+          subtitle="Follow active and completed emergency responses connected to your reports."
           icon={<AlertTriangle className="h-5 w-5" aria-hidden />}
-          className="flex max-h-[calc(100dvh-11rem)] min-h-[22rem] flex-col"
-          contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
         >
-            {isLoading ? (
-              <p className="text-sm text-[#42547A]">Loading your incidents...</p>
-            ) : null}
+          {isLoading ? (
+            <p className="text-sm text-[#42547A]">Loading emergency responses...</p>
+          ) : null}
 
-            {error ? <ErrorAlert message={error} /> : null}
+          {error ? <ErrorAlert message={error} /> : null}
 
-            {!isLoading && !error && incidents.length === 0 ? (
-              <EmptyState
-                title="No incidents linked yet."
-                description="No emergency incidents linked to your reports yet."
-                icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
-              />
-            ) : null}
+          {!isLoading && !error && incidents.length === 0 ? (
+            <EmptyState
+              title="No emergency responses yet."
+              description="When a report is connected to an emergency response, you can track it here."
+              icon={<AlertTriangle className="h-6 w-6" aria-hidden />}
+            />
+          ) : null}
 
-            {!isLoading && !error && incidents.length > 0 ? (
-              <div className="grid gap-4">
-                {incidents.map((incident) => {
-                  const locationText =
-                    formatLocation(incident.location) ||
-                    incident.location_text ||
-                    null;
-                  const resolvedLabel = getIncidentResolvedLabel(incident);
-                  const isFinal = isTerminalIncident(incident.status_code);
+          {!isLoading && !error && incidents.length > 0 ? (
+            <div className="grid gap-4">
+              {incidentsWithSummaries.map(({ incident, linkedReportSummary }) => {
+                const locationText =
+                  formatLocation(incident.location) ||
+                  incident.location_text ||
+                  null;
+                const isFinal = isTerminalIncident(incident.status_code);
+                const responseSummary = getResponseSummary(incident);
 
-                  return (
-                    <CitizenRecordCard
-                      id={incident.public_uuid}
-                      key={incident.public_uuid}
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold uppercase tracking-wide text-[#B71C1C]">
-                            {incident.incident_code}
-                          </p>
-                          <h3 className="mt-1 break-words text-lg font-semibold text-gray-900">
-                            {incident.title || "Emergency incident"}
-                          </h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge tone={incident.status_code}>
-                            {formatIncidentStatus(incident.status_code)}
-                          </Badge>
-                          {incident.severity_code ? (
-                            <Badge tone={incident.severity_code}>
-                              {formatBadgeLabel(incident.severity_code)}
+                return (
+                  <CitizenRecordCard
+                    id={incident.public_uuid}
+                    key={incident.public_uuid}
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h3 className="break-words text-lg font-semibold text-slate-950">
+                              {incident.title || "Emergency response"}
+                            </h3>
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#42547A]">
+                              {responseSummary}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge tone={incident.status_code}>
+                              {formatIncidentStatus(incident.status_code)}
                             </Badge>
-                          ) : null}
+                            {incident.severity_code ? (
+                              <Badge tone={incident.severity_code}>
+                                {formatBadgeLabel(incident.severity_code)}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <CitizenMetaItem
+                            label="Your report"
+                            value={linkedReportSummary}
+                          />
+                          <CitizenMetaItem
+                            label="Category"
+                            value={formatIncidentCategory(incident.category_code)}
+                          />
+                          <CitizenMetaItem
+                            label="Reported"
+                            value={formatBangladeshTime(incident.reported_at)}
+                          />
+                          <CitizenMetaItem
+                            label="Last updated"
+                            value={formatBangladeshTime(incident.last_updated)}
+                          />
+                          <div className="sm:col-span-2">
+                            <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
+                          </div>
                         </div>
                       </div>
 
-                      {incident.description ? (
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                          {incident.description}
-                        </p>
-                      ) : null}
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <CitizenMetaItem
-                          label="Category"
-                          value={formatBadgeLabel(incident.category_code)}
-                        />
-                        <CitizenMetaItem
-                          label="Origin"
-                          value={formatBadgeLabel(incident.origin_type)}
-                        />
-                        <CitizenMetaItem
-                          label="Linked Report"
-                          value={incident.intake_report_code}
-                        />
-                        <CitizenMetaItem
-                          label="Reported"
-                          value={formatBangladeshTime(incident.reported_at)}
-                        />
-                        {resolvedLabel ? (
-                          <CitizenMetaItem label="Resolved" value={resolvedLabel} />
-                        ) : null}
-                        <div className="sm:col-span-2">
-                          <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap items-center gap-3">
+                      <div className="flex w-full shrink-0 flex-col gap-2 lg:w-56">
                         <Button
                           type="button"
                           size="sm"
-                          variant="secondary"
+                          className="w-full justify-between"
                           onClick={() =>
                             router.push(
                               `/dashboard/citizen/incidents/${incident.public_uuid}`,
                             )
                           }
                         >
-                          View Details
+                          View Response Details
                           <ArrowRight className="h-4 w-4" aria-hidden />
                         </Button>
                         {isFinal ? (
-                          <span className="rounded-xl border border-[#002D62]/10 bg-[#EFF6FF] px-3 py-2 text-sm text-[#42547A]">
-                            Final and view-only
-                          </span>
+                          <p className="text-center text-xs text-[#42547A]">
+                            This response is complete and view-only.
+                          </p>
                         ) : null}
                       </div>
-                    </CitizenRecordCard>
-                  );
-                })}
-              </div>
-            ) : null}
+                    </div>
+                  </CitizenRecordCard>
+                );
+              })}
+            </div>
+          ) : null}
         </CitizenSectionCard>
-      </div>
+      </CitizenPageContent>
     </DashboardLayout>
   );
 }
