@@ -8,6 +8,7 @@ import { createOperationsRouter } from "./api/routes/operations.js";
 import { createLocationsRouter } from "./api/routes/locations.js";
 import { createNotificationsRouter } from "./api/routes/notifications.js";
 import { createAdminRouter } from "./api/routes/admin.js";
+import { createAdminReporterRiskRouter } from "./api/routes/adminReporterRisk.js";
 import { createAgencyRouter } from "./api/routes/agency.js";
 import { createPublicRouter } from "./api/routes/public.js";
 import { createReferenceRouter } from "./api/routes/reference.js";
@@ -46,6 +47,7 @@ export function createApp(options = {}) {
   app.use("/reference", createReferenceRouter({ requireAuth }));
   app.use("/operations/disasters", createDisastersRouter({ requireAuth }));
   app.use("/admin/facilities", createFacilitiesRouter({ requireAuth }));
+  app.use("/admin", createAdminReporterRiskRouter({ requireAuth }));
   app.use("/admin", createAdminRouter({ requireAuth }));
   app.use("/agency", createAgencyRouter({ requireAuth, requireAgencyContext }));
 

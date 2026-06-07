@@ -25,6 +25,19 @@ export async function promoteIntakeToEmergency(req, res) {
   });
 }
 
+export async function dismissIntakeReport(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const intakeReport = await incidentOperationsService.operationsDismissIntakeReport(
+    req.actorUserId,
+    params.reportPublicUuid,
+    req.body,
+  );
+  res.status(200).json({
+    message: "Intake report dismissed",
+    intake_report: intakeReport,
+  });
+}
+
 export async function listOperationsIncidents(req, res) {
   const query = req.validated?.query ?? req.query;
   const result = await incidentOperationsService.operationsListIncidents(query);

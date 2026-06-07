@@ -15,12 +15,17 @@ import {
   deleteOperationsIncidentIntakeReportLink,
   postOperationsIncidentNote,
   promoteIntakeToEmergency,
+  dismissIntakeReport,
 } from "../controllers/operationsIncidents.js";
 import {
   getOperationsIntakeReportLocationHistory,
   getOperationsIntakeReport,
   listOperationsIntakeReports,
 } from "../controllers/operationsIntakeReports.js";
+import {
+  getIntakeReportReporterRisk,
+  postIntakeReportVerification,
+} from "../controllers/operationsReporterVerification.js";
 import {
   validateOperationsCreateIncident,
   validateOperationsGateway999Create,
@@ -33,8 +38,14 @@ import {
   validateOperationsListIntakeQuery,
   validateOperationsPatchIncidentStatus,
   validateOperationsPromoteEmergency,
+  validateOperationsDismissIntakeReport,
   validateOperationsReportUuidParam,
 } from "../validators/operations.js";
+import {
+  validateIntakeReportVerification,
+  validateIntakeReportVerificationParams,
+  validateReporterRiskForIntakeParams,
+} from "../validators/reporterRisk.js";
 import { getOperationsDispatcherOverview } from "../controllers/operationsDispatcherOverview.js";
 import {
   getOperationsAgencyWorkload,
@@ -103,12 +114,35 @@ router.get(
 );
 
 router.post(
+  "/intake-reports/:reportPublicUuid/verification",
+  requireAnyPermission("reporter_risk.review", "incident.classify"),
+  validateIntakeReportVerificationParams,
+  validateIntakeReportVerification,
+  postIntakeReportVerification,
+);
+
+router.get(
+  "/intake-reports/:reportPublicUuid/reporter-risk",
+  requireAnyPermission("reporter_risk.review", "incident.classify"),
+  validateReporterRiskForIntakeParams,
+  getIntakeReportReporterRisk,
+);
+
+router.post(
   "/intake-reports/:reportPublicUuid/promote/emergency",
   requirePermission("incident.create"),
   requirePermission("incident.classify"),
   validateOperationsReportUuidParam,
   validateOperationsPromoteEmergency,
   promoteIntakeToEmergency,
+);
+
+router.post(
+  "/intake-reports/:reportPublicUuid/dismiss",
+  requirePermission("incident.classify"),
+  validateOperationsReportUuidParam,
+  validateOperationsDismissIntakeReport,
+  dismissIntakeReport,
 );
 
 router.post(
