@@ -1,6 +1,7 @@
 import validate from "./validator.js";
 import {
   classifyEmergency999Schema,
+  dismissIntakeReportSchema,
   gateway999CreateSchema,
   operationsLinkIntakeToIncidentSchema,
   operationsUnlinkIntakeFromIncidentSchema,
@@ -30,6 +31,11 @@ export const validateOperationsReportUuidParam = validate(
 export const validateOperationsPromoteEmergency = validate(
   "operations promote emergency",
   classifyEmergency999Schema,
+);
+
+export const validateOperationsDismissIntakeReport = validate(
+  "operations dismiss intake report",
+  dismissIntakeReportSchema,
 );
 
 export const validateOperationsCreateIncident = validate(
