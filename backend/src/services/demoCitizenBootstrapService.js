@@ -24,6 +24,16 @@ const DEMO_CITIZENS = [
     fullName: "Farhana Akter",
     phoneNumber: "01710000003",
   },
+  {
+    email: "citizen.rubel@niers.test",
+    fullName: "Rubel Hossain",
+    phoneNumber: "01710000004",
+  },
+  {
+    email: "citizen.shamim@niers.test",
+    fullName: "Shamim Ahmed",
+    phoneNumber: "01710000005",
+  },
 ];
 
 export async function bootstrapDemoCitizens() {
@@ -78,5 +88,7 @@ export async function bootstrapDemoCitizens() {
     }
   }
 
-  console.log("Bootstrapped demo citizens (citizen.rahima/karim/farhana@niers.test).");
+  console.log(
+    "Bootstrapped demo citizens (citizen.rahima/karim/farhana/rubel/shamim@niers.test).",
+  );
 }

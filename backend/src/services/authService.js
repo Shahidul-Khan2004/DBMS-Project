@@ -14,6 +14,8 @@ import {
   verifyAccessToken,
   verifyRefreshToken,
 } from "./tokenService.js";
+import { resolveUserAccountForAuth } from "./userAccountStatusService.js";
+import { assertUserCanLogin } from "../lib/accountStatusLoginErrors.js";
 
 export function toPublicUser(user) {
   return {
@@ -24,6 +26,8 @@ export function toPublicUser(user) {
     secondary_phone_number: user.secondary_phone_number ?? null,
     account_status: user.account_status,
     is_active: user.account_status === "active",
+    account_status_reason: user.account_status_reason ?? null,
+    account_status_expires_at: user.account_status_expires_at ?? null,
     created_at: user.created_at,
     updated_at: user.updated_at,
   };
@@ -96,10 +100,6 @@ export async function loginUser({ email, password }) {
     );
   }
 
-  if (user.account_status !== "active") {
-    throw new BackendError(403, "USER_INACTIVE", "User account is inactive");
-  }
-
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isPasswordValid) {
@@ -110,12 +110,15 @@ export async function loginUser({ email, password }) {
     );
   }
 
-  const authz = await resolveAuthorizationContext(user.id);
+  let resolvedUser = await resolveUserAccountForAuth(user);
+  assertUserCanLogin(resolvedUser);
+
+  const authz = await resolveAuthorizationContext(resolvedUser.id);
 
   return {
-    user: toPublicUser(user),
-    accessToken: signAccessToken(user),
-    refreshToken: signRefreshToken(user),
+    user: toPublicUser(resolvedUser),
+    accessToken: signAccessToken(resolvedUser),
+    refreshToken: signRefreshToken(resolvedUser),
     authz,
   };
 }
@@ -132,7 +135,9 @@ export async function refreshAccessToken({ refreshToken }) {
       );
     }
 
-    const user = await findUserByPublicUuid(payload.sub);
+    let user = await findUserByPublicUuid(payload.sub);
+
+    user = user ? await resolveUserAccountForAuth(user) : user;
 
     if (!user || user.account_status !== "active") {
       throw new BackendError(
@@ -178,7 +183,9 @@ export async function authenticateAccessToken(accessToken) {
       );
     }
 
-    const user = await findUserByPublicUuid(payload.sub);
+    let user = await findUserByPublicUuid(payload.sub);
+
+    user = user ? await resolveUserAccountForAuth(user) : user;
 
     if (!user || user.account_status !== "active") {
       throw new BackendError(

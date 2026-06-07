@@ -15,13 +15,6 @@ import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js
 import { bootstrapDemoDispatcher } from "./demoDispatcherBootstrapService.js";
 import { bootstrapDemoCitizens } from "./demoCitizenBootstrapService.js";
 import { runOperationalDemoSeeds } from "./operationalDemoSeedService.js";
-import {
-  ensureAgencyMembershipsPublicUuid,
-  ensureUserProfilesSecondaryPhoneNumber,
-  ensureIncidentReportLinksSoftUnlink,
-  ensureIntakeStatusUnlinkTransition,
-  migrateLegacyReportedIncidentStatus,
-} from "./schemaMigrations.js";
 
 const DEFAULT_PERMISSIONS = [
   {
@@ -194,6 +187,16 @@ const DEFAULT_PERMISSIONS = [
     moduleName: "relief",
     description: "Record relief distributions",
   },
+  {
+    permissionCode: "reporter_risk.review",
+    moduleName: "reporter_risk",
+    description: "Review intake report verification and reporter reliability",
+  },
+  {
+    permissionCode: "reporter_risk.manage",
+    moduleName: "reporter_risk",
+    description: "Manage reporter risk monitoring and account actions",
+  },
 ];
 
 const ROLE_DEFINITIONS = [
@@ -267,6 +270,7 @@ async function ensureRolesAndPermissions() {
     "disaster.manage_affected_areas",
     "disaster.link_incidents",
     "facility.read",
+    "reporter_risk.review",
   ];
 
   for (const permissionCode of dispatcherPermissionCodes) {
@@ -286,11 +290,6 @@ async function ensureRolesAndPermissions() {
 
 export async function bootstrapDevelopmentSystemAdmin() {
   await ensureRolesAndPermissions();
-  await ensureAgencyMembershipsPublicUuid();
-  await ensureUserProfilesSecondaryPhoneNumber();
-  await ensureIncidentReportLinksSoftUnlink();
-  await ensureIntakeStatusUnlinkTransition();
-  await migrateLegacyReportedIncidentStatus();
   await bootstrapDemoCitizens();
   await runOperationalDemoSeeds();
   await bootstrapDemoAgencyRepresentatives();
