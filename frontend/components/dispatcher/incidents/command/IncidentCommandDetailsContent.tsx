@@ -33,12 +33,14 @@ export function IncidentCommandDetailsContent({
   detail,
   sourceLabel,
   canEditLocation = false,
+  canViewLocationHistory = false,
   onEditLocation,
   onViewLocationHistory,
 }: {
   detail: IncidentDetailResponse;
   sourceLabel: string;
   canEditLocation?: boolean;
+  canViewLocationHistory?: boolean;
   onEditLocation?: () => void;
   onViewLocationHistory?: () => void;
 }) {
@@ -80,26 +82,30 @@ export function IncidentCommandDetailsContent({
           <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Location
           </h4>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={!canEditLocation}
-              onClick={onEditLocation}
-            >
-              Edit Location
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={!canEditLocation}
-              onClick={onViewLocationHistory}
-            >
-              View Location History
-            </Button>
-          </div>
+          {canEditLocation || canViewLocationHistory ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {canEditLocation ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={onEditLocation}
+                >
+                  Edit Location
+                </Button>
+              ) : null}
+              {canViewLocationHistory ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={onViewLocationHistory}
+                >
+                  View Location History
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <p className="mt-2 text-sm text-slate-800">
           {overview.locationText?.trim() || "No location recorded"}

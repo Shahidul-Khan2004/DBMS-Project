@@ -85,11 +85,12 @@ export function IncidentCommandSummaryCard({
           aria-label="Location actions"
         >
           <SummaryTextButton label="View Details" onClick={onOpenDetails} />
-          <SummaryTextButton
-            label="Edit Location"
-            onClick={onEditLocation}
-            disabled={!canEditLocation}
-          />
+          {canEditLocation ? (
+            <SummaryTextButton
+              label="Edit Location"
+              onClick={onEditLocation}
+            />
+          ) : null}
         </div>
       </div>
     </section>
