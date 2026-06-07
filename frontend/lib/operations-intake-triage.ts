@@ -126,7 +126,19 @@ export type RouteMutationAction =
   | "service_case"
   | "emergency"
   | "link"
+  | "duplicate"
+  | "false_report"
   | "location";
+
+export type DismissIntakePayload = {
+  disposition: "duplicate" | "false_report";
+  note?: string;
+};
+
+export type DismissIntakeResponse = {
+  message?: string;
+  intake_report?: OperationsIntakeReport;
+};
 
 export type PendingIntakeListParams = {
   statusFilter: TriageStatusFilter;
@@ -373,6 +385,16 @@ export async function linkIntakeToIncident(
   );
 }
 
+export async function dismissIntakeReport(
+  reportPublicUuid: string,
+  payload: DismissIntakePayload,
+): Promise<DismissIntakeResponse> {
+  return apiPost<DismissIntakeResponse>(
+    `/operations/intake-reports/${encodeURIComponent(reportPublicUuid)}/dismiss`,
+    payload,
+  );
+}
+
 export function mapApiErrorToRouteMessage(
   error: unknown,
   action: RouteMutationAction,
@@ -398,6 +420,8 @@ export function mapApiErrorToRouteMessage(
         "This report cannot be promoted in its current status.",
       INTAKE_ALREADY_LINKED:
         "This report is already linked to an incident or case.",
+      INTAKE_NOT_DISMISSABLE:
+        "This report may already have been routed. Refresh the queue and try again.",
       INCIDENT_NOT_FOUND: "The selected incident could not be found.",
       INCIDENT_NOT_LINKABLE:
         "The selected incident cannot accept new intake links.",
@@ -416,6 +440,9 @@ export function mapApiErrorToRouteMessage(
       }
       if (action === "link") {
         return "Unable to link this report to the selected incident.";
+      }
+      if (action === "duplicate" || action === "false_report") {
+        return "Unable to dismiss this report. It may already have been routed.";
       }
     }
 
@@ -447,6 +474,9 @@ export function mapApiErrorToRouteMessage(
   }
   if (action === "link") {
     return "Unable to link this report to the selected incident.";
+  }
+  if (action === "duplicate" || action === "false_report") {
+    return "Unable to dismiss this report. Please try again.";
   }
   if (action === "location") {
     return "Could not update the reported location. Please try again.";

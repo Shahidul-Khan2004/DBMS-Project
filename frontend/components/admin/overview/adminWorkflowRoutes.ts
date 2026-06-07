@@ -6,6 +6,7 @@ import {
   Eye,
   Radio,
   Shield,
+  UserX,
 } from "lucide-react";
 import { nationalDisasterLandingPath } from "@/lib/admin-national-disaster-routes";
 
@@ -73,6 +74,16 @@ export const ADMIN_WORKFLOW_AREAS: readonly AdminWorkflowArea[] = [
     availability: "available",
     href: "/dashboard/admin/dispatcher-oversight",
     primaryActionLabel: "Open Dispatcher Oversight",
+  },
+  {
+    id: "reporter-risk",
+    title: "Reporter Risk",
+    description:
+      "Monitor false report patterns, review reporter reliability, and manage account restrictions.",
+    icon: UserX,
+    availability: "available",
+    href: "/dashboard/admin/reporter-risk",
+    primaryActionLabel: "Open Reporter Risk",
   },
   {
     id: "national-disaster",

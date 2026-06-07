@@ -44,17 +44,20 @@ export function PageLoading({
 export function MessageBanner({
   tone,
   title,
+  description,
   children,
   action,
   className = "",
 }: {
   tone: MessageTone;
   title?: string;
-  children: ReactNode;
+  description?: string;
+  children?: ReactNode;
   action?: ReactNode;
   className?: string;
 }) {
   const Icon = toneIcons[tone];
+  const hasBody = Boolean(description) || children != null;
 
   return (
     <div
@@ -65,9 +68,14 @@ export function MessageBanner({
         <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
           {title ? <p className="font-semibold">{title}</p> : null}
-          <div className={title ? "mt-1 leading-6" : "leading-6"}>
-            {children}
-          </div>
+          {description ? (
+            <p className={title ? "mt-1 leading-6" : "leading-6"}>{description}</p>
+          ) : null}
+          {children ? (
+            <div className={hasBody && title ? "mt-2 leading-6" : title || description ? "mt-1 leading-6" : "leading-6"}>
+              {children}
+            </div>
+          ) : null}
           {action ? <div className="mt-3 flex flex-wrap gap-2">{action}</div> : null}
         </div>
       </div>
