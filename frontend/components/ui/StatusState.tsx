@@ -80,14 +80,18 @@ export function EmptyState({
   description,
   icon,
   action,
+  className = "",
 }: {
   title: string;
   description: string;
   icon?: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded-3xl border border-dashed border-[#002D62]/20 bg-white p-8 text-center shadow-sm">
+    <div
+      className={`rounded-3xl border border-dashed border-[#002D62]/20 bg-white p-8 text-center shadow-sm ${className}`}
+    >
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#002D62]">
         {icon ?? <SearchX className="h-6 w-6" aria-hidden />}
       </div>
