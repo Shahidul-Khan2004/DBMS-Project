@@ -8,6 +8,8 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     account_status ENUM('active','suspended','disabled','pending_verification') NOT NULL DEFAULT 'pending_verification',
+    account_status_reason TEXT NULL,
+    account_status_expires_at TIMESTAMP NULL,
     email_verified_at TIMESTAMP NULL,
     last_login_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
