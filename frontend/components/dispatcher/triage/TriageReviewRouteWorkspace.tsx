@@ -142,6 +142,8 @@ export function TriageReviewRouteWorkspace({
           onOpenDetail={reviewRoute.handleOpenDetail}
           showHeader={showPanelHeader}
           continueLabel={continueLabel}
+          selectedDisasterPublicUuid={reviewRoute.selectedDisasterPublicUuid}
+          onDisasterChange={reviewRoute.setSelectedDisasterPublicUuid}
         />
         </div>
       </div>

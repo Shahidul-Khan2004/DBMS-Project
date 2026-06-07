@@ -27,6 +27,8 @@ export function Gateway999Workspace() {
     incidentsLoading,
     incidentsError,
     loadIncidents,
+    selectedDisasterPublicUuid,
+    setSelectedDisasterPublicUuid,
   } = useGateway999Intake();
 
   const handleCancel = () => {
@@ -86,6 +88,8 @@ export function Gateway999Workspace() {
                 onSelectRoute={handleSelectRoute}
                 onRetryIncidents={() => void loadIncidents()}
                 onCancel={handleCancel}
+                selectedDisasterPublicUuid={selectedDisasterPublicUuid}
+                onDisasterChange={setSelectedDisasterPublicUuid}
               />
             </div>
           </div>

@@ -13,6 +13,7 @@ import {
   triageLabelClassName,
 } from "@/components/dispatcher/triage/triageFormStyles";
 import type { RouteMode } from "@/components/dispatcher/triage/types";
+import { DisasterLinkSelector } from "@/components/dispatcher/disasters/DisasterLinkSelector";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { INCIDENT_CATEGORY_OPTIONS } from "@/lib/incident-category-options";
@@ -59,6 +60,8 @@ type Gateway999IntakePanelProps = {
   ) => void;
   onRetryIncidents: () => void;
   onCancel: () => void;
+  selectedDisasterPublicUuid?: string | null;
+  onDisasterChange?: (uuid: string | null) => void;
 };
 
 export function Gateway999IntakePanel({
@@ -76,6 +79,8 @@ export function Gateway999IntakePanel({
   onSelectRoute,
   onRetryIncidents,
   onCancel,
+  selectedDisasterPublicUuid = null,
+  onDisasterChange,
 }: Gateway999IntakePanelProps) {
   const categoryError =
     showValidation && !form.categoryCode.trim() ? "Choose a category." : null;
@@ -358,6 +363,17 @@ export function Gateway999IntakePanel({
                   </p>
                 </div>
               </div>
+            ) : null}
+
+            {(routeMode === "emergency_incident" ||
+              routeMode === "existing_incident") &&
+            onDisasterChange ? (
+              <DisasterLinkSelector
+                selectedDisasterPublicUuid={selectedDisasterPublicUuid}
+                onChange={onDisasterChange}
+                disabled={isSubmitting}
+                className="mt-3"
+              />
             ) : null}
 
             {routeMode === "service_case" ? (

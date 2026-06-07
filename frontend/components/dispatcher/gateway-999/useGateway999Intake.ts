@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { toast } from "sonner";
 import { filterNonTerminalOperationsIncidents } from "@/components/dispatcher/incidents/filterNonTerminalOperationsIncidents";
 import { mapGateway999IncidentOption } from "@/components/dispatcher/gateway-999/mapGateway999IncidentOption";
 import type {
@@ -25,6 +26,7 @@ import {
   submitGateway999Intake,
   type Gateway999Payload,
 } from "@/lib/gateway-999-api";
+import { tryLinkIncidentToDisaster } from "@/lib/disaster-incident-link";
 import { getOperationsIncidents } from "@/lib/operations-intake-triage";
 
 function createInitialFormState(): Gateway999FormState {
@@ -80,6 +82,9 @@ export function useGateway999Intake() {
   const [incidents, setIncidents] = useState<Gateway999IncidentOption[]>([]);
   const [incidentsLoading, setIncidentsLoading] = useState(false);
   const [incidentsError, setIncidentsError] = useState<string | null>(null);
+  const [selectedDisasterPublicUuid, setSelectedDisasterPublicUuid] = useState<
+    string | null
+  >(null);
 
   const validLocationCoords = useMemo(
     () =>
@@ -175,6 +180,7 @@ export function useGateway999Intake() {
     setHandoff(null);
     setIncidents([]);
     setIncidentsError(null);
+    setSelectedDisasterPublicUuid(null);
   }, []);
 
   const buildPayload = useCallback((): Gateway999Payload | null => {
@@ -337,6 +343,24 @@ export function useGateway999Intake() {
             ? form.incidentPublicUuid
             : undefined,
         );
+
+        if (
+          selectedDisasterPublicUuid &&
+          nextHandoff.publicUuid &&
+          (payload.disposition === "emergency_incident" ||
+            payload.disposition === "existing_incident")
+        ) {
+          const linkResult = await tryLinkIncidentToDisaster({
+            disasterUuid: selectedDisasterPublicUuid,
+            incidentUuid: nextHandoff.publicUuid,
+            context:
+              payload.disposition === "existing_incident" ? "linked" : "created",
+          });
+          if (!linkResult.ok) {
+            toast.warning(linkResult.message);
+          }
+        }
+
         setHandoff(nextHandoff);
       } catch (err) {
         setSubmitError(mapGateway999Error(err));
@@ -344,7 +368,13 @@ export function useGateway999Intake() {
         setIsSubmitting(false);
       }
     },
-    [buildPayload, form.incidentPublicUuid, handoff, isSubmitting],
+    [
+      buildPayload,
+      form.incidentPublicUuid,
+      handoff,
+      isSubmitting,
+      selectedDisasterPublicUuid,
+    ],
   );
 
   return {
@@ -367,5 +397,7 @@ export function useGateway999Intake() {
     incidentsLoading,
     incidentsError,
     loadIncidents,
+    selectedDisasterPublicUuid,
+    setSelectedDisasterPublicUuid,
   };
 }

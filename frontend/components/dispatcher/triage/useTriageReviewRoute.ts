@@ -27,6 +27,7 @@ import type {
   RouteResult,
   ServiceCaseDraft,
 } from "@/components/dispatcher/triage/types";
+import { tryLinkIncidentToDisaster } from "@/lib/disaster-incident-link";
 import {
   classifyIntakeAsServiceCase,
   fetchIntakeReportDetail,
@@ -81,6 +82,9 @@ export function useTriageReviewRoute({
   const [incidentsError, setIncidentsError] = useState<string | null>(null);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedDisasterPublicUuid, setSelectedDisasterPublicUuid] = useState<
+    string | null
+  >(null);
 
   const clearRouteMutationState = useCallback(() => {
     setRouteError(null);
@@ -108,6 +112,7 @@ export function useTriageReviewRoute({
     setIncidentsError(null);
     setLocationDialogOpen(false);
     setHistoryDialogOpen(false);
+    setSelectedDisasterPublicUuid(null);
   }, [clearRouteMutationState]);
 
   const loadDetail = useCallback(
@@ -293,6 +298,16 @@ export function useTriageReviewRoute({
         return;
       }
 
+      if (selectedDisasterPublicUuid) {
+        const linkResult = await tryLinkIncidentToDisaster({
+          disasterUuid: selectedDisasterPublicUuid,
+          incidentUuid: incident.public_uuid,
+        });
+        if (!linkResult.ok) {
+          toast.warning(linkResult.message);
+        }
+      }
+
       await completeRouteSuccess("success_emergency_incident", {
         kind: "emergency_incident",
         publicUuid: incident.public_uuid,
@@ -320,6 +335,7 @@ export function useTriageReviewRoute({
     emergencyDraft,
     reportId,
     selectedDetail,
+    selectedDisasterPublicUuid,
   ]);
 
   const handleSubmitLink = useCallback(async () => {
@@ -349,6 +365,17 @@ export function useTriageReviewRoute({
         note: linkDraft.note.trim() || undefined,
       });
 
+      if (selectedDisasterPublicUuid) {
+        const linkResult = await tryLinkIncidentToDisaster({
+          disasterUuid: selectedDisasterPublicUuid,
+          incidentUuid: linkDraft.incidentId,
+          context: "linked",
+        });
+        if (!linkResult.ok) {
+          toast.warning(linkResult.message);
+        }
+      }
+
       await completeRouteSuccess("success_existing_incident", {
         kind: "existing_incident",
         publicUuid: linkDraft.incidentId,
@@ -370,6 +397,7 @@ export function useTriageReviewRoute({
     linkDraft,
     reportId,
     selectedDetail,
+    selectedDisasterPublicUuid,
   ]);
 
   const clearSuccessAndResetOptions = useCallback(() => {
@@ -448,8 +476,10 @@ export function useTriageReviewRoute({
     locationDialogOpen,
     historyDialogOpen,
     locationDialogItem,
+    selectedDisasterPublicUuid,
     isSuccessRouteMode: isSuccessRouteMode(routeMode),
     setServiceCaseDraft,
+    setSelectedDisasterPublicUuid,
     setEmergencyDraft,
     setLinkDraft,
     setLocationDialogOpen,

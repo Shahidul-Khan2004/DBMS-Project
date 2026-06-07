@@ -5,13 +5,19 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useDispatcherNav } from "@/components/dispatcher/DispatcherNavContext";
 import {
+  getDisasterPrimaryButtonClasses,
+} from "@/components/dispatcher/disasters/disasterColors";
+import {
   DISPATCHER_OPS_TABS,
   getDispatcherOpsSectionLabel,
+  isDispatcherNationalDisasterRoute,
   isDispatcherOpsTabActive,
   isGateway999Route,
 } from "@/components/dispatcher/dispatcherOpsSection";
 import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
 import { Button } from "@/components/ui/Button";
+import { dispatcherNationalDisasterLandingPath } from "@/lib/dispatcher-national-disaster-routes";
+import { useDispatcherActiveDisasters } from "@/lib/hooks/use-dispatcher-active-disasters";
 
 export { DISPATCHER_OPS_TABS };
 
@@ -21,6 +27,9 @@ export function DispatcherOpsNav() {
   const { openMenu } = useDispatcherNav();
   const sectionLabel = getDispatcherOpsSectionLabel(pathname);
   const is999Active = isGateway999Route(pathname);
+  const isNationalDisasterActive = isDispatcherNationalDisasterRoute(pathname);
+  const { totalCount, fetchFailed, loading } = useDispatcherActiveDisasters();
+  const showDisasterCount = !loading && !fetchFailed && totalCount > 0;
 
   return (
     <>
@@ -45,19 +54,33 @@ export function DispatcherOpsNav() {
               </Link>
             );
           })}
+          <Button
+            type="button"
+            variant="emergency"
+            size="sm"
+            className={`ml-1 shrink-0 rounded-md shadow-sm ${
+              is999Active ? DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES : ""
+            }`}
+            aria-current={is999Active ? "page" : undefined}
+            onClick={() => router.push("/dashboard/dispatcher/gateway-999")}
+          >
+            + Start 999 Intake
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="emergency"
-          size="sm"
-          className={`shrink-0 rounded-md shadow-sm ${
-            is999Active ? DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES : ""
-          }`}
-          aria-current={is999Active ? "page" : undefined}
-          onClick={() => router.push("/dashboard/dispatcher/gateway-999")}
-        >
-          + Start 999 Intake
-        </Button>
+        <div className="flex shrink-0 items-center">
+          <Link
+            href={dispatcherNationalDisasterLandingPath()}
+            className={getDisasterPrimaryButtonClasses(isNationalDisasterActive)}
+            aria-current={isNationalDisasterActive ? "page" : undefined}
+          >
+            National Disaster
+            {showDisasterCount ? (
+              <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1 text-xs font-semibold">
+                {totalCount}
+              </span>
+            ) : null}
+          </Link>
+        </div>
       </nav>
 
       <div
