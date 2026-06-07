@@ -136,6 +136,8 @@ Optional proximity sorting uses **stored** `locations` rows only (no raw `latitu
 | Operations | GET | `/operations/intake-reports` | `incident.classify` |
 | Operations | GET | `/operations/intake-reports/:reportPublicUuid` | `incident.classify` |
 | Operations | GET | `/operations/intake-reports/:reportPublicUuid/reported-location-history` | `incident.classify` |
+| Operations | POST | `/operations/intake-reports/:reportPublicUuid/verification` | `reporter_risk.review` or `incident.classify` |
+| Operations | GET | `/operations/intake-reports/:reportPublicUuid/reporter-risk` | `reporter_risk.review` or `incident.classify` |
 | Operations | POST | `/operations/intake-reports/:reportPublicUuid/promote/emergency` | `incident.create` + `incident.classify` |
 | Operations | POST | `/operations/gateway/999/intake-and-incident` | `incident.classify` |
 | Operations | POST | `/operations/incidents` | `incident.create` |
@@ -159,6 +161,10 @@ Optional proximity sorting uses **stored** `locations` rows only (no raw `latitu
 | Admin | PATCH | `/admin/agencies/:agencyPublicUuid/activate` | `agency.manage` |
 | Admin | POST | `/admin/agencies/:agencyPublicUuid/representatives` | `agency.manage` |
 | Admin | GET | `/admin/agencies/:agencyPublicUuid/representatives` | `agency.manage` |
+| Admin | GET | `/admin/reporters/risk` | `reporter_risk.manage` |
+| Admin | GET | `/admin/reporters/:userPublicUuid/risk` | `reporter_risk.manage` |
+| Admin | PATCH | `/admin/users/:userPublicUuid/account-status` | `reporter_risk.manage` |
+| Admin | POST | `/admin/reporters/:userPublicUuid/actions` | `reporter_risk.manage` |
 | Admin | PATCH | `/admin/agency-memberships/:membershipPublicUuid/deactivate` | `agency.manage` |
 | Agency | GET | `/agency/me` | `agency.view_own` + active membership |
 | Agency | GET | `/agency/incidents` | `dispatch.view_own_agency` |
@@ -288,6 +294,56 @@ Registration sets `users.account_status` to **`active`** so the account can log 
   }
 }
 ```
+
+**Example errors (403) — returned only after the email exists and the password is correct:**
+
+`ACCOUNT_SUSPENDED`:
+
+```json
+{
+  "error": {
+    "code": "ACCOUNT_SUSPENDED",
+    "message": "Account suspended",
+    "details": {
+      "accountStatus": "suspended",
+      "reason": "Repeated confirmed malicious false reports",
+      "suspendedUntil": "2026-06-15T18:00:00.000Z",
+      "remainingSeconds": 86400
+    }
+  }
+}
+```
+
+`ACCOUNT_DISABLED`:
+
+```json
+{
+  "error": {
+    "code": "ACCOUNT_DISABLED",
+    "message": "Account disabled",
+    "details": {
+      "accountStatus": "disabled",
+      "reason": "Repeated confirmed malicious false reports"
+    }
+  }
+}
+```
+
+`ACCOUNT_PENDING_VERIFICATION`:
+
+```json
+{
+  "error": {
+    "code": "ACCOUNT_PENDING_VERIFICATION",
+    "message": "Account pending verification",
+    "details": {
+      "accountStatus": "pending_verification"
+    }
+  }
+}
+```
+
+Wrong email/password always returns **`401 INVALID_CREDENTIALS`** and does not reveal account status.
 
 ### POST `/auth/refresh`
 
@@ -941,6 +997,60 @@ Same fields as list elements, plus optional read-only reporter/caller detail:
 ```
 
 **Response (404):** `INTAKE_REPORT_NOT_FOUND`
+
+Optional additive fields on intake detail (`latest_verification`, `reporter_risk`) when the report has a linked reporter user:
+
+```json
+{
+  "intake_report": {
+    "latest_verification": {
+      "verdict": "false_alarm",
+      "confidence_level": "high",
+      "reason": "…",
+      "created_at": "2026-05-04T12:00:00.000Z"
+    },
+    "reporter_risk": {
+      "risk_level": "medium",
+      "total_reports": 12,
+      "false_reports_30d": 2,
+      "malicious_false_reports": 1
+    }
+  }
+}
+```
+
+### POST `/operations/intake-reports/:reportPublicUuid/verification`
+
+Records a dispatcher/system-admin verification verdict for an intake report. Multiple reviews per report are allowed; the latest by `created_at` is the current verification state.
+
+**Permissions:** `reporter_risk.review` or `incident.classify`.
+
+**Body:**
+
+```json
+{
+  "verdict": "malicious_false_report",
+  "reason": "Repeated fake fire reports from same account",
+  "evidenceNote": "Agency checked location; no incident found.",
+  "confidenceLevel": "high"
+}
+```
+
+**Verdict values:** `genuine`, `duplicate`, `mistaken`, `unverified`, `false_alarm`, `malicious_false_report`.
+
+**Validation:** `malicious_false_report` requires `reason` or `evidenceNote`. High confidence on `false_alarm` or `malicious_false_report` requires `evidenceNote`.
+
+**Response (201):** `{ message, verification, reporter_risk }`
+
+**Errors:** `401`, `403`, `404 INTAKE_REPORT_NOT_FOUND`, `422 VALIDATION_ERROR`
+
+### GET `/operations/intake-reports/:reportPublicUuid/reporter-risk`
+
+Returns reporter reliability for the intake’s linked user. Anonymous or unlinked reports return `reporter_risk: null`.
+
+**Permissions:** `reporter_risk.review` or `incident.classify`.
+
+**Response (200):** `{ reporter_risk, recent_verifications }`
 
 ### GET `/operations/intake-reports/:reportPublicUuid/reported-location-history`
 
@@ -3120,6 +3230,62 @@ Deactivated (`finalized`) hub activations are **reactivated** on a new POST for 
 Seeded Kurigram facilities (examples): `f6000001-0000-4000-8000-000000000001` (college shelter), `f6000001-0000-4000-8000-000000000005` (relief warehouse). Relief catalog: `rice`, `bottled_water`, `blanket`, `dry_food_packet`, `medicine_kit`, `hygiene_kit`.
 
 **No disaster operational rows are seeded** — create disasters, areas, declarations, and activations live during demo.
+
+---
+
+## Admin — reporter risk and false report handling
+
+Base path: `/admin`. Requires **`reporter_risk.manage`** (system administrators receive this via bootstrap).
+
+False report handling is a **graduated review system**. Mistaken, duplicate, and unverified reports are **not** treated as malicious abuse. Repeated **confirmed malicious false reports** may lead to warning, suspension, or disabling. **`users.account_status`** remains the lifecycle source of truth (`active`, `suspended`, `disabled`, `pending_verification`); there is no separate ban flag. Emergency reporting is not automatically blocked solely due to false-report history — dispatchers see risk signals and administrators take deliberate action.
+
+### GET `/admin/reporters/risk`
+
+Paginated list from `vw_reporter_reliability`.
+
+**Query:** `riskLevel` (`low`|`medium`|`high`), `accountStatus`, `limit` (1–100, default 50), `offset`, `sort` (`risk_desc`, `false_reports_30d_desc`, `total_reports_desc`, `latest_false_report_desc`).
+
+**Response (200):** `{ reporters, pagination }`
+
+### GET `/admin/reporters/:userPublicUuid/risk`
+
+Reporter profile summary, recent reports with latest verdict, and account action history.
+
+### PATCH `/admin/users/:userPublicUuid/account-status`
+
+**Body:**
+
+```json
+{
+  "accountStatus": "suspended",
+  "reason": "Repeated confirmed malicious false reports",
+  "suspensionDays": 30
+}
+```
+
+Optional timed suspension when `accountStatus` is `suspended` (one of **`suspendedUntil`** or **`suspensionDays`** is required):
+
+* **`suspendedUntil`** — ISO datetime in the future
+* **`suspensionDays`** — integer 1–365
+
+Allowed `accountStatus`: `active`, `suspended`, `disabled`. Writes `reporter_account_actions` (including `suspension_ends_at` when timed) and updates `users.account_status`, `users.account_status_reason`, and `users.account_status_expires_at`. Reactivating clears reason and expiry. Returns **`409 ACCOUNT_STATUS_UNCHANGED`** if status is already set. Admins cannot change their own status (**403**).
+
+**Response user fields include:** `account_status_reason`, `account_status_expires_at` (when suspended).
+
+### POST `/admin/reporters/:userPublicUuid/actions`
+
+Record a warning or note without changing account status.
+
+**Body:**
+
+```json
+{
+  "actionType": "warning",
+  "reason": "First confirmed false report. Citizen warned."
+}
+```
+
+Allowed `actionType`: `warning`, `note`.
 
 ---
 
