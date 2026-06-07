@@ -7,6 +7,7 @@ import {
   TERMINAL_INCIDENT_STATUSES,
   LINKABLE_INCIDENT_STATUSES,
   type LinkIntakeToIncidentPayload,
+  type OperationsIncidentsQuery,
   type OperationsIncidentRow,
   type PromoteEmergencyPayload,
 } from "@/lib/operations-intake-triage";
@@ -109,6 +110,34 @@ export function sortIncidentsByAffectedAreaMatch(
     const aActive = LINKABLE_INCIDENT_STATUSES.has(a.status_code) ? 0 : 1;
     const bActive = LINKABLE_INCIDENT_STATUSES.has(b.status_code) ? 0 : 1;
     if (aActive !== bActive) return aActive - bActive;
+    return 0;
+  });
+}
+
+export async function listOperationsIncidents(
+  query: OperationsIncidentsQuery = {},
+): Promise<OperationsIncidentRow[]> {
+  const data = await getOperationsIncidents({
+    limit: 100,
+    offset: 0,
+    ...query,
+  });
+  return data.incidents ?? [];
+}
+
+export function sortIncidentsForDisasterLink(
+  incidents: OperationsIncidentRow[],
+  linkedIncidentUuids: Set<string>,
+): OperationsIncidentRow[] {
+  return [...incidents].sort((a, b) => {
+    const aLinked = linkedIncidentUuids.has(a.public_uuid) ? 0 : 1;
+    const bLinked = linkedIncidentUuids.has(b.public_uuid) ? 0 : 1;
+    if (aLinked !== bLinked) return aLinked - bLinked;
+
+    const aActive = LINKABLE_INCIDENT_STATUSES.has(a.status_code) ? 0 : 1;
+    const bActive = LINKABLE_INCIDENT_STATUSES.has(b.status_code) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+
     return 0;
   });
 }

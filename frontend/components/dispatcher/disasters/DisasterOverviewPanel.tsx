@@ -17,8 +17,10 @@ import type { OperationsDisasterDashboard } from "@/lib/disaster-operations-type
 
 export function DisasterOverviewPanel({
   dashboard,
+  className = "",
 }: {
   dashboard: OperationsDisasterDashboard;
+  className?: string;
 }) {
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const { disaster } = dashboard;
@@ -30,65 +32,67 @@ export function DisasterOverviewPanel({
     <>
       <DisasterOverviewSectionCard
         title="Disaster Overview"
-        className="shrink-0"
+        className={className}
+        fillBody
+        bodyClassName="flex min-h-0 flex-1 flex-col"
       >
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-xs font-medium text-slate-500">Event code</dt>
-          <dd className="mt-0.5 font-medium text-slate-900">{disaster.event_code}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium text-slate-500">Status</dt>
-          <dd className="mt-0.5">
-            <Badge size="compact" tone="active">
-              {formatBadgeLabel(formatDisasterStatusLabel(disaster.status_code))}
-            </Badge>
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium text-slate-500">Severity</dt>
-          <dd className="mt-0.5 text-slate-900">
-            {formatDisasterSeverityLabel(disaster.severity_level)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium text-slate-500">Type</dt>
-          <dd className="mt-0.5 text-slate-900">
-            {formatDisasterEventTypeLabel(
-              disaster.event_type_code,
-              disaster.event_type_name,
-            )}
-          </dd>
-        </div>
-        {disaster.started_at ? (
           <div>
-            <dt className="text-xs font-medium text-slate-500">Started</dt>
-            <dd className="mt-0.5 text-slate-900">
-              {formatBangladeshTime(disaster.started_at)}
+            <dt className="text-xs font-medium text-slate-500">Event code</dt>
+            <dd className="mt-0.5 font-medium text-slate-900">{disaster.event_code}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-slate-500">Status</dt>
+            <dd className="mt-0.5">
+              <Badge size="compact" tone="active">
+                {formatBadgeLabel(formatDisasterStatusLabel(disaster.status_code))}
+              </Badge>
             </dd>
           </div>
-        ) : null}
-        {disaster.ended_at ? (
           <div>
-            <dt className="text-xs font-medium text-slate-500">Ended</dt>
+            <dt className="text-xs font-medium text-slate-500">Severity</dt>
             <dd className="mt-0.5 text-slate-900">
-              {formatBangladeshTime(disaster.ended_at)}
+              {formatDisasterSeverityLabel(disaster.severity_level)}
             </dd>
           </div>
-        ) : null}
-        <div className="sm:col-span-2">
-          <dt className="text-xs font-medium text-slate-500">Title</dt>
-          <dd className="mt-0.5 font-semibold text-slate-900">{disaster.title}</dd>
-        </div>
-        {disaster.public_guidance ? (
+          <div>
+            <dt className="text-xs font-medium text-slate-500">Type</dt>
+            <dd className="mt-0.5 text-slate-900">
+              {formatDisasterEventTypeLabel(
+                disaster.event_type_code,
+                disaster.event_type_name,
+              )}
+            </dd>
+          </div>
+          {disaster.started_at ? (
+            <div>
+              <dt className="text-xs font-medium text-slate-500">Started</dt>
+              <dd className="mt-0.5 text-slate-900">
+                {formatBangladeshTime(disaster.started_at)}
+              </dd>
+            </div>
+          ) : null}
+          {disaster.ended_at ? (
+            <div>
+              <dt className="text-xs font-medium text-slate-500">Ended</dt>
+              <dd className="mt-0.5 text-slate-900">
+                {formatBangladeshTime(disaster.ended_at)}
+              </dd>
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
-            <dt className="text-xs font-medium text-slate-500">Public guidance</dt>
-            <dd className="mt-0.5 text-slate-700">{disaster.public_guidance}</dd>
+            <dt className="text-xs font-medium text-slate-500">Title</dt>
+            <dd className="mt-0.5 font-semibold text-slate-900">{disaster.title}</dd>
           </div>
-        ) : null}
+          {disaster.public_guidance ? (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500">Public guidance</dt>
+              <dd className="mt-0.5 text-slate-700">{disaster.public_guidance}</dd>
+            </div>
+          ) : null}
         </dl>
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-auto border-t border-slate-100 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">Agency Resources</p>

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { TriageAddToDisasterDialog } from "@/components/dispatcher/disasters/TriageAddToDisasterDialog";
 import { EditReportedLocationDialog } from "@/components/dispatcher/triage/EditReportedLocationDialog";
 import { ReportedLocationHistoryDialog } from "@/components/dispatcher/triage/ReportedLocationHistoryDialog";
 import { ReviewRoutePanel } from "@/components/dispatcher/triage/ReviewRoutePanel";
 import { useTriageReviewRoute } from "@/components/dispatcher/triage/useTriageReviewRoute";
 import type { RouteMode } from "@/components/dispatcher/triage/types";
+import { useDispatcherActiveDisasters } from "@/lib/hooks/use-dispatcher-active-disasters";
 
 export type TriageReviewRouteWorkspaceProps = {
   reportId: string | null;
@@ -41,6 +43,10 @@ export function TriageReviewRouteWorkspace({
   variant = "panel",
   onWorkflowStateChange,
 }: TriageReviewRouteWorkspaceProps) {
+  const [disasterDialogOpen, setDisasterDialogOpen] = useState(false);
+  const { activeDisasters, fetchFailed } = useDispatcherActiveDisasters();
+  const showDisasterRoute = !fetchFailed && activeDisasters.length > 0;
+
   const reviewRoute = useTriageReviewRoute({
     reportId,
     enabled,
@@ -71,7 +77,7 @@ export function TriageReviewRouteWorkspace({
 
   const panelClassName = embedded
     ? `flex h-full min-h-0 w-full min-w-0 flex-col ${className ?? ""}`
-    : `flex min-w-0 flex-col ${className ?? ""}`;
+    : `flex h-full min-h-0 w-full min-w-0 flex-col lg:overflow-hidden ${className ?? ""}`;
 
   const headerSubtitle =
     reviewRoute.displayItem?.reportCode?.trim() ||
@@ -104,13 +110,7 @@ export function TriageReviewRouteWorkspace({
           </div>
         ) : null}
 
-        <div
-          className={
-            variant === "drawer"
-              ? "min-h-0 flex-1 overflow-hidden"
-              : "lg:overflow-hidden"
-          }
-        >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ReviewRoutePanel
           item={reviewRoute.selectedDetail}
           handoffItem={reviewRoute.handoffItem}
@@ -144,6 +144,10 @@ export function TriageReviewRouteWorkspace({
           continueLabel={continueLabel}
           selectedDisasterPublicUuid={reviewRoute.selectedDisasterPublicUuid}
           onDisasterChange={reviewRoute.setSelectedDisasterPublicUuid}
+          showDisasterRoute={showDisasterRoute}
+          onOpenDisasterDialog={() => setDisasterDialogOpen(true)}
+          disasterRouteDisabled={reviewRoute.detailLoading}
+          embedded={embedded}
         />
         </div>
       </div>
@@ -160,6 +164,20 @@ export function TriageReviewRouteWorkspace({
         reportPublicUuid={reviewRoute.locationDialogItem?.id ?? null}
         reportSummary={reviewRoute.locationDialogItem?.summary}
         onClose={() => reviewRoute.setHistoryDialogOpen(false)}
+      />
+
+      <TriageAddToDisasterDialog
+        open={disasterDialogOpen}
+        item={reviewRoute.selectedDetail}
+        activeDisasters={activeDisasters}
+        onClose={() => setDisasterDialogOpen(false)}
+        onSuccess={async () => {
+          await onAfterRouteSuccess?.();
+        }}
+        onEditLocation={() => {
+          setDisasterDialogOpen(false);
+          reviewRoute.setLocationDialogOpen(true);
+        }}
       />
     </>
   );

@@ -67,12 +67,23 @@ export function DisasterCommandOverviewWorkspace({
         }
       />
 
-      <div className="mt-3 grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[minmax(420px,48fr)_minmax(460px,52fr)] lg:items-start">
-        <DisasterOverviewPanel dashboard={dashboard} />
+      <div className="mt-4 grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[minmax(420px,48fr)_minmax(460px,52fr)]">
+        <section className="min-h-0 overflow-hidden">
+          <DisasterOverviewPanel dashboard={dashboard} className="h-full" />
+        </section>
 
-        <section className="grid min-h-0 gap-4 overflow-hidden lg:min-h-0 lg:h-full lg:grid-rows-[minmax(0,52fr)_minmax(0,48fr)]">
-          <DisasterAffectedAreasPanel dashboard={dashboard} />
-          <DisasterActivityPanel dashboard={dashboard} />
+        <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4 overflow-hidden">
+          <DisasterAffectedAreasPanel
+            dashboard={dashboard}
+            className="min-h-0 h-full"
+            previewMode
+          />
+          <DisasterActivityPanel
+            dashboard={dashboard}
+            className="min-h-0 h-full"
+            previewMode
+            compactHeader
+          />
         </section>
       </div>
     </div>
