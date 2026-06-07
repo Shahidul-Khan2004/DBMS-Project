@@ -89,6 +89,22 @@ describe("showcase operational seed integration", { skip: !dbUp || !showcaseEnv 
     assert.ok((messagesRes.body.messages ?? messagesRes.body).length >= 3);
   });
 
+  it("reporter risk demo has five citizens in reliability view", async () => {
+    const [rows] = await pool.execute(
+      `
+        SELECT reporter_full_name, risk_level, account_status
+        FROM vw_reporter_reliability
+        WHERE reporter_email LIKE 'citizen.%@niers.test'
+        ORDER BY reporter_full_name
+      `,
+    );
+    assert.equal(rows.length, 5, "expected five demo citizens in reporter reliability view");
+    const shamim = rows.find((r) => r.reporter_full_name === "Shamim Ahmed");
+    assert.ok(shamim, "expected Shamim Ahmed in reporter reliability view");
+    assert.equal(shamim.risk_level, "high");
+    assert.equal(shamim.account_status, "suspended");
+  });
+
   it("showcase gas-leak incident has fire-service dispatches", async () => {
     const [rows] = await pool.execute(
       `SELECT id FROM emergency_incidents WHERE public_uuid = ? LIMIT 1`,

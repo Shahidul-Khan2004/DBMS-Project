@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useDispatcherNav } from "@/components/dispatcher/DispatcherNavContext";
 import {
-  getDisasterPrimaryButtonClasses,
-} from "@/components/dispatcher/disasters/disasterColors";
+  DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES,
+  getEmergencyPrimaryLinkClasses,
+} from "@/components/dispatcher/emergencyColors";
 import {
   DISPATCHER_OPS_TABS,
   getDispatcherOpsSectionLabel,
@@ -14,7 +15,6 @@ import {
   isDispatcherOpsTabActive,
   isGateway999Route,
 } from "@/components/dispatcher/dispatcherOpsSection";
-import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
 import { Button } from "@/components/ui/Button";
 import { dispatcherNationalDisasterLandingPath } from "@/lib/dispatcher-national-disaster-routes";
 import { useDispatcherActiveDisasters } from "@/lib/hooks/use-dispatcher-active-disasters";
@@ -70,7 +70,7 @@ export function DispatcherOpsNav() {
         <div className="flex shrink-0 items-center">
           <Link
             href={dispatcherNationalDisasterLandingPath()}
-            className={getDisasterPrimaryButtonClasses(isNationalDisasterActive)}
+            className={getEmergencyPrimaryLinkClasses(isNationalDisasterActive)}
             aria-current={isNationalDisasterActive ? "page" : undefined}
           >
             National Disaster

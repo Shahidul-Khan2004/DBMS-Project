@@ -85,6 +85,8 @@ DROP TABLE IF EXISTS case_statuses;
 DROP TABLE IF EXISTS emergency_call_triage_answers;
 DROP TABLE IF EXISTS emergency_call_notes;
 DROP TABLE IF EXISTS emergency_calls;
+DROP TABLE IF EXISTS reporter_account_actions;
+DROP TABLE IF EXISTS intake_report_verification_reviews;
 DROP TABLE IF EXISTS intake_report_attachments;
 DROP TABLE IF EXISTS intake_report_location_history;
 DROP TABLE IF EXISTS intake_report_status_history;

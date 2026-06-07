@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { EmergencyIncidentRouteForm } from "@/components/dispatcher/triage/EmergencyIncidentRouteForm";
 import { ExistingIncidentRouteForm } from "@/components/dispatcher/triage/ExistingIncidentRouteForm";
+import { DismissRouteForm } from "@/components/dispatcher/triage/DismissRouteForm";
 import { ReportedLocationDisplay } from "@/components/dispatcher/triage/ReportedLocationDisplay";
 import { hasValidReportedLocation } from "@/components/dispatcher/triage/reportedLocationCoords";
 import { RouteSelector } from "@/components/dispatcher/triage/RouteSelector";
@@ -11,11 +12,13 @@ import { SelectedIntakeHeader } from "@/components/dispatcher/triage/SelectedInt
 import { ServiceCaseRouteForm } from "@/components/dispatcher/triage/ServiceCaseRouteForm";
 import { WorkflowContextHeader } from "@/components/dispatcher/triage/WorkflowContextHeader";
 import { DisasterLinkSelector } from "@/components/dispatcher/disasters/DisasterLinkSelector";
+import { ReporterReliabilityCard } from "@/components/dispatcher/triage/ReporterReliabilityCard";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { Button } from "@/components/ui/Button";
 import type {
   ActiveIncidentOption,
+  DismissDraft,
   EmergencyDraft,
   IntakeQueueItem,
   LinkDraft,
@@ -23,6 +26,7 @@ import type {
   RouteResult,
   ServiceCaseDraft,
 } from "@/components/dispatcher/triage/types";
+import type { RouteChoice } from "@/components/dispatcher/triage/triageReviewRouteUtils";
 
 interface ReviewRoutePanelProps {
   item: IntakeQueueItem | null;
@@ -34,9 +38,10 @@ interface ReviewRoutePanelProps {
   serviceCaseDraft: ServiceCaseDraft;
   emergencyDraft: EmergencyDraft;
   linkDraft: LinkDraft;
+  dismissDraft: DismissDraft;
   routeResult: RouteResult | null;
   routeError?: string | null;
-  submittingRoute?: "service_case" | "emergency" | "link" | null;
+  submittingRoute?: "service_case" | "emergency" | "link" | "duplicate" | "false_report" | null;
   activeIncidents?: ActiveIncidentOption[];
   incidentsLoading?: boolean;
   incidentsError?: string | null;
@@ -44,16 +49,13 @@ interface ReviewRoutePanelProps {
   onServiceCaseDraftChange: (draft: ServiceCaseDraft) => void;
   onEmergencyDraftChange: (draft: EmergencyDraft) => void;
   onLinkDraftChange: (draft: LinkDraft) => void;
-  onSelectRoute: (
-    mode: Extract<
-      RouteMode,
-      "service_case" | "emergency_incident" | "existing_incident"
-    >,
-  ) => void;
+  onDismissDraftChange: (draft: DismissDraft) => void;
+  onSelectRoute: (mode: RouteChoice) => void;
   onBackToOptions: () => void;
   onSubmitServiceCase: () => void;
   onSubmitEmergency: () => void;
   onSubmitLink: () => void;
+  onSubmitDismiss: () => void;
   onContinueTriage: () => void;
   onEditLocation: () => void;
   onViewHistory: () => void;
@@ -66,13 +68,18 @@ interface ReviewRoutePanelProps {
   onOpenDisasterDialog?: () => void;
   disasterRouteDisabled?: boolean;
   embedded?: boolean;
+  reporterRisk?: import("@/types/reporter-risk").ReporterRiskSummary | null;
+  reporterRiskLoading?: boolean;
+  onRecordVerification?: () => void;
 }
 
 function isFormRouteMode(mode: RouteMode): boolean {
   return (
     mode === "service_case" ||
     mode === "emergency_incident" ||
-    mode === "existing_incident"
+    mode === "existing_incident" ||
+    mode === "duplicate" ||
+    mode === "false_report"
   );
 }
 
@@ -155,6 +162,7 @@ export function ReviewRoutePanel({
   serviceCaseDraft,
   emergencyDraft,
   linkDraft,
+  dismissDraft,
   routeResult,
   routeError = null,
   submittingRoute = null,
@@ -165,11 +173,13 @@ export function ReviewRoutePanel({
   onServiceCaseDraftChange,
   onEmergencyDraftChange,
   onLinkDraftChange,
+  onDismissDraftChange,
   onSelectRoute,
   onBackToOptions,
   onSubmitServiceCase,
   onSubmitEmergency,
   onSubmitLink,
+  onSubmitDismiss,
   onContinueTriage,
   onEditLocation,
   onViewHistory,
@@ -182,6 +192,9 @@ export function ReviewRoutePanel({
   onOpenDisasterDialog,
   disasterRouteDisabled = false,
   embedded = false,
+  reporterRisk = null,
+  reporterRiskLoading = false,
+  onRecordVerification,
 }: ReviewRoutePanelProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
@@ -194,7 +207,9 @@ export function ReviewRoutePanel({
   const isSuccessMode =
     routeMode === "success_service_case" ||
     routeMode === "success_emergency_incident" ||
-    routeMode === "success_existing_incident";
+    routeMode === "success_existing_incident" ||
+    routeMode === "success_duplicate" ||
+    routeMode === "success_false_report";
 
   const isFormMode = isFormRouteMode(routeMode);
   const isDefaultReview = routeMode === "options";
@@ -202,7 +217,9 @@ export function ReviewRoutePanel({
   const formRouteError =
     routeMode === "service_case" ||
     routeMode === "emergency_incident" ||
-    routeMode === "existing_incident"
+    routeMode === "existing_incident" ||
+    routeMode === "duplicate" ||
+    routeMode === "false_report"
       ? routeError
       : null;
 
@@ -243,6 +260,7 @@ export function ReviewRoutePanel({
               <RouteSelector
                 routeMode={routeMode}
                 onSelect={onSelectRoute}
+                showDismissRoutes
                 showDisasterRoute={showDisasterRoute}
                 onOpenDisasterDialog={onOpenDisasterDialog}
                 disasterRouteDisabled={disasterRouteDisabled}
@@ -293,6 +311,12 @@ export function ReviewRoutePanel({
           <>
             {isDefaultReview ? (
               <>
+                <ReporterReliabilityCard
+                  reporterRisk={reporterRisk}
+                  loading={reporterRiskLoading}
+                  onRecordVerification={onRecordVerification}
+                />
+
                 <ReportedLocationDisplay
                   location={displayItem.location}
                   previewKey={displayItem.id}
@@ -322,7 +346,6 @@ export function ReviewRoutePanel({
                   <ServiceCaseRouteForm
                     draft={serviceCaseDraft}
                     onChange={onServiceCaseDraftChange}
-                    onBack={onBackToOptions}
                     onSubmit={onSubmitServiceCase}
                     submitError={formRouteError}
                     isSubmitting={submittingRoute === "service_case"}
@@ -336,7 +359,6 @@ export function ReviewRoutePanel({
                       item={displayItem}
                       draft={emergencyDraft}
                       onChange={onEmergencyDraftChange}
-                      onBack={onBackToOptions}
                       onSubmit={onSubmitEmergency}
                       onEditReportedLocation={onEditLocation}
                       submitError={formRouteError}
@@ -364,7 +386,6 @@ export function ReviewRoutePanel({
                     incidentsError={incidentsError}
                     onRetryIncidents={onRetryIncidents}
                     onChange={onLinkDraftChange}
-                    onBack={onBackToOptions}
                     onSubmit={onSubmitLink}
                     submitError={formRouteError}
                     isSubmitting={submittingRoute === "link"}
@@ -377,6 +398,17 @@ export function ReviewRoutePanel({
                     selectedDisasterPublicUuid={selectedDisasterPublicUuid}
                     onChange={onDisasterChange}
                     disabled={submittingRoute === "link" || routeSubmitDisabled}
+                  />
+                ) : null}
+
+                {routeMode === "duplicate" || routeMode === "false_report" ? (
+                  <DismissRouteForm
+                    disposition={routeMode}
+                    draft={dismissDraft}
+                    onChange={onDismissDraftChange}
+                    onSubmit={onSubmitDismiss}
+                    submitError={formRouteError}
+                    isSubmitting={submittingRoute === routeMode}
                   />
                 ) : null}
               </div>

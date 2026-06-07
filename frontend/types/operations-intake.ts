@@ -35,6 +35,13 @@ export interface OperationsIntakeReport {
   reporter?: OperationsIntakeReporter | null;
   /** Present on GET /operations/intake-reports/:uuid detail only. */
   emergency_call?: OperationsEmergencyCall | null;
+  latest_verification?: {
+    verdict: string;
+    confidence_level: string;
+    reason?: string | null;
+    created_at: string;
+  } | null;
+  reporter_risk?: import("@/types/reporter-risk").ReporterRiskSummary | null;
   /** Not returned by operations mapper; optional for legacy UI. */
   location_text?: string | null;
   has_service_case: boolean;

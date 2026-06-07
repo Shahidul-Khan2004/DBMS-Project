@@ -13,6 +13,8 @@ Copy [`backend/.env.example`](../backend/.env.example) as a starting point. Pass
 | `citizen.rahima@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
 | `citizen.karim@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
 | `citizen.farhana@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
+| `citizen.rubel@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
+| `citizen.shamim@niers.test` | `citizen` | `DEMO_CITIZEN_PASSWORD` | `ChangeMeCitizen123` |
 | `fire.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
 | `police.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
 | `medical.rep@niers.test` | `agency_representative` | `DEMO_REP_PASSWORD` | `ChangeMeDemoRep123` |
@@ -25,7 +27,7 @@ All demo passwords (`DEMO_*`) must be **at least 8 characters** or bootstrap is 
 
 ## Showcase seed (day-to-day operations)
 
-When `DEMO_CITIZEN_PASSWORD` is set, the backend also applies operational demo SQL (`29`–`31` in [`docker-init/`](../backend/src/schemas/docker-init/)) after creating demo citizens.
+When `DEMO_CITIZEN_PASSWORD` is set, the backend also applies operational demo SQL (`29`–`32` in [`docker-init/`](../backend/src/schemas/docker-init/)) after creating demo citizens.
 
 **What is pre-seeded**
 
@@ -51,6 +53,18 @@ When `DEMO_CITIZEN_PASSWORD` is set, the backend also applies operational demo S
 | `citizen.rahima@niers.test` | Rahima Begum | `01710000001` |
 | `citizen.karim@niers.test` | Abdul Karim | `01710000002` |
 | `citizen.farhana@niers.test` | Farhana Akter | `01710000003` |
+| `citizen.rubel@niers.test` | Rubel Hossain | `01710000004` |
+| `citizen.shamim@niers.test` | Shamim Ahmed | `01710000005` |
+
+**Reporter risk demo personas** (seed `32`, after bootstrap):
+
+| Citizen | Risk profile |
+|---------|----------------|
+| Rahima Begum | Genuine reports, low risk |
+| Abdul Karim | Duplicate reports |
+| Farhana Akter | False alarms, medium risk (warning recorded) |
+| Rubel Hossain | Repeated false alarms |
+| Shamim Ahmed | Malicious spam, high risk, 30-day timed suspension |
 
 **Bootstrap:** [`demoCitizenBootstrapService.js`](../backend/src/services/demoCitizenBootstrapService.js)
 

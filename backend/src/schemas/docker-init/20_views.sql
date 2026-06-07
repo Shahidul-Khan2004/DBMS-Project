@@ -386,3 +386,91 @@ INNER JOIN facilities f ON f.id = rha.facility_id
 INNER JOIN vw_disaster_relief_inventory_balance inv ON inv.relief_hub_activation_id = rha.id
 INNER JOIN relief_items ri ON ri.id = inv.relief_item_id
 WHERE rha.activation_status = 'active';
+
+CREATE VIEW vw_reporter_reliability AS
+SELECT
+    u.id AS reporter_user_id,
+    u.public_uuid AS reporter_public_uuid,
+    up.full_name AS reporter_full_name,
+    u.email AS reporter_email,
+    up.phone_number AS reporter_phone_number,
+    u.account_status,
+    u.account_status_expires_at,
+    stats.total_reports,
+    stats.reviewed_reports,
+    stats.genuine_reports,
+    stats.duplicate_reports,
+    stats.mistaken_reports,
+    stats.unverified_reports,
+    stats.false_alarm_reports,
+    stats.malicious_false_reports,
+    stats.false_reports_30d,
+    stats.malicious_false_reports_30d,
+    stats.latest_false_report_at,
+    stats.latest_report_at,
+    CASE
+        WHEN stats.malicious_false_reports_30d >= 2
+            OR stats.false_reports_30d >= 4
+            OR stats.malicious_false_reports >= 3 THEN 'high'
+        WHEN stats.malicious_false_reports_30d = 1
+            OR stats.false_reports_30d BETWEEN 2 AND 3
+            OR stats.false_alarm_reports >= 3 THEN 'medium'
+        ELSE 'low'
+    END AS risk_level
+FROM users u
+INNER JOIN user_profiles up ON up.user_id = u.id
+INNER JOIN (
+    SELECT
+        ir.reporter_user_id,
+        COUNT(*) AS total_reports,
+        SUM(CASE WHEN lv.verdict IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_reports,
+        SUM(CASE WHEN lv.verdict = 'genuine' THEN 1 ELSE 0 END) AS genuine_reports,
+        SUM(CASE WHEN lv.verdict = 'duplicate' THEN 1 ELSE 0 END) AS duplicate_reports,
+        SUM(CASE WHEN lv.verdict = 'mistaken' THEN 1 ELSE 0 END) AS mistaken_reports,
+        SUM(CASE WHEN lv.verdict = 'unverified' THEN 1 ELSE 0 END) AS unverified_reports,
+        SUM(CASE WHEN lv.verdict = 'false_alarm' THEN 1 ELSE 0 END) AS false_alarm_reports,
+        SUM(CASE WHEN lv.verdict = 'malicious_false_report' THEN 1 ELSE 0 END) AS malicious_false_reports,
+        SUM(
+            CASE
+                WHEN lv.verdict IN ('false_alarm', 'malicious_false_report')
+                    AND lv.created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)
+                THEN 1
+                ELSE 0
+            END
+        ) AS false_reports_30d,
+        SUM(
+            CASE
+                WHEN lv.verdict = 'malicious_false_report'
+                    AND lv.created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)
+                THEN 1
+                ELSE 0
+            END
+        ) AS malicious_false_reports_30d,
+        MAX(
+            CASE
+                WHEN lv.verdict IN ('false_alarm', 'malicious_false_report')
+                THEN lv.created_at
+                ELSE NULL
+            END
+        ) AS latest_false_report_at,
+        MAX(ir.reported_at) AS latest_report_at
+    FROM intake_reports ir
+    LEFT JOIN (
+        SELECT intake_report_id, verdict, created_at
+        FROM (
+            SELECT
+                intake_report_id,
+                verdict,
+                created_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY intake_report_id
+                    ORDER BY created_at DESC, id DESC
+                ) AS rn
+            FROM intake_report_verification_reviews
+        ) ranked
+        WHERE rn = 1
+    ) lv ON lv.intake_report_id = ir.id
+    WHERE ir.reporter_user_id IS NOT NULL
+    GROUP BY ir.reporter_user_id
+) stats ON stats.reporter_user_id = u.id;
+

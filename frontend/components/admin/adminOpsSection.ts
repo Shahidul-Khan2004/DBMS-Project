@@ -36,6 +36,9 @@ export function getAdminOpsSectionLabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/admin/dispatcher-oversight")) {
     return "Dispatcher Oversight";
   }
+  if (pathname.startsWith("/dashboard/admin/reporter-risk")) {
+    return "Reporter Risk";
+  }
   if (pathname === "/dashboard/admin") {
     return "Command Center";
   }

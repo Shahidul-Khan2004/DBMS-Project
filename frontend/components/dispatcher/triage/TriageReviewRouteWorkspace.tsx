@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { TriageAddToDisasterDialog } from "@/components/dispatcher/disasters/TriageAddToDisasterDialog";
 import { EditReportedLocationDialog } from "@/components/dispatcher/triage/EditReportedLocationDialog";
+import { RecordVerificationModal } from "@/components/dispatcher/triage/RecordVerificationModal";
 import { ReportedLocationHistoryDialog } from "@/components/dispatcher/triage/ReportedLocationHistoryDialog";
 import { ReviewRoutePanel } from "@/components/dispatcher/triage/ReviewRoutePanel";
 import { useTriageReviewRoute } from "@/components/dispatcher/triage/useTriageReviewRoute";
@@ -121,6 +122,7 @@ export function TriageReviewRouteWorkspace({
           serviceCaseDraft={reviewRoute.serviceCaseDraft}
           emergencyDraft={reviewRoute.emergencyDraft}
           linkDraft={reviewRoute.linkDraft}
+          dismissDraft={reviewRoute.dismissDraft}
           routeResult={reviewRoute.routeResult}
           routeError={reviewRoute.routeError}
           submittingRoute={reviewRoute.submittingRoute}
@@ -131,11 +133,13 @@ export function TriageReviewRouteWorkspace({
           onServiceCaseDraftChange={reviewRoute.setServiceCaseDraft}
           onEmergencyDraftChange={reviewRoute.setEmergencyDraft}
           onLinkDraftChange={reviewRoute.setLinkDraft}
+          onDismissDraftChange={reviewRoute.setDismissDraft}
           onSelectRoute={reviewRoute.handleSelectRoute}
           onBackToOptions={reviewRoute.handleBackToOptions}
           onSubmitServiceCase={() => void reviewRoute.handleSubmitServiceCase()}
           onSubmitEmergency={() => void reviewRoute.handleSubmitEmergency()}
           onSubmitLink={() => void reviewRoute.handleSubmitLink()}
+          onSubmitDismiss={() => void reviewRoute.handleSubmitDismiss()}
           onContinueTriage={() => void handleContinueAfterSuccess()}
           onEditLocation={() => reviewRoute.setLocationDialogOpen(true)}
           onViewHistory={() => reviewRoute.setHistoryDialogOpen(true)}
@@ -148,6 +152,9 @@ export function TriageReviewRouteWorkspace({
           onOpenDisasterDialog={() => setDisasterDialogOpen(true)}
           disasterRouteDisabled={reviewRoute.detailLoading}
           embedded={embedded}
+          reporterRisk={reviewRoute.reporterRisk}
+          reporterRiskLoading={reviewRoute.reporterRiskLoading}
+          onRecordVerification={() => reviewRoute.setVerificationModalOpen(true)}
         />
         </div>
       </div>
@@ -178,6 +185,13 @@ export function TriageReviewRouteWorkspace({
           setDisasterDialogOpen(false);
           reviewRoute.setLocationDialogOpen(true);
         }}
+      />
+
+      <RecordVerificationModal
+        open={reviewRoute.verificationModalOpen}
+        reportPublicUuid={reportId ?? ""}
+        onClose={() => reviewRoute.setVerificationModalOpen(false)}
+        onSuccess={(risk) => reviewRoute.setReporterRisk(risk)}
       />
     </>
   );

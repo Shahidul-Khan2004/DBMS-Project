@@ -9,7 +9,6 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 interface ServiceCaseRouteFormProps {
   draft: ServiceCaseDraft;
   onChange: (draft: ServiceCaseDraft) => void;
-  onBack: () => void;
   onSubmit: () => void;
   submitError?: string | null;
   isSubmitting?: boolean;
@@ -19,7 +18,6 @@ interface ServiceCaseRouteFormProps {
 export function ServiceCaseRouteForm({
   draft,
   onChange,
-  onBack,
   onSubmit,
   submitError = null,
   isSubmitting = false,
@@ -86,10 +84,7 @@ export function ServiceCaseRouteForm({
 
       {submitError ? <ErrorAlert message={submitError} /> : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-3">
-        <Button type="button" variant="secondary" size="sm" onClick={onBack}>
-          Back to Route Options
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3">
         <Button
           type="button"
           variant="primary"

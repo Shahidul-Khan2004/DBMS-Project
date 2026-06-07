@@ -18,4 +18,5 @@ DROP VIEW IF EXISTS vw_dispatcher_performance;
 DROP VIEW IF EXISTS vw_intake_operator_performance;
 DROP VIEW IF EXISTS vw_duplicate_emergency_call_clusters;
 DROP VIEW IF EXISTS vw_admin_case_queue;
+DROP VIEW IF EXISTS vw_reporter_reliability;
 DROP VIEW IF EXISTS vw_user_case_dashboard;

@@ -6,15 +6,15 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 import { useDispatcherNav } from "@/components/dispatcher/DispatcherNavContext";
 import {
-  getDisasterPrimaryButtonClasses,
-} from "@/components/dispatcher/disasters/disasterColors";
-import {
   DISPATCHER_OPS_TABS,
   isDispatcherNationalDisasterRoute,
   isDispatcherOpsTabActive,
   isGateway999Route,
 } from "@/components/dispatcher/dispatcherOpsSection";
-import { DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES } from "@/components/dispatcher/emergencyColors";
+import {
+  DISPATCHER_EMERGENCY_ACTIVE_RING_CLASSES,
+  getEmergencyPrimaryLinkClasses,
+} from "@/components/dispatcher/emergencyColors";
 import { Button } from "@/components/ui/Button";
 import { dispatcherNationalDisasterLandingPath } from "@/lib/dispatcher-national-disaster-routes";
 import { useDispatcherActiveDisasters } from "@/lib/hooks/use-dispatcher-active-disasters";
@@ -132,7 +132,7 @@ export function DispatcherOpsDrawer() {
             </Button>
             <Link
               href={dispatcherNationalDisasterLandingPath()}
-              className={`${getDisasterPrimaryButtonClasses(isNationalDisasterActive)} w-full justify-between rounded-lg px-3 py-2.5`}
+              className={`${getEmergencyPrimaryLinkClasses(isNationalDisasterActive)} w-full justify-between rounded-lg px-3 py-2.5`}
               aria-current={isNationalDisasterActive ? "page" : undefined}
               onClick={closeMenu}
             >

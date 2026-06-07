@@ -5,6 +5,7 @@ import type {
 import { getSeverityBadgeTone } from "@/components/dispatcher/incidents/severityStyles";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { formatReportStatus } from "@/lib/report-status";
 
 const SUCCESS_PANEL_CLASSES =
   "rounded-lg border border-[#006747]/25 bg-[#F0F7F4] p-2.5 text-sm ring-1 ring-[#006747]/20";
@@ -129,42 +130,89 @@ export function RouteSuccessHandoff({
     );
   }
 
-  return (
-    <div className="space-y-3">
-      <header>
-        <h4 className="text-sm font-semibold text-[#006747]">Report Linked to Incident</h4>
-        <p className="mt-1 text-sm font-medium text-slate-800">{item.summary}</p>
-      </header>
+  if (routeResult.kind === "duplicate" || routeResult.kind === "false_report") {
+    const title =
+      routeResult.kind === "duplicate"
+        ? "Report Marked Duplicate"
+        : "Report Marked False";
 
-      <section className={SUCCESS_PANEL_CLASSES}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#006747]">
-          Linked to
-        </p>
-        {routeResult.incidentCode ? (
-          <p className="mt-1 font-mono text-sm font-medium text-slate-900">
-            {routeResult.incidentCode}
+    return (
+      <div className="space-y-3">
+        <header>
+          <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+          <p className="mt-1 text-sm font-medium text-slate-800">{item.summary}</p>
+        </header>
+
+        <section className={NEUTRAL_PANEL_CLASSES}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Intake Closed
           </p>
-        ) : null}
-        <p className="mt-1 font-medium text-slate-900">{routeResult.incidentTitle}</p>
-      </section>
+          {routeResult.reportCode ? (
+            <p className="mt-1 font-mono text-sm font-medium text-slate-900">
+              {routeResult.reportCode}
+            </p>
+          ) : null}
+          <p className="mt-2 text-slate-600">
+            Status:{" "}
+            <Badge tone={routeResult.intakeStatus} size="compact">
+              {formatReportStatus(routeResult.intakeStatus)}
+            </Badge>
+          </p>
+        </section>
 
-      <p className="text-sm text-slate-600">
-        This report is now linked to the selected active incident.
-      </p>
+        <p className="text-sm text-slate-600">
+          This report has been removed from the triage queue.
+        </p>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="primary" size="sm" onClick={onOpenDetail}>
-          Open Incident Command
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={onContinueTriage}
-        >
-          {continueLabel}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="primary" size="sm" onClick={onContinueTriage}>
+            {continueLabel}
+          </Button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (routeResult.kind === "existing_incident") {
+    return (
+      <div className="space-y-3">
+        <header>
+          <h4 className="text-sm font-semibold text-[#006747]">Report Linked to Incident</h4>
+          <p className="mt-1 text-sm font-medium text-slate-800">{item.summary}</p>
+        </header>
+
+        <section className={SUCCESS_PANEL_CLASSES}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#006747]">
+            Linked to
+          </p>
+          {routeResult.incidentCode ? (
+            <p className="mt-1 font-mono text-sm font-medium text-slate-900">
+              {routeResult.incidentCode}
+            </p>
+          ) : null}
+          <p className="mt-1 font-medium text-slate-900">{routeResult.incidentTitle}</p>
+        </section>
+
+        <p className="text-sm text-slate-600">
+          This report is now linked to the selected active incident.
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="primary" size="sm" onClick={onOpenDetail}>
+            Open Incident Command
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onContinueTriage}
+          >
+            {continueLabel}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

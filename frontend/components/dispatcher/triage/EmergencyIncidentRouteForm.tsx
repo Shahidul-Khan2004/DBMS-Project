@@ -10,7 +10,6 @@ interface EmergencyIncidentRouteFormProps {
   item: IntakeQueueItem;
   draft: EmergencyDraft;
   onChange: (draft: EmergencyDraft) => void;
-  onBack: () => void;
   onSubmit: () => void;
   onEditReportedLocation: () => void;
   submitError?: string | null;
@@ -22,7 +21,6 @@ export function EmergencyIncidentRouteForm({
   item,
   draft,
   onChange,
-  onBack,
   onSubmit,
   onEditReportedLocation,
   submitError = null,
@@ -122,10 +120,7 @@ export function EmergencyIncidentRouteForm({
 
       {submitError ? <ErrorAlert message={submitError} /> : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 pt-3">
-        <Button type="button" variant="secondary" size="sm" onClick={onBack}>
-          Back to Route Options
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3">
         <Button
           type="button"
           variant="primary"

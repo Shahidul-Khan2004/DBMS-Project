@@ -38,6 +38,8 @@ const ALL_PERMISSION_CODES = [
   "relief.manage_requests",
   "relief.request_own_shelter",
   "relief.distribute",
+  "reporter_risk.review",
+  "reporter_risk.manage",
 ];
 
 const DISPATCHER_PERMISSION_CODES = [
@@ -55,6 +57,7 @@ const DISPATCHER_PERMISSION_CODES = [
   "disaster.manage_affected_areas",
   "disaster.link_incidents",
   "facility.read",
+  "reporter_risk.review",
 ];
 
 const AGENCY_REP_PERMISSION_CODES = [

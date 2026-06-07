@@ -94,6 +94,11 @@ export const classifyEmergency999Schema = z.object({
   reportedAt: z.iso.datetime({ offset: true }).optional(),
 });
 
+export const dismissIntakeReportSchema = z.object({
+  disposition: z.enum(["duplicate", "false_report"]),
+  note: z.string().trim().max(500).optional(),
+});
+
 export const userRoleAssignmentSchema = z.object({
   roleCode: z
     .string()
@@ -482,3 +487,147 @@ export const updateMyProfileSchema = z
       message: "At least one editable field must be provided",
     },
   );
+
+const verificationVerdictEnum = z.enum([
+  "genuine",
+  "duplicate",
+  "mistaken",
+  "unverified",
+  "false_alarm",
+  "malicious_false_report",
+]);
+
+const verificationConfidenceEnum = z.enum(["low", "medium", "high"]);
+
+export const intakeReportVerificationBodySchema = z
+  .object({
+    verdict: verificationVerdictEnum,
+    reason: z
+      .string()
+      .trim()
+      .max(255, "reason must be at most 255 characters")
+      .optional(),
+    evidenceNote: z
+      .string()
+      .trim()
+      .max(2000, "evidenceNote must be at most 2000 characters")
+      .optional(),
+    confidenceLevel: verificationConfidenceEnum.optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    confidenceLevel: data.confidenceLevel ?? "medium",
+  }))
+  .superRefine((data, ctx) => {
+    const hasReason = Boolean(data.reason?.trim());
+    const hasEvidence = Boolean(data.evidenceNote?.trim());
+
+    if (data.verdict === "malicious_false_report" && !hasReason && !hasEvidence) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "reason or evidenceNote is required for malicious_false_report verdict",
+        path: ["evidenceNote"],
+      });
+    }
+
+    if (
+      data.confidenceLevel === "high" &&
+      (data.verdict === "false_alarm" || data.verdict === "malicious_false_report") &&
+      !hasEvidence
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "evidenceNote is required when confidenceLevel is high for false verdicts",
+        path: ["evidenceNote"],
+      });
+    }
+  });
+
+export const adminAccountStatusBodySchema = z
+  .object({
+    accountStatus: z.enum(["active", "suspended", "disabled"]),
+    reason: z
+      .string()
+      .trim()
+      .min(5, "reason must be at least 5 characters")
+      .max(500, "reason must be at most 500 characters"),
+    suspensionDays: z.coerce.number().int().min(1).max(365).optional(),
+    suspendedUntil: z
+      .string()
+      .datetime({ message: "suspendedUntil must be a valid ISO datetime" })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.accountStatus !== "suspended") {
+      if (data.suspensionDays != null || data.suspendedUntil != null) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "suspensionDays and suspendedUntil are only allowed when accountStatus is suspended",
+          path: ["suspensionDays"],
+        });
+      }
+      return;
+    }
+
+    if (data.suspensionDays != null && data.suspendedUntil != null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Provide suspensionDays or suspendedUntil, not both",
+        path: ["suspendedUntil"],
+      });
+    }
+
+    if (data.suspendedUntil) {
+      const until = new Date(data.suspendedUntil);
+      if (Number.isNaN(until.getTime()) || until <= new Date()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "suspendedUntil must be a future datetime",
+          path: ["suspendedUntil"],
+        });
+      }
+      return;
+    }
+
+    if (data.suspensionDays == null) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "suspendedUntil or suspensionDays is required when accountStatus is suspended",
+        path: ["suspendedUntil"],
+      });
+    }
+  });
+
+export const adminReporterActionBodySchema = z.object({
+  actionType: z.enum(["warning", "note"]),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "reason must be at least 5 characters")
+    .max(500, "reason must be at most 500 characters"),
+});
+
+export const adminListReporterRiskQuerySchema = z.object({
+  riskLevel: z.enum(["low", "medium", "high"]).optional(),
+  accountStatus: z
+    .enum(["active", "suspended", "disabled", "pending_verification"])
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+  sort: z
+    .enum([
+      "risk_desc",
+      "false_reports_30d_desc",
+      "total_reports_desc",
+      "latest_false_report_desc",
+    ])
+    .optional(),
+});
+
+export const userPublicUuidParamSchema = z.object({
+  userPublicUuid: z.uuid({ message: "Invalid user id" }),
+});

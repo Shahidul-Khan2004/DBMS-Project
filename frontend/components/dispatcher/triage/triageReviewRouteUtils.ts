@@ -28,14 +28,20 @@ export function resetDraftsForItem(item: IntakeQueueItem) {
 
 export type RouteChoice = Extract<
   RouteMode,
-  "service_case" | "emergency_incident" | "existing_incident"
+  | "service_case"
+  | "emergency_incident"
+  | "existing_incident"
+  | "duplicate"
+  | "false_report"
 >;
 
 export function isSuccessRouteMode(mode: RouteMode): boolean {
   return (
     mode === "success_service_case" ||
     mode === "success_emergency_incident" ||
-    mode === "success_existing_incident"
+    mode === "success_existing_incident" ||
+    mode === "success_duplicate" ||
+    mode === "success_false_report"
   );
 }
 

@@ -18,8 +18,13 @@ import {
   findIntakeReportDetailForOperations,
   listIntakeReportsForOperations,
 } from "../repositories/operationsIntakeRepo.js";
+import { dismissIntakeReportInTransaction } from "../repositories/intakeGatewayRepo.js";
 import { listIntakeReportLocationHistory } from "../repositories/intakeRepo.js";
 import { findIntakeReportByPublicUuid } from "../repositories/intakeRepo.js";
+import {
+  resolveIntakeReportIdByPublicUuid,
+} from "../repositories/reporterVerificationRepo.js";
+import { getLatestVerificationAndReporterRisk } from "./reporterVerificationService.js";
 import { createNotification } from "./notificationService.js";
 import { mergeGeoSortIntoFilters, resolveGeoSortFromQuery } from "./geoSortService.js";
 
@@ -58,7 +63,13 @@ export async function operationsListIntakeReports(queryFilters) {
 }
 
 export async function operationsGetIntakeReport(publicUuid) {
-  return findIntakeReportDetailForOperations(publicUuid);
+  const row = await findIntakeReportDetailForOperations(publicUuid);
+  const reportMeta = await resolveIntakeReportIdByPublicUuid(publicUuid);
+  const enrichment = await getLatestVerificationAndReporterRisk(
+    reportMeta.id,
+    reportMeta.reporter_user_id,
+  );
+  return { ...row, ...enrichment };
 }
 
 export async function operationsGetIntakeReportLocationHistory(actorUserId, reportPublicUuid) {
@@ -67,6 +78,21 @@ export async function operationsGetIntakeReportLocationHistory(actorUserId, repo
     actorUserId,
     actorRoleCodes: ["dispatcher"],
   });
+}
+
+export async function operationsDismissIntakeReport(
+  actorUserId,
+  reportPublicUuid,
+  body,
+) {
+  await dismissIntakeReportInTransaction({
+    intakeReportPublicUuid: reportPublicUuid,
+    actorUserId,
+    disposition: body.disposition,
+    note: body.note,
+  });
+
+  return findIntakeReportDetailForOperations(reportPublicUuid);
 }
 
 export async function operationsCreateStandaloneIncident(actorUserId, body) {

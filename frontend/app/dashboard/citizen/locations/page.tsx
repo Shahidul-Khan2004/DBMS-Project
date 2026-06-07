@@ -218,7 +218,7 @@ export default function CitizenLocationsPage() {
           subtitle="Search or place a marker for the location you want to save."
           icon={<PlusCircle className="h-5 w-5" aria-hidden />}
           className="self-start [&_header]:px-4 [&_header]:py-3"
-          contentClassName="!p-4"
+          contentClassName="!p-4 space-y-3"
         >
             {error && <ErrorAlert message={error} />}
             {message && (
@@ -290,7 +290,7 @@ export default function CitizenLocationsPage() {
                 )}
               </div>
 
-              <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2">
+              <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-3">
                 <p className="text-xs font-medium text-slate-700">
                   Optional location details
                 </p>
@@ -338,7 +338,7 @@ export default function CitizenLocationsPage() {
                     />
                   </div>
                 </div>
-                <div className="mt-3 flex justify-end">
+                <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3">
                   <Button
                     type="button"
                     isLoading={saving}
@@ -414,6 +414,7 @@ export default function CitizenLocationsPage() {
                   title="No saved locations yet."
                   description="Add your home, workplace, school, or another place you report from often."
                   icon={<MapPin className="h-6 w-6" aria-hidden />}
+                  className="w-full"
                 />
               </div>
             ) : (

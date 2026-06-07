@@ -239,7 +239,15 @@ export function Gateway999IntakePanel({
           <section aria-labelledby="gateway-route">
             <RouteSelector
               routeMode={routeMode}
-              onSelect={onSelectRoute}
+              onSelect={(mode) => {
+                if (
+                  mode === "service_case" ||
+                  mode === "emergency_incident" ||
+                  mode === "existing_incident"
+                ) {
+                  onSelectRoute(mode);
+                }
+              }}
               disabled={isSubmitting}
               title="Route This Call"
               subtitle="Choose where this live call should be routed."
