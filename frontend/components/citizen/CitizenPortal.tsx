@@ -50,6 +50,8 @@ type CitizenSectionCardProps = {
   title: string;
   subtitle?: string;
   icon?: ReactNode;
+  topBar?: ReactNode;
+  headerAction?: ReactNode;
   children: ReactNode;
   className?: string;
   contentClassName?: string;
@@ -59,6 +61,8 @@ export function CitizenSectionCard({
   title,
   subtitle,
   icon,
+  topBar,
+  headerAction,
   children,
   className = "",
   contentClassName = "",
@@ -67,21 +71,29 @@ export function CitizenSectionCard({
     <section
       className={`overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 ${className}`}
     >
+      {topBar ? (
+        <div className="border-b border-[#002D62]/10 px-4 py-3 sm:px-5">
+          {topBar}
+        </div>
+      ) : null}
       <header className="shrink-0 border-b border-[#002D62]/10 px-4 py-3.5 sm:px-5">
-        <div className="flex items-center gap-3">
-          {icon ? (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#002D62]">
-              {icon}
-            </div>
-          ) : null}
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-[#002D62]">{title}</h3>
-            {subtitle ? (
-              <p className="mt-1 text-sm leading-5 text-[#42547A]">
-                {subtitle}
-              </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {icon ? (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#002D62]">
+                {icon}
+              </div>
             ) : null}
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold text-[#002D62]">{title}</h3>
+              {subtitle ? (
+                <p className="mt-1 text-sm leading-5 text-[#42547A]">
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
           </div>
+          {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
         </div>
       </header>
       <div className={`p-4 sm:p-5 ${contentClassName}`}>{children}</div>

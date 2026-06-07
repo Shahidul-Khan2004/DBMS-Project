@@ -129,28 +129,6 @@ function formatLocation(location: IntakeLocation | null | undefined) {
   );
 }
 
-function LocationObjectDetails({
-  location,
-}: {
-  location: IntakeLocation | null | undefined;
-}) {
-  if (!location) {
-    return (
-      <div className="rounded-2xl border border-dashed border-[#002D62]/20 bg-white p-4 text-sm text-gray-600">
-        No structured reported location is stored for this report.
-      </div>
-    );
-  }
-
-  return (
-    <dl className="grid gap-3 rounded-xl border border-[#002D62]/10 bg-white p-3 sm:grid-cols-2">
-      <DetailRow label="Address Text" value={location.address_text} />
-      <DetailRow label="Place Name" value={location.place_name} />
-      <DetailRow label="Source" value={formatBadgeLabel(location.source)} />
-    </dl>
-  );
-}
-
 function getActorDisplayName(item: IntakeLocationHistoryItem) {
   const actorKind = item.changed_by?.actor_kind ?? "system";
   const fullName = item.changed_by?.full_name?.trim();
@@ -240,6 +218,8 @@ export default function CitizenReportDetailPage() {
   const [locationMessage, setLocationMessage] = useState("");
   const [locationError, setLocationError] = useState("");
   const [savingLocation, setSavingLocation] = useState(false);
+  const [selectedLocationDetails, setSelectedLocationDetails] =
+    useState<LocationPickerSelectionDetails>({});
   const [locationForm, setLocationForm] = useState({
     latitude: "",
     longitude: "",
@@ -295,9 +275,15 @@ export default function CitizenReportDetailPage() {
       setLocationForm({
         latitude: nextReport.location?.latitude?.toString() ?? "",
         longitude: nextReport.location?.longitude?.toString() ?? "",
+        addressText: "",
+        placeName: "",
+      });
+      setSelectedLocationDetails({
         addressText:
-          nextReport.location?.address_text ?? nextReport.location_text ?? "",
-        placeName: nextReport.location?.place_name ?? "",
+          nextReport.location?.address_text ??
+          nextReport.location_text ??
+          undefined,
+        placeName: nextReport.location?.place_name ?? undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load report.");
@@ -311,13 +297,21 @@ export default function CitizenReportDetailPage() {
       location: LocationPickerValue,
       details?: LocationPickerSelectionDetails,
     ) => {
-      setLocationForm((current) => ({
-        ...current,
-        latitude: location.latitude.toString(),
-        longitude: location.longitude.toString(),
-        addressText: details?.addressText ?? current.addressText,
-        placeName: details?.placeName ?? current.placeName,
-      }));
+      setSelectedLocationDetails(details ?? {});
+      setLocationForm((current) => {
+        const latitude = location.latitude.toString();
+        const longitude = location.longitude.toString();
+        const locationChanged =
+          current.latitude !== latitude || current.longitude !== longitude;
+
+        return {
+          ...current,
+          latitude,
+          longitude,
+          addressText: locationChanged ? "" : current.addressText,
+          placeName: locationChanged ? "" : current.placeName,
+        };
+      });
       setLocationError("");
       setLocationMessage("");
     },
@@ -349,6 +343,8 @@ export default function CitizenReportDetailPage() {
 
     const latitude = Number(locationForm.latitude);
     const longitude = Number(locationForm.longitude);
+    const manualAddressText = locationForm.addressText;
+    const manualPlaceName = locationForm.placeName;
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       setLocationError("Choose a valid point on the map.");
@@ -377,9 +373,15 @@ export default function CitizenReportDetailPage() {
       setLocationForm({
         latitude: data.report.location?.latitude?.toString() ?? "",
         longitude: data.report.location?.longitude?.toString() ?? "",
+        addressText: manualAddressText,
+        placeName: manualPlaceName,
+      });
+      setSelectedLocationDetails({
         addressText:
-          data.report.location?.address_text ?? data.report.location_text ?? "",
-        placeName: data.report.location?.place_name ?? "",
+          data.report.location?.address_text ??
+          data.report.location_text ??
+          undefined,
+        placeName: data.report.location?.place_name ?? undefined,
       });
       setLocationMessage(data.message || "Reported location updated.");
       const historyData = await apiJson<IntakeLocationHistoryResponse>(
@@ -410,14 +412,27 @@ export default function CitizenReportDetailPage() {
         }
       : null;
   const linkedIncidentTerminal = isLinkedIncidentTerminal(report, linkedIncident);
+  const selectedLocationLabel =
+    locationForm.addressText.trim() ||
+    selectedLocationDetails.addressText?.trim() ||
+    locationForm.placeName.trim() ||
+    selectedLocationDetails.placeName?.trim() ||
+    "Selected map point";
+  const selectedPlaceName =
+    locationForm.placeName.trim() ||
+    selectedLocationDetails.placeName?.trim() ||
+    "";
+  const showDistinctPlaceName =
+    Boolean(selectedPlaceName) && selectedPlaceName !== selectedLocationLabel;
 
   return (
     <DashboardLayout
       title="Report Details"
       subtitle={`Report ${report?.report_code ?? reportPublicUuid}`}
       onLogout={handleLogout}
+      contentClassName="h-[calc(100dvh-10rem)] min-h-0 overflow-hidden"
     >
-      <div className="space-y-3">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         {error && <ErrorAlert message={error} />}
         {loading ? (
           <CompactCard>
@@ -435,9 +450,8 @@ export default function CitizenReportDetailPage() {
             </CardContent>
           </CompactCard>
         ) : (
-          <>
-            <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)]">
-              <div className="min-w-0 space-y-3">
+          <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-y-contain lg:grid-cols-[minmax(0,1.04fr)_minmax(360px,0.96fr)] lg:overflow-hidden">
+              <div className="min-w-0 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain lg:pr-1">
                 <CompactCard>
                   <CardContent className="!p-0">
                     <div className="border-b border-[#002D62]/10 px-4 py-3 sm:px-5">
@@ -583,7 +597,7 @@ export default function CitizenReportDetailPage() {
                 </CompactCard>
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain lg:pl-1">
                 <CompactCard className="overflow-hidden">
                   <CardHeader className="border-b border-[#002D62]/10 !px-4 !py-3">
                     <div className="flex items-center gap-3">
@@ -615,7 +629,6 @@ export default function CitizenReportDetailPage() {
                         {locationMessage}
                       </div>
                     )}
-
                     {!linkedIncidentTerminal ? (
                       <form onSubmit={handleLocationSubmit} className="space-y-3">
                         <LocationPicker
@@ -626,70 +639,126 @@ export default function CitizenReportDetailPage() {
                           syncSearchQueryToSelectedLabel={false}
                           embedded
                           embeddedCompact
-                          mapClassName="h-[clamp(230px,32vh,290px)] w-full"
+                          searchPlaceholder="Search address, place, or landmark..."
+                          mapClassName="h-[clamp(200px,27vh,250px)] w-full"
+                          mapWrapperClassName="w-full"
+                          embeddedMapSectionClassName="mt-3 w-full shrink-0"
                           showSelectionSummary={false}
                         />
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                              Address Text
-                            </label>
-                            <input
-                              value={locationForm.addressText}
-                              onChange={(event) =>
-                                setLocationForm((current) => ({
-                                  ...current,
-                                  addressText: event.target.value,
-                                }))
-                              }
-                              className="mt-1 w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900"
-                              placeholder="Optional address or landmark"
-                            />
+                        <div
+                          className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
+                          aria-live="polite"
+                        >
+                          {selectedLocation ? (
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-slate-900">
+                                Selected location
+                              </p>
+                              <p className="text-sm font-medium leading-snug text-slate-900">
+                                {selectedLocationLabel}
+                              </p>
+                              {showDistinctPlaceName ? (
+                                <p className="text-xs text-slate-500">
+                                  {selectedPlaceName}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-semibold text-slate-900">
+                                No map point selected
+                              </p>
+                              <p className="text-xs leading-snug text-slate-600">
+                                Choose a map point before saving.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-2">
+                          <p className="text-xs font-medium text-slate-700">
+                            Optional location details
+                          </p>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+                            <div>
+                              <label
+                                htmlFor="report-location-address"
+                                className="block text-xs font-semibold text-slate-700"
+                              >
+                                Location Name or Address
+                              </label>
+                              <input
+                                id="report-location-address"
+                                value={locationForm.addressText}
+                                onChange={(event) =>
+                                  setLocationForm((current) => ({
+                                    ...current,
+                                    addressText: event.target.value,
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                                placeholder="Building, road, or landmark description"
+                              />
+                            </div>
+                            <div>
+                              <label
+                                htmlFor="report-location-place"
+                                className="block text-xs font-semibold text-slate-700"
+                              >
+                                Place Name
+                              </label>
+                              <input
+                                id="report-location-place"
+                                value={locationForm.placeName}
+                                onChange={(event) =>
+                                  setLocationForm((current) => ({
+                                    ...current,
+                                    placeName: event.target.value,
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-lg border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                                placeholder="Optional landmark or place name"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                              Place Name
-                            </label>
-                            <input
-                              value={locationForm.placeName}
-                              onChange={(event) =>
-                                setLocationForm((current) => ({
-                                  ...current,
-                                  placeName: event.target.value,
-                                }))
-                              }
-                              className="mt-1 w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-gray-900"
-                              placeholder="Optional place name"
-                            />
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            {report.location ? (
+                              <a
+                                href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
+                              >
+                                Open location in map
+                              </a>
+                            ) : (
+                              <span />
+                            )}
+                            <Button
+                              type="submit"
+                              size="sm"
+                              isLoading={savingLocation}
+                            >
+                              Save Location
+                            </Button>
                           </div>
                         </div>
-                        <Button type="submit" size="sm" isLoading={savingLocation}>
-                          Save Location
-                        </Button>
                       </form>
                     ) : null}
-
-                    <div className={linkedIncidentTerminal ? "" : "mt-4"}>
-                      <h3 className="mb-2 text-sm font-semibold text-[#002D62]">
-                        Structured Location
-                      </h3>
-                      <LocationObjectDetails location={report.location} />
-                    </div>
-                    {report.location ? (
+                    {linkedIncidentTerminal && report.location ? (
                       <a
                         href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-3 inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
+                        className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
                       >
                         Open location in map
                       </a>
                     ) : null}
+
                   </CardContent>
                 </CompactCard>
               </div>
             </div>
-          </>
         )}
       </div>
     </DashboardLayout>

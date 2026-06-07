@@ -295,8 +295,8 @@ function DashboardSummaryCard({
   error?: string;
 }) {
   return (
-    <Card className="flex min-h-[320px] flex-col overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-sm shadow-[#002D62]/8">
-      <CardHeader className="!border-b-0 !px-5 !pb-4 !pt-5">
+    <Card className="flex min-h-[270px] flex-col overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-sm shadow-[#002D62]/8">
+      <CardHeader className="!border-b-0 !px-5 !pb-3 !pt-4">
         <div className="flex items-center gap-4">
           <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
             <Icon className="h-6 w-6" aria-hidden />
@@ -307,7 +307,7 @@ function DashboardSummaryCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col !px-5 !pb-5 !pt-0">
+      <CardContent className="flex flex-1 flex-col !px-5 !pb-4 !pt-0">
         {error ? (
           <div className="mb-4">
             <ErrorAlert message={error} />
@@ -362,7 +362,7 @@ function WelcomeCard({ userName }: { userName?: string | null }) {
   return (
     <Card className="overflow-hidden !rounded-2xl !border-slate-200 !bg-white shadow-lg shadow-[#002D62]/8">
       <CardContent className="!p-0">
-        <div className="relative min-h-[170px] overflow-hidden">
+        <div className="relative min-h-[135px] overflow-hidden">
           <Image
             src="/images/citizen-dashboard-hero-clean.webp"
             alt="Bangladesh disaster response team assisting flood-affected citizens"
@@ -373,7 +373,7 @@ function WelcomeCard({ userName }: { userName?: string | null }) {
           />
           <div className="absolute inset-0 bg-[#002D62]/30 mix-blend-multiply" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff_0%,rgba(255,255,255,0.94)_24%,rgba(255,255,255,0.42)_42%,rgba(255,255,255,0)_58%)]" />
-          <div className="relative flex min-h-[170px] max-w-md flex-col justify-center px-6 py-6 sm:px-9">
+          <div className="relative flex min-h-[135px] max-w-md flex-col justify-center px-6 py-4 sm:px-9">
             <h1
               className="max-w-[22rem] truncate text-2xl font-bold text-[#002D62] sm:text-3xl"
               title={welcomeTitle}
@@ -562,12 +562,12 @@ export default function CitizenDashboard() {
       subtitle="Report incidents and emergencies"
       onLogout={handleLogout}
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         {error && <ErrorAlert message={error} />}
 
         <WelcomeCard userName={welcomeName} />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <DashboardSummaryCard
             title="Reports"
             description="View the status of your submitted reports."
@@ -652,7 +652,7 @@ export default function CitizenDashboard() {
             ]}
           />
         </div>
-        <footer className="flex flex-wrap items-center justify-center gap-4 pb-1 text-sm text-[#42547A]">
+        <footer className="flex flex-wrap items-center justify-center gap-3 text-xs text-[#42547A]">
           <span>© 2025 NIERS. All rights reserved.</span>
           <Link className="font-medium text-[#0B3FE8]" href="/">
             Privacy Policy

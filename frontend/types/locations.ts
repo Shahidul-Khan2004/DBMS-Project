@@ -37,3 +37,9 @@ export interface CreateSavedLocationResponse {
   message: string;
   location: SavedLocation;
 }
+
+export interface SaveLocationResponse {
+  message: string;
+  savedLocationPublicUuid: string;
+  label: string | null;
+}

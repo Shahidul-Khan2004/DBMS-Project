@@ -119,6 +119,8 @@ export default function CitizenNewReportPage() {
   const [submittedReport, setSubmittedReport] =
     useState<SubmittedReport | null>(null);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [selectedLocationDetails, setSelectedLocationDetails] =
+    useState<LocationPickerSelectionDetails>({});
 
   const [form, setForm] = useState<ReportFormState>({
     categoryCode: "",
@@ -160,14 +162,21 @@ export default function CitizenNewReportPage() {
       location: LocationPickerValue,
       details?: LocationPickerSelectionDetails,
     ) => {
-      setForm((prev) => ({
-        ...prev,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: details?.addressText ?? "",
-        locationPlaceName: details?.placeName ?? "",
-        savedLocationId: "",
-      }));
+      setSelectedLocationDetails(details ?? {});
+      setForm((prev) => {
+        const locationChanged =
+          prev.latitude !== location.latitude ||
+          prev.longitude !== location.longitude;
+
+        return {
+          ...prev,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          locationAddress: locationChanged ? "" : prev.locationAddress,
+          locationPlaceName: locationChanged ? "" : prev.locationPlaceName,
+          savedLocationId: "",
+        };
+      });
       setMessage(null);
       setFormError("");
       setSubmittedReport(null);
@@ -184,6 +193,7 @@ export default function CitizenNewReportPage() {
       locationPlaceName: "",
       savedLocationId: "",
     }));
+    setSelectedLocationDetails({});
     setFormError("");
     setSubmittedReport(null);
   };
@@ -200,6 +210,19 @@ export default function CitizenNewReportPage() {
     >,
   ) => {
     const { name, value } = e.target;
+    if (name === "savedLocationId") {
+      const selectedLocation = savedLocations.find(
+        (location) => location.publicUuid === value,
+      );
+
+      if (selectedLocation) {
+        setSelectedLocationDetails({
+          addressText: selectedLocation.addressText ?? undefined,
+          placeName: selectedLocation.placeName ?? undefined,
+        });
+      }
+    }
+
     setForm((prev) => {
       if (name === "savedLocationId") {
         const selectedLocation = savedLocations.find(
@@ -218,8 +241,8 @@ export default function CitizenNewReportPage() {
           savedLocationId: selectedLocation.publicUuid,
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          locationAddress: selectedLocation.addressText ?? "",
-          locationPlaceName: selectedLocation.placeName ?? "",
+          locationAddress: "",
+          locationPlaceName: "",
         };
       }
 
@@ -390,6 +413,7 @@ export default function CitizenNewReportPage() {
         locationPlaceName: "",
         savedLocationId: "",
       });
+      setSelectedLocationDetails({});
       setFormError("");
     } catch (err) {
       console.error("Failed to submit citizen report", err);
@@ -415,14 +439,18 @@ export default function CitizenNewReportPage() {
   );
   const selectedLocationLabel =
     form.locationAddress.trim() ||
+    selectedLocationDetails.addressText?.trim() ||
     form.locationPlaceName.trim() ||
+    selectedLocationDetails.placeName?.trim() ||
     (selectedSavedLocation
       ? formatSavedLocation(selectedSavedLocation)
       : "Selected map point");
+  const selectedPlaceName =
+    form.locationPlaceName.trim() ||
+    selectedLocationDetails.placeName?.trim() ||
+    "";
   const showDistinctPlaceName =
-    Boolean(form.locationPlaceName.trim()) &&
-    form.locationPlaceName.trim() !== form.locationAddress.trim() &&
-    form.locationPlaceName.trim() !== selectedLocationLabel;
+    Boolean(selectedPlaceName) && selectedPlaceName !== selectedLocationLabel;
   const selectedCategoryLabel =
     CATEGORY_OPTIONS.find((option) => option.value === form.categoryCode)
       ?.label ?? "-";
@@ -437,10 +465,11 @@ export default function CitizenNewReportPage() {
       title="Report New Incident"
       subtitle="Create a report with accurate details so responders can review it quickly."
       onLogout={handleLogout}
+      contentClassName="xl:h-[calc(100dvh-9rem)] xl:min-h-0 xl:overflow-hidden"
     >
-      <div className="space-y-3">
+      <div className="space-y-3 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
         {formError ? (
-          <div className="rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
+          <div className="shrink-0 rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
             <div className="flex gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
               <p className="font-medium">{formError}</p>
@@ -449,15 +478,15 @@ export default function CitizenNewReportPage() {
         ) : null}
 
         <form
-          className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3"
+          className="grid items-start gap-3 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-3 xl:items-stretch"
           onSubmit={handleSubmit}
         >
           <CitizenSectionCard
             title="Incident Details"
             subtitle="Use clear details so NIERS can review the report quickly."
             icon={<ClipboardList className="h-5 w-5" aria-hidden />}
-            className="[&_header]:px-4 [&_header]:py-3"
-            contentClassName="!p-4 space-y-3"
+            className="[&_header]:px-4 [&_header]:py-3 xl:flex xl:min-h-0 xl:flex-col"
+            contentClassName="!p-4 space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain"
           >
                   <div>
                     <div>
@@ -531,7 +560,7 @@ export default function CitizenNewReportPage() {
               title="Reported Location *"
               subtitle="Search or place a marker for where this incident was reported."
               icon={<MapPin className="h-5 w-5" aria-hidden />}
-              className="flex max-h-[calc(100dvh-11rem)] min-h-0 flex-col [&_header]:px-4 [&_header]:py-3"
+              className="flex max-h-[calc(100dvh-11rem)] min-h-0 flex-col [&_header]:px-4 [&_header]:py-3 xl:max-h-none"
               contentClassName="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain !p-4"
             >
                   <div>
@@ -587,7 +616,7 @@ export default function CitizenNewReportPage() {
                     embedded
                     embeddedCompact
                     searchPlaceholder="Search address, place, or landmark..."
-                    mapClassName="h-[clamp(230px,32vh,320px)] w-full"
+                    mapClassName="h-[clamp(190px,25vh,240px)] w-full"
                     embeddedMapSectionClassName="mt-3 w-full shrink-0"
                     showSelectionSummary={false}
                   />
@@ -606,7 +635,7 @@ export default function CitizenNewReportPage() {
                         </p>
                         {showDistinctPlaceName ? (
                           <p className="text-xs text-slate-500">
-                            {form.locationPlaceName.trim()}
+                            {selectedPlaceName}
                           </p>
                         ) : null}
                         <button
@@ -674,8 +703,8 @@ export default function CitizenNewReportPage() {
               title="Review and Submit"
               subtitle="Confirm the backend-supported report details before sending."
               icon={<CheckCircle2 className="h-5 w-5" aria-hidden />}
-              className="lg:col-span-2 2xl:col-span-1 [&_header]:px-4 [&_header]:py-3"
-              contentClassName="!p-4 space-y-3"
+              className="lg:col-span-2 xl:col-span-1 xl:flex xl:min-h-0 xl:flex-col [&_header]:px-4 [&_header]:py-3"
+              contentClassName="!p-4 space-y-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-y-contain"
             >
                 <div className="grid gap-3">
                   <div className="rounded-xl border border-[#002D62]/10 bg-[#F6F9FE] p-3">
@@ -760,53 +789,61 @@ export default function CitizenNewReportPage() {
               >
                 Submit Report
               </Button>
-          </CitizenSectionCard>
-
-          {message ? (
-            <div
-              className={`rounded-2xl border p-3 text-sm xl:col-span-3 ${
-                message.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-[#DA291C]/20 bg-red-50 text-red-700"
-              }`}
-            >
-              <div className="flex gap-3">
-                {message.type === "success" ? (
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-                ) : (
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-                )}
-                <div>
-                  <p className="font-medium">{message.text}</p>
-                  {message.type === "success" ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {submittedReport?.publicUuid ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() =>
-                            router.push(
-                              `/dashboard/citizen/reports/${submittedReport.publicUuid}`,
-                            )
-                          }
-                        >
-                          View Report Details
-                        </Button>
+              {message ? (
+                <div
+                  className={`rounded-xl border p-3 text-sm ${
+                    message.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-[#DA291C]/20 bg-red-50 text-red-700"
+                  }`}
+                  aria-live="polite"
+                >
+                  <div className="flex gap-3">
+                    {message.type === "success" ? (
+                      <CheckCircle2
+                        className="mt-0.5 h-5 w-5 shrink-0"
+                        aria-hidden
+                      />
+                    ) : (
+                      <AlertCircle
+                        className="mt-0.5 h-5 w-5 shrink-0"
+                        aria-hidden
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium">{message.text}</p>
+                      {message.type === "success" ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {submittedReport?.publicUuid ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/citizen/reports/${submittedReport.publicUuid}`,
+                                )
+                              }
+                            >
+                              View Report Details
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              router.push("/dashboard/citizen/reports")
+                            }
+                          >
+                            My Reports
+                          </Button>
+                        </div>
                       ) : null}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => router.push("/dashboard/citizen/reports")}
-                      >
-                        My Reports
-                      </Button>
                     </div>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : null}
+              ) : null}
+            </CitizenSectionCard>
         </form>
       </div>
     </DashboardLayout>
