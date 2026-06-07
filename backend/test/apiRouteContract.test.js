@@ -38,6 +38,9 @@ function invalidBodyForRoute(route) {
   if (route.path.includes("classify/emergency") || route.path.includes("/promote/emergency")) {
     return { severityCode: "not-valid" };
   }
+  if (route.path.includes("/intake-reports") && route.path.endsWith("/dismiss")) {
+    return { disposition: "not-valid" };
+  }
   if (route.path.includes("/escalate")) {
     return { severityCode: "critical" };
   }

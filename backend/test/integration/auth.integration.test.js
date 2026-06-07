@@ -27,6 +27,26 @@ describe("auth integration", { skip: !dbUp }, () => {
     assert.equal(res.body.error?.code, "INVALID_CREDENTIALS");
   });
 
+  it("POST /auth/login returns ACCOUNT_SUSPENDED for suspended showcase user", async () => {
+    const password = process.env.DEMO_CITIZEN_PASSWORD;
+    if (!password) return;
+
+    const res = await request(app)
+      .post("/auth/login")
+      .set(jsonHeaders())
+      .send({ email: "citizen.shamim@niers.test", password });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error?.code, "ACCOUNT_SUSPENDED");
+    assert.equal(res.body.error?.message, "Account suspended");
+    assert.equal(res.body.error?.details?.accountStatus, "suspended");
+    assert.ok(res.body.error?.details?.reason);
+    assert.ok(
+      res.body.error?.details?.remainingSeconds != null ||
+        res.body.error?.details?.suspendedUntil,
+    );
+  });
+
   it("GET /users/me returns profile for registered user", async () => {
     const { email, accessToken } = await registerTestUser(app, { fullName: "Me Test User" });
 
