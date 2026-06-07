@@ -898,3 +898,73 @@ export async function ensureEmergencyCallForIntake(params) {
     conn.release();
   }
 }
+
+const DISMISSABLE_INTAKE_STATUSES = new Set(["received", "under_review"]);
+const DISMISS_DISPOSITIONS = new Set(["duplicate", "false_report"]);
+
+export async function dismissIntakeReportInTransaction({
+  intakeReportPublicUuid,
+  actorUserId,
+  disposition,
+  note,
+}) {
+  if (!DISMISS_DISPOSITIONS.has(disposition)) {
+    throw new BackendError(422, "INVALID_DISPOSITION", "Invalid dismiss disposition");
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.execute(
+      `
+        SELECT ir.id, ist.status_code AS intake_status
+        FROM intake_reports ir
+        INNER JOIN intake_statuses ist ON ist.id = ir.current_status_id
+        WHERE ir.public_uuid = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [intakeReportPublicUuid],
+    );
+
+    if (!rows[0]) {
+      throw new BackendError(404, "INTAKE_REPORT_NOT_FOUND", "Intake report not found");
+    }
+
+    const intakeReportId = rows[0].id;
+    const intakeStatus = rows[0].intake_status;
+
+    if (!DISMISSABLE_INTAKE_STATUSES.has(intakeStatus)) {
+      throw new BackendError(
+        409,
+        "INTAKE_NOT_DISMISSABLE",
+        "Intake report cannot be dismissed in its current status",
+      );
+    }
+
+    await updateIntakeReportStatusInTransaction(
+      conn,
+      intakeReportId,
+      disposition,
+      actorUserId,
+      note?.trim() || null,
+    );
+
+    await conn.execute(
+      `
+        UPDATE intake_reports
+        SET final_disposition = ?
+        WHERE id = ?
+      `,
+      [disposition, intakeReportId],
+    );
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}

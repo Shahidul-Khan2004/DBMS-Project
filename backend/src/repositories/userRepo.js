@@ -11,6 +11,8 @@ const userSelect = `
     u.email,
     u.password_hash,
     u.account_status,
+    u.account_status_reason,
+    u.account_status_expires_at,
     u.created_at,
     u.updated_at,
     up.full_name,
