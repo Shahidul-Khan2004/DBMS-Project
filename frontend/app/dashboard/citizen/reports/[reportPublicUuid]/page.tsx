@@ -27,12 +27,17 @@ import type {
   LocationPickerSelectionDetails,
   LocationPickerValue,
 } from "@/components/location/LocationPicker";
-import { apiJson } from "@/lib/api";
+import { apiGet, apiJson } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import { getMyIncidents } from "@/lib/citizen-incidents-api";
 import { formatBangladeshTime } from "@/lib/datetime";
 import { formatIncidentStatus, isTerminalIncident } from "@/lib/incident-status";
-import { formatReportStatus, getReportStatusTone } from "@/lib/report-status";
+import {
+  INTAKE_FINAL_STATUSES,
+  formatReportStatus,
+  getReportStatusTone,
+} from "@/lib/report-status";
+import { isServiceCaseFinal } from "@/lib/service-case-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
 import type {
@@ -43,6 +48,10 @@ import type {
   IntakeReportDetailResponse,
   UpdateIntakeLocationResponse,
 } from "@/types/intake";
+import type {
+  CitizenServiceCase,
+  CitizenServiceCaseListResponse,
+} from "@/types/service-case";
 
 const LocationPicker = dynamic(
   () =>
@@ -191,15 +200,20 @@ function LocationHistory({ history }: { history: IntakeLocationHistoryItem[] }) 
   );
 }
 
-function isLinkedIncidentTerminal(
+function isLinkedIncidentTerminal(linkedIncident: CitizenIncident | null) {
+  return linkedIncident ? isTerminalIncident(linkedIncident.status_code) : false;
+}
+
+function isReportLocationReadOnly(
   report: IntakeReport | null,
   linkedIncident: CitizenIncident | null,
+  linkedServiceCase: CitizenServiceCase | null,
 ) {
-  return (
-    Boolean(report?.incident_is_terminal) ||
-    isTerminalIncident(report?.incident_status_code) ||
-    (linkedIncident ? isTerminalIncident(linkedIncident.status_code) : false)
-  );
+  if (!report) return false;
+  if (INTAKE_FINAL_STATUSES.has(report.intake_status)) return true;
+  if (Boolean(report.final_disposition?.trim())) return true;
+  if (isLinkedIncidentTerminal(linkedIncident)) return true;
+  return isServiceCaseFinal(linkedServiceCase?.status_code);
 }
 
 export default function CitizenReportDetailPage() {
@@ -211,6 +225,8 @@ export default function CitizenReportDetailPage() {
   const [linkedIncident, setLinkedIncident] = useState<CitizenIncident | null>(
     null,
   );
+  const [linkedServiceCase, setLinkedServiceCase] =
+    useState<CitizenServiceCase | null>(null);
   const [history, setHistory] = useState<IntakeLocationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -232,16 +248,19 @@ export default function CitizenReportDetailPage() {
     setError("");
     setIncidentError("");
     try {
-      const [detailResult, historyResult, incidentsResult] =
+      const [detailResult, historyResult, incidentsResult, serviceCasesResult] =
         await Promise.allSettled([
-        apiJson<IntakeReportDetailResponse>(
-          `/intake/reports/${reportPublicUuid}`,
-        ),
-        apiJson<IntakeLocationHistoryResponse>(
-          `/intake/reports/${reportPublicUuid}/reported-location-history`,
-        ),
-        getMyIncidents(),
-      ]);
+          apiJson<IntakeReportDetailResponse>(
+            `/intake/reports/${reportPublicUuid}`,
+          ),
+          apiJson<IntakeLocationHistoryResponse>(
+            `/intake/reports/${reportPublicUuid}/reported-location-history`,
+          ),
+          getMyIncidents(),
+          apiGet<CitizenServiceCaseListResponse>(
+            "/intake/reports/my/service-cases",
+          ),
+        ]);
 
       if (detailResult.status === "rejected") {
         throw detailResult.reason;
@@ -270,6 +289,17 @@ export default function CitizenReportDetailPage() {
               : "Could not load linked emergency incident details.",
           );
         }
+      }
+
+      if (serviceCasesResult.status === "fulfilled") {
+        setLinkedServiceCase(
+          serviceCasesResult.value.service_cases?.find(
+            (serviceCase) =>
+              serviceCase.intake_public_uuid === nextReport.public_uuid,
+          ) ?? null,
+        );
+      } else {
+        setLinkedServiceCase(null);
       }
 
       setLocationForm({
@@ -334,9 +364,9 @@ export default function CitizenReportDetailPage() {
     setLocationError("");
     setLocationMessage("");
 
-    if (isLinkedIncidentTerminal(report, linkedIncident)) {
+    if (isReportLocationReadOnly(report, linkedIncident, linkedServiceCase)) {
       setLocationError(
-        "This report is linked to a final incident, so its reported location is view-only.",
+        "Location updates are no longer available because this report has already been resolved.",
       );
       return;
     }
@@ -411,7 +441,11 @@ export default function CitizenReportDetailPage() {
           longitude: Number(locationForm.longitude),
         }
       : null;
-  const linkedIncidentTerminal = isLinkedIncidentTerminal(report, linkedIncident);
+  const locationReadOnly = isReportLocationReadOnly(
+    report,
+    linkedIncident,
+    linkedServiceCase,
+  );
   const selectedLocationLabel =
     locationForm.addressText.trim() ||
     selectedLocationDetails.addressText?.trim() ||
@@ -606,13 +640,13 @@ export default function CitizenReportDetailPage() {
                       </div>
                       <div>
                         <h2 className="text-base font-bold text-[#002D62]">
-                          {linkedIncidentTerminal
+                          {locationReadOnly
                             ? "Reported Location"
                             : "Update Reported Location"}
                         </h2>
                         <p className="mt-1 text-sm text-gray-600">
-                          {linkedIncidentTerminal
-                            ? "This report is linked to a final incident and is view-only."
+                          {locationReadOnly
+                            ? "Location updates are no longer available because this report has already been resolved."
                             : "Save only the structured location object."}
                         </p>
                       </div>
@@ -629,7 +663,7 @@ export default function CitizenReportDetailPage() {
                         {locationMessage}
                       </div>
                     )}
-                    {!linkedIncidentTerminal ? (
+                    {!locationReadOnly ? (
                       <form onSubmit={handleLocationSubmit} className="space-y-3">
                         <LocationPicker
                           value={selectedLocation}
@@ -744,15 +778,22 @@ export default function CitizenReportDetailPage() {
                         </div>
                       </form>
                     ) : null}
-                    {linkedIncidentTerminal && report.location ? (
-                      <a
-                        href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
-                      >
-                        Open location in map
-                      </a>
+                    {locationReadOnly ? (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-[#002D62]/10 bg-[#EFF6FF] p-3 text-sm text-[#002D62]">
+                          Location updates are no longer available because this report has already been resolved.
+                        </div>
+                        {report.location ? (
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
+                          >
+                            Open location in map
+                          </a>
+                        ) : null}
+                      </div>
                     ) : null}
 
                   </CardContent>
