@@ -20,14 +20,17 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PageLoading } from "@/components/ui/StatusState";
-import { apiPost, ensureAuthSession } from "@/lib/api";
+import { apiJson, apiPost, ensureAuthSession } from "@/lib/api";
 import { clearAuthSession } from "@/lib/auth-store";
 import {
   getCurrentBangladeshDatetimeLocal,
   isValidBangladeshLocalDatetime,
   toBangladeshIsoDatetime,
 } from "@/lib/datetime";
-import { getMySavedLocations } from "@/lib/locations-api";
+import {
+  getMySavedLocations,
+  saveLocationForCurrentUser,
+} from "@/lib/locations-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type {
   LocationPickerSelectionDetails,
@@ -36,6 +39,7 @@ import type {
 import type {
   CreateIntakeReportRequest,
   CreateIntakeReportResponse,
+  IntakeReportDetailResponse,
 } from "@/types/intake";
 import type { SavedLocation } from "@/types/locations";
 
@@ -335,6 +339,7 @@ export default function CitizenNewReportPage() {
     const description = form.description.trim();
     const addr = form.locationAddress.trim();
     const placeName = form.locationPlaceName.trim();
+    const usedSavedLocation = Boolean(form.savedLocationId);
     const selectedCoordinates = getSelectedCoordinates(form);
 
     if (summary.length < 6) {
@@ -416,6 +421,24 @@ export default function CitizenNewReportPage() {
         CreateIntakeReportRequest
       >("/intake/reports", payload);
 
+      if (!usedSavedLocation && selectedCoordinates) {
+        try {
+          const detail = await apiJson<IntakeReportDetailResponse>(
+            `/intake/reports/${data.intake.public_uuid}`,
+          );
+          const locationUuid = detail.report.location?.public_uuid;
+          if (locationUuid) {
+            await saveLocationForCurrentUser(locationUuid);
+            await loadSavedLocations();
+          }
+        } catch (bookmarkErr) {
+          console.warn(
+            "Report submitted but location could not be saved for reuse",
+            bookmarkErr,
+          );
+        }
+      }
+
       setMessage({
         type: "success",
         text: `Report submitted successfully. Reference: ${data.intake.report_code}`,
@@ -483,15 +506,28 @@ export default function CitizenNewReportPage() {
   const locationReady = detailsReady && !locationValidationMessage;
   const canSubmit = detailsReady && locationReady;
 
+  const locationMapWrapperClassName =
+    "mx-auto h-[210px] w-full max-w-[760px] min-w-0 shrink-0 xl:h-[230px]";
+  const locationMapClassName = "h-full w-full";
+
+  const workspaceCardClassName =
+    "flex h-full min-h-0 flex-col overflow-hidden border-slate-200/80";
+  const workspaceCardBodyClassName =
+    "min-h-0 flex-1 overflow-y-auto overscroll-y-contain lg:overflow-x-hidden";
+  const workspaceActionBarClassName =
+    "flex flex-col-reverse gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:justify-end sm:px-5";
+
   return (
     <DashboardLayout
       title="Report New Incident"
       subtitle="Share what happened so NIERS can review your report."
       onLogout={handleLogout}
+      fillViewport
+      contentClassName="min-h-0 overflow-y-auto lg:overflow-hidden"
     >
-      <CitizenPageContent>
+      <CitizenPageContent className="flex min-h-0 flex-1 flex-col gap-3 !space-y-0 !py-0 max-lg:min-h-fit lg:min-h-0 lg:overflow-hidden">
         {formError ? (
-          <div className="rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
+          <div className="shrink-0 rounded-2xl border border-[#DA291C]/20 bg-red-50 p-4 text-sm text-red-700">
             <div className="flex gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
               <p className="font-medium">{formError}</p>
@@ -500,11 +536,38 @@ export default function CitizenNewReportPage() {
         ) : null}
 
         {step === "review" ? (
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form
+            className="flex min-h-0 flex-1 flex-col max-lg:min-h-fit lg:min-h-0 lg:overflow-hidden lg:pb-2"
+            onSubmit={handleSubmit}
+          >
             <CitizenSectionCard
               title="Review Your Report"
               subtitle="Review your report before sending it to NIERS."
               icon={<CheckCircle2 className="h-5 w-5" aria-hidden />}
+              className={`min-h-0 flex-1 ${workspaceCardClassName}`}
+              contentClassName={workspaceCardBodyClassName}
+              footer={
+                <div className={workspaceActionBarClassName}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setStep("form");
+                      setMessage(null);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={isSubmitting}
+                    disabled={!canSubmit}
+                  >
+                    Submit Report
+                  </Button>
+                </div>
+              }
             >
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-200/80 bg-[#F6F9FE] p-4">
@@ -640,103 +703,107 @@ export default function CitizenNewReportPage() {
                   </div>
                 </div>
               ) : null}
-
-              <div className="mt-6 flex flex-wrap gap-3 border-t border-slate-200/80 pt-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setStep("form");
-                    setMessage(null);
-                  }}
-                  disabled={isSubmitting}
-                >
-                  Back
-                </Button>
-                <Button type="submit" isLoading={isSubmitting} disabled={!canSubmit}>
-                  Submit Report
-                </Button>
-              </div>
             </CitizenSectionCard>
           </form>
         ) : (
           <form
-            className="space-y-6"
+            className="grid min-h-0 flex-1 grid-cols-1 gap-3 max-lg:min-h-fit lg:min-h-0 lg:grid-cols-[minmax(0,54fr)_minmax(0,46fr)] lg:items-stretch lg:overflow-hidden lg:pb-2"
             onSubmit={(event) => {
               event.preventDefault();
               handleContinueToReview();
             }}
           >
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,52fr)_minmax(0,48fr)]">
-              <CitizenSectionCard
-                title="Incident Details"
-                icon={<ClipboardList className="h-5 w-5" aria-hidden />}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                      Category
-                    </label>
-                    <select
-                      name="categoryCode"
-                      value={form.categoryCode}
-                      onChange={handleChange}
-                      required
-                      className="block h-[46px] w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
-                    >
-                      <option value="" disabled>
-                        Select category
-                      </option>
-                      {CATEGORY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+            <div className="flex min-h-0 flex-col lg:h-full">
+                <CitizenSectionCard
+                  title="Incident Details"
+                  icon={<ClipboardList className="h-5 w-5" aria-hidden />}
+                  className={`min-h-0 flex-1 ${workspaceCardClassName}`}
+                  contentClassName={workspaceCardBodyClassName}
+                  footer={
+                    <div className={workspaceActionBarClassName}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => router.push("/dashboard/citizen")}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={!canSubmit}>
+                        Continue to Review
+                      </Button>
+                    </div>
+                  }
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        Category
+                        <span className="ml-1 text-[#DA291C]">*</span>
+                      </label>
+                      <select
+                        name="categoryCode"
+                        value={form.categoryCode}
+                        onChange={handleChange}
+                        required
+                        className="block h-[46px] w-full rounded-xl border border-[#002D62]/20 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                      >
+                        <option value="" disabled>
+                          Select category
                         </option>
-                      ))}
-                    </select>
-                  </div>
+                        {CATEGORY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <Input
-                    name="summary"
-                    label="Summary"
-                    value={form.summary}
-                    onChange={handleChange}
-                    placeholder="Briefly describe what happened"
-                    required
-                  />
-
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={form.description}
+                    <Input
+                      name="summary"
+                      label="Summary"
+                      value={form.summary}
                       onChange={handleChange}
-                      rows={4}
-                      placeholder="Add nearby landmarks, risks, affected people, or anything responders should know"
-                      className="w-full rounded-xl border border-[#002D62]/20 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-500 transition-colors focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                      placeholder="Briefly describe what happened"
+                      required
+                    />
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        Description
+                      </label>
+                      <textarea
+                        name="description"
+                        value={form.description}
+                        onChange={handleChange}
+                        rows={4}
+                        placeholder="Add nearby landmarks, risks, affected people, or anything responders should know"
+                        className="w-full rounded-xl border border-[#002D62]/20 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-500 transition-colors focus:border-[#006747] focus:outline-none focus:ring-2 focus:ring-[#006747]/35"
+                      />
+                    </div>
+
+                    <Input
+                      type="datetime-local"
+                      name="reportedAt"
+                      label="Reported Time"
+                      value={form.reportedAt}
+                      onChange={handleChange}
+                      icon={<CalendarClock className="h-4 w-4" aria-hidden />}
+                      helpText="Defaults to the current time; adjust if needed."
                     />
                   </div>
+                </CitizenSectionCard>
+              </div>
 
-                  <Input
-                    type="datetime-local"
-                    name="reportedAt"
-                    label="Reported Time"
-                    value={form.reportedAt}
-                    onChange={handleChange}
-                    icon={<CalendarClock className="h-4 w-4" aria-hidden />}
-                    helpText="Defaults to the current time; adjust if needed."
-                  />
-                </div>
-              </CitizenSectionCard>
-
-              <CitizenSectionCard
-                title="Reported Location"
-                subtitle="Choose where this incident happened."
-                icon={<MapPin className="h-5 w-5" aria-hidden />}
-              >
-                <div className="space-y-4">
-                  <div>
+              <div className="flex min-h-0 flex-col lg:h-full">
+                <CitizenSectionCard
+                  title="Reported Location"
+                  subtitle="Choose where this incident happened."
+                  icon={<MapPin className="h-5 w-5" aria-hidden />}
+                  className={workspaceCardClassName}
+                  contentClassName={workspaceCardBodyClassName}
+                >
+                  <div className="flex flex-col gap-2.5">
+                    <div className="shrink-0">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Saved Location
                     </label>
@@ -788,14 +855,17 @@ export default function CitizenNewReportPage() {
                     syncSearchQueryToSelectedLabel={false}
                     embedded
                     embeddedCompact
+                    scrollWheelZoom={false}
                     searchPlaceholder="Search address, place, or landmark..."
-                    mapClassName="h-[clamp(220px,32vh,280px)] w-full"
+                    mapClassName={locationMapClassName}
+                    mapWrapperClassName={locationMapWrapperClassName}
                     embeddedMapSectionClassName="mt-3 w-full shrink-0"
+                    className="w-full shrink-0"
                     showSelectionSummary={false}
                   />
 
                   <div
-                    className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
+                    className="shrink-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2"
                     aria-live="polite"
                   >
                     {selectedCoordinates || form.savedLocationId ? (
@@ -831,7 +901,7 @@ export default function CitizenNewReportPage() {
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-3">
+                  <div className="shrink-0 rounded-lg border border-slate-100 bg-slate-50/40 px-3 py-3">
                     <p className="text-xs font-medium text-slate-700">
                       Optional location details
                     </p>
@@ -872,19 +942,6 @@ export default function CitizenNewReportPage() {
                   </div>
                 </div>
               </CitizenSectionCard>
-            </div>
-
-            <div className="flex flex-wrap gap-3 border-t border-slate-200/80 pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => router.push("/dashboard/citizen")}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!canSubmit}>
-                Continue to Review
-              </Button>
             </div>
           </form>
         )}

@@ -71,6 +71,8 @@ type CitizenSectionCardProps = {
   topBar?: ReactNode;
   headerAction?: ReactNode;
   children: ReactNode;
+  footer?: ReactNode;
+  footerClassName?: string;
   className?: string;
   contentClassName?: string;
 };
@@ -82,12 +84,14 @@ export function CitizenSectionCard({
   topBar,
   headerAction,
   children,
+  footer,
+  footerClassName = "",
   className = "",
   contentClassName = "",
 }: CitizenSectionCardProps) {
   return (
     <section
-      className={`overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[#002D62]/10 bg-white shadow-sm shadow-[#002D62]/5 ${footer ? "flex min-h-0 flex-col" : ""} ${className}`}
     >
       {topBar ? (
         <div className="border-b border-[#002D62]/10 px-4 py-3 sm:px-5">
@@ -115,6 +119,13 @@ export function CitizenSectionCard({
         </div>
       </header>
       <div className={`p-4 sm:p-5 ${contentClassName}`}>{children}</div>
+      {footer ? (
+        <div
+          className={`shrink-0 border-t border-[#002D62]/10 ${footerClassName}`}
+        >
+          {footer}
+        </div>
+      ) : null}
     </section>
   );
 }

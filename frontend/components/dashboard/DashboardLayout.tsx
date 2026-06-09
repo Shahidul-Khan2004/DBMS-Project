@@ -21,6 +21,8 @@ interface DashboardLayoutProps {
   showHealthBadge?: boolean;
   /** Applied to the main content children wrapper (e.g. full-height dispatcher pages). */
   contentClassName?: string;
+  /** Fill remaining viewport below header/nav (citizen workspace pages). */
+  fillViewport?: boolean;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -31,6 +33,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   hideSidebar = false,
   showHealthBadge = true,
   contentClassName = "",
+  fillViewport = false,
 }) => {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole>("citizen");
@@ -49,9 +52,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     isCitizenDashboardShell && !hideSidebar;
   const isCitizenReportNewPage = pathname === "/dashboard/citizen/report-new";
   const showCitizenReportAction = !isCitizenReportNewPage;
+  const useFillViewport = fillViewport && isCitizenDashboardShell;
   const shellWidthClass = "w-full";
   const shellClassName = isCitizenDashboardShell
-    ? "min-h-dvh overflow-x-hidden bg-[#F6F9FE] text-[#002D62]"
+    ? `${useFillViewport ? "h-dvh" : "min-h-dvh"} flex flex-col overflow-x-hidden bg-[#F6F9FE] text-[#002D62]`
     : "min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200";
   const headerClassName = isCitizenDashboardShell
     ? "border-b border-[#002D62]/10 bg-white shadow-sm"
@@ -78,8 +82,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     ? "inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#0B3FE8] bg-white px-0 text-sm font-bold text-[#002D62] transition-colors hover:bg-[#EFF6FF] min-[480px]:w-[6.5rem] min-[480px]:px-3"
     : "inline-flex items-center gap-2 rounded-2xl border-2 border-[#002D62] bg-white px-4 py-2 text-sm font-semibold text-[#002D62] transition-colors hover:bg-[#EFF6FF]";
   const contentOuterClassName = isCitizenDashboardShell
-    ? `${shellWidthClass} w-full px-4 py-3 sm:px-6 lg:px-8 2xl:px-10`
+    ? useFillViewport
+      ? `${shellWidthClass} flex min-h-0 w-full flex-1 flex-col px-4 pb-4 pt-3 sm:px-6 lg:px-8 2xl:px-10`
+      : `${shellWidthClass} w-full px-4 py-3 sm:px-6 lg:px-8 2xl:px-10`
     : `${shellWidthClass} w-full px-4 py-6 sm:px-6 lg:px-8 2xl:px-10`;
+  const contentInnerClassName = [
+    "min-w-0 w-full",
+    useFillViewport ? "flex min-h-0 flex-1 flex-col" : "",
+    contentClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const accountActions = (
     <>
@@ -111,7 +124,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const shellContent = (
     <>
-      <div className={headerClassName}>
+      <div className={`${headerClassName}${useFillViewport ? " shrink-0" : ""}`}>
         <div className={headerInnerClassName}>
           <div className={headerRowClassName}>
             <div className={headerTitleGroupClassName}>
@@ -171,7 +184,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       ) : null}
 
       <div className={contentOuterClassName}>
-        <div className={`min-w-0 w-full ${contentClassName}`.trim()}>{children}</div>
+        <div className={contentInnerClassName}>{children}</div>
       </div>
     </>
   );

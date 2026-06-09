@@ -276,16 +276,13 @@ export function LocationPicker({
   const selectionRequestRef = useRef(0);
   const resolvingRequestRef = useRef(0);
   const lastSyncedSelectedLabelRef = useRef("");
-  const [isMapReady, setIsMapReady] = useState(false);
-  const [mapInstanceKey, setMapInstanceKey] = useState(0);
+  const [isClientReady, setIsClientReady] = useState(false);
   const mapCenter = value
     ? ([value.latitude, value.longitude] as [number, number])
     : DEFAULT_CENTER;
 
   useEffect(() => {
-    setMapInstanceKey((currentKey) => currentKey + 1);
-    setIsMapReady(true);
-    return () => setIsMapReady(false);
+    setIsClientReady(true);
   }, []);
 
   const isSearchDisabled = disabled || isSearching;
@@ -670,11 +667,10 @@ export function LocationPicker({
       <div
         className={`relative isolate z-0 overflow-hidden rounded-2xl border border-[#002D62]/10 bg-slate-100 shadow-sm ${mapWrapperClassName}`}
       >
-        {!isMapReady ? (
+        {!isClientReady ? (
           <MapLoadingPlaceholder className={mapClassName} />
         ) : (
           <MapContainer
-            key={mapInstanceKey}
             center={mapCenter}
             zoom={value ? SELECTED_ZOOM : DEFAULT_ZOOM}
             scrollWheelZoom={scrollWheelZoom}
