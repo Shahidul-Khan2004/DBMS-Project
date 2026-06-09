@@ -1,67 +1,15 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { listPublicDisasters } from "@/lib/public-disasters-api";
-import type { PublicDisaster } from "@/types/public-disaster";
-
-function formatDetail(value?: string | null) {
-  if (!value) return null;
-  return value
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatGuidance(value?: string | null) {
-  const guidance = value?.trim().replace(/[\/\s]+$/u, "");
-  if (!guidance) return null;
-  return /[.!?]$/u.test(guidance) ? guidance : `${guidance}.`;
-}
-
-function buildHeadline(disaster: PublicDisaster) {
-  const disasterType = formatDetail(disaster.disaster_type_name) ?? "Disaster";
-  const severity = formatDetail(disaster.severity_level) ?? "Unspecified";
-  const guidance = formatGuidance(disaster.public_guidance);
-
-  return `NATIONAL DISASTER ALERT: ${disaster.title} — ${disasterType} emergency — Severity: ${severity}.${guidance ? ` ${guidance}` : ""}`;
-}
+import { useMemo } from "react";
+import { useDeclaredNationalDisasters } from "@/hooks/useDeclaredNationalDisasters";
+import { buildDisasterHeadline } from "@/lib/national-disaster-alert";
 
 export function NationalDisasterHeroAlert() {
-  const [declaredDisasters, setDeclaredDisasters] = useState<PublicDisaster[]>(
-    [],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadDisasters() {
-      try {
-        const data = await listPublicDisasters();
-        if (cancelled) return;
-
-        setDeclaredDisasters(
-          data.disasters.filter(
-            (disaster) => disaster.disaster_status === "declared",
-          ),
-        );
-      } catch {
-        if (!cancelled) setDeclaredDisasters([]);
-      }
-    }
-
-    void loadDisasters();
-    const intervalId = window.setInterval(loadDisasters, 60000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, []);
+  const { disasters: declaredDisasters } = useDeclaredNationalDisasters();
 
   const headlines = useMemo(
-    () => declaredDisasters.map((disaster) => buildHeadline(disaster)),
+    () => declaredDisasters.map((disaster) => buildDisasterHeadline(disaster)),
     [declaredDisasters],
   );
 

@@ -10,6 +10,8 @@ import { CitizenNavProvider } from "@/components/citizen/CitizenNavContext";
 import { CitizenTopNav } from "@/components/citizen/CitizenTopNav";
 import { HealthBadge } from "@/components/HealthBadge";
 import { ProfileMenu } from "@/components/dashboard/ProfileMenu";
+import { CitizenNationalDisasterAlert } from "@/components/national-disaster/CitizenNationalDisasterAlert";
+import { OpsNationalDisasterAlertBar } from "@/components/national-disaster/OpsNationalDisasterAlertBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface DashboardLayoutProps {
@@ -53,6 +55,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const isCitizenReportNewPage = pathname === "/dashboard/citizen/report-new";
   const showCitizenReportAction = !isCitizenReportNewPage;
   const useFillViewport = fillViewport && isCitizenDashboardShell;
+  const showCitizenDisasterAlert = isCitizenDashboardShell;
+  const showOpsDisasterAlert =
+    role === "dispatcher" ||
+    role === "system_admin" ||
+    role === "agency_representative";
   const shellWidthClass = "w-full";
   const shellClassName = isCitizenDashboardShell
     ? `${useFillViewport ? "h-dvh" : "min-h-dvh"} flex flex-col overflow-x-hidden bg-[#F6F9FE] text-[#002D62]`
@@ -175,6 +182,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
         </div>
       </div>
+
+      {showCitizenDisasterAlert ? <CitizenNationalDisasterAlert /> : null}
+      {showOpsDisasterAlert ? (
+        <OpsNationalDisasterAlertBar role={role} />
+      ) : null}
 
       {showCitizenTopNav ? (
         <>
