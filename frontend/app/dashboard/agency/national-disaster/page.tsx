@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AgencyDashboardPage } from "@/components/agency/AgencyDashboardPage";
 import { AgencyDisasterListRow } from "@/components/agency/national-disaster/AgencyDisasterListRow";
-import { AgencyNationalDisasterBanner } from "@/components/agency/national-disaster/AgencyNationalDisasterBanner";
 import { AgencySkeletonBlock } from "@/components/agency/AgencySkeletonBlock";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -54,8 +53,6 @@ export default function AgencyNationalDisasterPage() {
             Refresh
           </Button>
         </header>
-
-        <AgencyNationalDisasterBanner />
 
         {error ? (
           <div className="mb-3 shrink-0">
