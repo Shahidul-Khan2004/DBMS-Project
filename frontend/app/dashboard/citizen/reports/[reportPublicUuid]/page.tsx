@@ -23,6 +23,7 @@ import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
+import { OpenLocationMapButton } from "@/components/location/LocationMapModal";
 import type {
   LocationPickerSelectionDetails,
   LocationPickerValue,
@@ -754,19 +755,7 @@ export default function CitizenReportDetailPage() {
                               />
                             </div>
                           </div>
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                            {report.location ? (
-                              <a
-                                href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
-                              >
-                                Open location in map
-                              </a>
-                            ) : (
-                              <span />
-                            )}
+                          <div className="mt-3 flex justify-end">
                             <Button
                               type="submit"
                               size="sm"
@@ -784,14 +773,16 @@ export default function CitizenReportDetailPage() {
                           Location updates are no longer available because this report has already been resolved.
                         </div>
                         {report.location ? (
-                          <a
-                            href={`https://www.openstreetmap.org/?mlat=${report.location.latitude}&mlon=${report.location.longitude}#map=16/${report.location.latitude}/${report.location.longitude}`}
-                            target="_blank"
-                            rel="noreferrer"
+                          <OpenLocationMapButton
+                            latitude={report.location.latitude}
+                            longitude={report.location.longitude}
+                            previewKey={report.public_uuid}
+                            title="Reported location"
+                            addressText={report.location.address_text ?? undefined}
+                            placeName={report.location.place_name ?? undefined}
+                            label="Open location in map"
                             className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
-                          >
-                            Open location in map
-                          </a>
+                          />
                         ) : null}
                       </div>
                     ) : null}
