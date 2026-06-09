@@ -13,6 +13,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { clearAuthSession } from "@/lib/auth-store";
 import { formatBangladeshTime } from "@/lib/datetime";
+import { OpenLocationMapButton } from "@/components/location/LocationMapModal";
 import { getMySavedLocations } from "@/lib/locations-api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { SavedLocation } from "@/types/locations";
@@ -140,14 +141,15 @@ export default function CitizenLocationsPage() {
                       </p>
                     </div>
                     <div className="flex shrink-0 sm:justify-end">
-                      <a
-                        href={`https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=16/${location.latitude}/${location.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-full border border-[#002D62]/20 bg-[#EFF6FF] px-4 text-xs font-semibold text-[#002D62] transition-colors hover:border-[#002D62]/30 hover:bg-[#DCEBFF]"
-                      >
-                        Open map
-                      </a>
+                      <OpenLocationMapButton
+                        latitude={location.latitude}
+                        longitude={location.longitude}
+                        previewKey={location.publicUuid}
+                        title={formatLocationName(location)}
+                        addressText={location.addressText ?? undefined}
+                        placeName={location.placeName ?? undefined}
+                        label="View map"
+                      />
                     </div>
                   </div>
                 </li>
