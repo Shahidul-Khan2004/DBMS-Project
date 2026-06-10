@@ -137,9 +137,12 @@ export interface PatchServiceCaseStatusPayload {
   note?: string;
 }
 
+export type DispatcherServiceCaseMessageType = "admin_reply" | "system_note";
+
 export interface PostServiceCaseMessagePayload {
   title: string;
   description?: string;
+  messageType?: DispatcherServiceCaseMessageType;
 }
 
 export interface PostServiceCaseResolvePayload {

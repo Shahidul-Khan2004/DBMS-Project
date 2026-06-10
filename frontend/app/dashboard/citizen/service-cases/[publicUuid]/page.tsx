@@ -1,16 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  FileText,
-  Headphones,
-  MapPin,
-  RefreshCw,
-  Send,
-} from "lucide-react";
+import { FileText, MapPin, Send } from "lucide-react";
+import { CitizenServiceCaseConversationPanel } from "@/components/citizen/service-cases/CitizenServiceCaseConversationPanel";
 import { getValidReportedCoordinates } from "@/components/dispatcher/triage/reportedLocationCoords";
+import { LocationMapModal } from "@/components/location/LocationMapModal";
 import {
   CitizenBackButton,
   CitizenPageContent,
@@ -38,19 +33,6 @@ import type {
   ServiceCaseMessageResponse,
 } from "@/types/service-case";
 
-const ReportedLocationMapPreview = dynamic(
-  () =>
-    import("@/components/dispatcher/triage/ReportedLocationMapPreview").then(
-      (mod) => ({ default: mod.ReportedLocationMapPreview }),
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[220px] w-full animate-pulse rounded-lg bg-slate-100" />
-    ),
-  },
-);
-
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
@@ -65,49 +47,6 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
 function formatLocation(location: CitizenServiceCase["location"] | null | undefined) {
   if (!location) return "-";
   return location.address_text || location.place_name || "Map location selected";
-}
-
-function messageAuthor(message: ServiceCaseMessageResult) {
-  if (message.message_type === "admin_reply") {
-    return message.sender?.full_name?.trim() || "Operations team";
-  }
-  if (message.message_type === "user_message") return "You";
-  if (message.message_type === "system_note") return "System";
-  return "System";
-}
-
-function fallbackSubject(messageType: string | null | undefined) {
-  if (messageType === "admin_reply") return "Operations team message";
-  if (messageType === "user_message") return "Your message";
-  if (messageType === "system_note") return "System update";
-  return "Message";
-}
-
-function normalizeMessage(message: ServiceCaseMessageResult) {
-  if (message.subject !== undefined || message.body !== undefined) {
-    const subject = message.subject?.trim();
-    const body = message.body?.trim();
-
-    return {
-      subject: subject || fallbackSubject(message.message_type),
-      body: body || null,
-    };
-  }
-
-  const rawBody = message.message_body?.trim();
-  if (!rawBody) {
-    return {
-      subject: "Message",
-      body: null,
-    };
-  }
-
-  const [subjectLine, ...rest] = rawBody.split(/\r?\n\r?\n/);
-  const subject = subjectLine.replace(/^Subject:\s*/i, "").trim();
-  return {
-    subject: subject || "Message",
-    body: rest.join("\n\n").trim() || null,
-  };
 }
 
 const terminalStatuses = new Set([
@@ -139,7 +78,7 @@ export default function CitizenServiceCaseDetailPage() {
   const [sending, setSending] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
-  const [desktopMapOpen, setDesktopMapOpen] = useState(false);
+  const [locationMapOpen, setLocationMapOpen] = useState(false);
 
   const statusCode = serviceCase?.status_code ?? "";
   const isTerminal = useMemo(() => terminalStatuses.has(statusCode), [statusCode]);
@@ -220,7 +159,7 @@ export default function CitizenServiceCaseDetailPage() {
   }, [isChecking, loadMessages, loadServiceCase]);
 
   useEffect(() => {
-    setDesktopMapOpen(false);
+    setLocationMapOpen(false);
   }, [publicUuid]);
 
   const handleLogout = () => {
@@ -388,7 +327,7 @@ export default function CitizenServiceCaseDetailPage() {
             </Card>
 
             {!loading && hasLocation ? (
-              <Card className="flex min-h-[200px] flex-1 flex-col overflow-hidden !rounded-2xl !border-slate-200/80 !bg-white shadow-sm xl:min-h-0">
+              <Card className="shrink-0 overflow-hidden !rounded-2xl !border-slate-200/80 !bg-white shadow-sm">
                 <CardHeader className="!border-b !border-slate-200/80 !px-4 !py-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
@@ -400,16 +339,15 @@ export default function CitizenServiceCaseDetailPage() {
                         type="button"
                         variant="secondary"
                         size="sm"
-                        className="hidden shrink-0 xl:inline-flex"
-                        onClick={() => setDesktopMapOpen((open) => !open)}
-                        aria-expanded={desktopMapOpen}
+                        className="shrink-0"
+                        onClick={() => setLocationMapOpen(true)}
                       >
-                        {desktopMapOpen ? "Hide map" : "View map"}
+                        View map
                       </Button>
                     ) : null}
                   </div>
                 </CardHeader>
-                <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain !p-4">
+                <CardContent className="!p-4">
                   <p className="break-words text-sm text-gray-800">
                     {formatLocation(serviceCase!.location)}
                     {serviceCase!.location_text &&
@@ -417,32 +355,6 @@ export default function CitizenServiceCaseDetailPage() {
                       ? `, ${serviceCase!.location_text}`
                       : ""}
                   </p>
-                  {locationCoordinates ? (
-                    <>
-                      <div className="mt-3 xl:hidden">
-                        <ReportedLocationMapPreview
-                          previewKey={serviceCase!.public_uuid}
-                          latitude={locationCoordinates.latitude}
-                          longitude={locationCoordinates.longitude}
-                          addressText={serviceCase!.location?.address_text ?? undefined}
-                          placeName={serviceCase!.location?.place_name ?? undefined}
-                          heightClassName="h-[180px]"
-                        />
-                      </div>
-                      {desktopMapOpen ? (
-                        <div className="mt-3 hidden xl:block">
-                          <ReportedLocationMapPreview
-                            previewKey={serviceCase!.public_uuid}
-                            latitude={locationCoordinates.latitude}
-                            longitude={locationCoordinates.longitude}
-                            addressText={serviceCase!.location?.address_text ?? undefined}
-                            placeName={serviceCase!.location?.place_name ?? undefined}
-                            heightClassName="h-[180px]"
-                          />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
                 </CardContent>
               </Card>
             ) : null}
@@ -450,117 +362,19 @@ export default function CitizenServiceCaseDetailPage() {
 
           {!loading && serviceCase ? (
             <div className="flex min-h-0 min-w-0 flex-col xl:h-full">
-              <div className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm xl:min-h-0">
-                <div className="shrink-0 border-b border-slate-200/80 px-4 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h2 className="text-sm font-semibold text-slate-900">Conversation</h2>
-                      <p className="mt-0.5 text-xs text-slate-600">
-                        Messages between you and the operations team.
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void loadMessages()}
-                        disabled={messagesLoading}
-                      >
-                        <RefreshCw className="h-4 w-4" aria-hidden />
-                        Refresh
-                      </Button>
-                      {canReply ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            setMessageError(null);
-                            setSendMessageOpen(true);
-                          }}
-                        >
-                          <Send className="h-4 w-4" aria-hidden />
-                          Send Message
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  {!canReply ? (
-                    <MessageBanner tone="info" className="mt-2">
-                      {isEscalated
-                        ? "This service case has been escalated to an emergency response and cannot receive new replies."
-                        : isTerminal
-                          ? "This service case is final and cannot receive new replies."
-                          : "Replies are not available for this service case status."}
-                    </MessageBanner>
-                  ) : null}
-                </div>
-
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3">
-                  {messagesLoading ? (
-                    <LoadingSkeleton lines={4} />
-                  ) : messagesError ? (
-                    <ErrorAlert message={messagesError} />
-                  ) : messages.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#002D62]/15 bg-[#F8FBFF] px-4 py-5 text-center">
-                      <p className="text-sm font-semibold text-[#002D62]">
-                        No messages yet
-                      </p>
-                      <p className="mt-1 text-sm text-[#42547A]">
-                        Case messages from you and the operations team will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="space-y-3">
-                      {messages.map((message) => {
-                        const parsed = normalizeMessage(message);
-                        const fromCitizen = message.message_type === "user_message";
-
-                        return (
-                          <li
-                            key={message.id}
-                            className={`flex gap-2 ${
-                              fromCitizen ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            {!fromCitizen ? (
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-white">
-                                <Headphones className="h-5 w-5" aria-hidden />
-                              </div>
-                            ) : null}
-                            <div
-                              className={`max-w-[min(78%,36rem)] rounded-2xl px-4 py-3 ${
-                                fromCitizen ? "bg-[#EFF6FF]" : "bg-[#F6F9FE]"
-                              }`}
-                            >
-                              <p className="text-sm font-bold text-[#002D62]">
-                                {messageAuthor(message)}
-                              </p>
-                              {parsed.subject &&
-                              parsed.subject !== fallbackSubject(message.message_type) ? (
-                                <p className="mt-1 text-sm font-semibold text-gray-900">
-                                  {parsed.subject}
-                                </p>
-                              ) : null}
-                              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                                {parsed.body || "No additional message body."}
-                              </p>
-                              <p className="mt-2 text-xs text-[#60739A]">
-                                {formatBangladeshTime(message.created_at)}
-                              </p>
-                            </div>
-                            {fromCitizen ? (
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0B3FE8] text-sm font-bold text-white">
-                                You
-                              </div>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </div>
+              <CitizenServiceCaseConversationPanel
+                messages={messages}
+                messagesLoading={messagesLoading}
+                messagesError={messagesError}
+                canReply={canReply}
+                isTerminal={isTerminal}
+                isEscalated={isEscalated}
+                onRefresh={() => void loadMessages()}
+                onSendMessage={() => {
+                  setMessageError(null);
+                  setSendMessageOpen(true);
+                }}
+              />
             </div>
           ) : null}
         </div>
@@ -634,6 +448,19 @@ export default function CitizenServiceCaseDetailPage() {
             </div>
           </form>
         </div>
+      ) : null}
+
+      {locationCoordinates && serviceCase ? (
+        <LocationMapModal
+          open={locationMapOpen}
+          onClose={() => setLocationMapOpen(false)}
+          latitude={locationCoordinates.latitude}
+          longitude={locationCoordinates.longitude}
+          previewKey={serviceCase.public_uuid}
+          title="Location"
+          addressText={serviceCase.location?.address_text ?? undefined}
+          placeName={serviceCase.location?.place_name ?? undefined}
+        />
       ) : null}
     </DashboardLayout>
   );
