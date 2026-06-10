@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { DisasterAffectedAreasTab } from "@/components/admin/disasters/detail/DisasterAffectedAreasTab";
 import { DisasterIncidentsTab } from "@/components/admin/disasters/detail/DisasterIncidentsTab";
@@ -12,12 +12,13 @@ import { DisasterResponsibilitiesTab } from "@/components/admin/disasters/detail
 import { DisasterShelterNetworkTab } from "@/components/admin/disasters/detail/DisasterShelterNetworkTab";
 import { DisasterStatusActionDialog } from "@/components/admin/disasters/detail/DisasterStatusActionDialog";
 import { DisasterSupportFacilitiesTab } from "@/components/admin/disasters/detail/DisasterSupportFacilitiesTab";
+import {
+  computeDisasterDetailTabCounts,
+  DisasterDetailTabNav,
+} from "@/components/admin/disasters/detail/DisasterDetailTabNav";
 import { DisasterTimelineTab } from "@/components/admin/disasters/detail/DisasterTimelineTab";
 import { DeclarationAmendmentModal } from "@/components/admin/disasters/detail/DeclarationAmendmentModal";
-import {
-  DISASTER_DETAIL_TABS,
-  type DisasterDetailTab,
-} from "@/components/admin/disasters/detail/disasterDetailTabs";
+import type { DisasterDetailTab } from "@/components/admin/disasters/detail/disasterDetailTabs";
 import { useDisasterDashboard } from "@/components/admin/disasters/detail/useDisasterDashboard";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -32,10 +33,113 @@ import {
   hasInitialDeclaration,
   type DisasterLifecycleAction,
 } from "@/lib/disaster-operations-format";
+import type { AdminFacilityListItem } from "@/types/admin-facility";
+import type { DisasterDashboardResponse } from "@/types/disaster-operations";
 
 type DisasterDetailWorkspaceProps = {
   disasterPublicUuid: string;
 };
+
+type DisasterDetailTabPanelProps = {
+  activeTab: DisasterDetailTab;
+  disasterPublicUuid: string;
+  dashboard: DisasterDashboardResponse;
+  facilities: AdminFacilityListItem[];
+  facilityLocations: ReturnType<typeof useDisasterDashboard>["facilityLocations"];
+  isReadOnly: boolean;
+  onRefresh: () => Promise<void>;
+};
+
+function DisasterDetailTabPanel({
+  activeTab,
+  disasterPublicUuid,
+  dashboard,
+  facilities,
+  facilityLocations,
+  isReadOnly,
+  onRefresh,
+}: DisasterDetailTabPanelProps) {
+  switch (activeTab) {
+    case "overview":
+      return <DisasterOverviewTab dashboard={dashboard} />;
+    case "affected-areas":
+      return (
+        <DisasterAffectedAreasTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "shelter-network":
+      return (
+        <DisasterShelterNetworkTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          facilities={facilities}
+          facilityLocations={facilityLocations}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "relief-hubs":
+      return (
+        <DisasterReliefHubsNetworkTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          facilities={facilities}
+          facilityLocations={facilityLocations}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "support-facilities":
+      return (
+        <DisasterSupportFacilitiesTab
+          dashboard={dashboard}
+          facilities={facilities}
+        />
+      );
+    case "agencies":
+      return (
+        <DisasterResponsibilitiesTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "incidents":
+      return (
+        <DisasterIncidentsTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "relief":
+      return (
+        <DisasterReliefTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    case "timeline":
+      return (
+        <DisasterTimelineTab
+          disasterPublicUuid={disasterPublicUuid}
+          dashboard={dashboard}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      );
+    default:
+      return null;
+  }
+}
 
 export function DisasterDetailWorkspace({
   disasterPublicUuid,
@@ -56,6 +160,14 @@ export function DisasterDetailWorkspace({
     useState<DisasterLifecycleAction | null>(null);
   const [amendOpen, setAmendOpen] = useState(false);
 
+  const tabCounts = useMemo(
+    () =>
+      dashboard
+        ? computeDisasterDetailTabCounts(dashboard, facilities)
+        : {},
+    [dashboard, facilities],
+  );
+
   if (isLoading && !dashboard) {
     return <LoadingSkeleton lines={10} />;
   }
@@ -67,7 +179,7 @@ export function DisasterDetailWorkspace({
           href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← National Disaster Management
+          ← Disaster Command
         </Link>
         <ErrorAlert message={error} />
       </div>
@@ -86,19 +198,19 @@ export function DisasterDetailWorkspace({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden lg:overflow-hidden">
-      <div className="mb-3 shrink-0 space-y-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden lg:overflow-hidden">
+      <div className="shrink-0 space-y-0.5">
         <Link
           href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← National Disaster Management
+          ← Disaster Command
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900">
                 {disaster.title}
               </h2>
               <Badge size="compact" tone="active">
@@ -108,7 +220,7 @@ export function DisasterDetailWorkspace({
                 <span className="text-xs text-slate-500">Read-only</span>
               ) : null}
             </div>
-            <p className="mt-0.5 text-sm text-slate-600">
+            <p className="mt-0.5 truncate text-sm text-slate-600">
               {disaster.event_code}
               {" · "}
               {formatDisasterEventTypeLabel(
@@ -178,109 +290,46 @@ export function DisasterDetailWorkspace({
         </div>
       </div>
 
-      <div
-        className="mb-3 flex shrink-0 flex-wrap gap-2"
-        role="tablist"
-        aria-label="Disaster dashboard sections"
+      <section
+        aria-label="Disaster dashboard"
+        className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white shadow-sm lg:overflow-hidden"
       >
-        {DISASTER_DETAIL_TABS.map((tab) => {
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setActiveTab(tab.id)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-[#002D62] text-white shadow-sm"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeTab === "overview" ? (
-        <DisasterOverviewTab dashboard={dashboard} />
-      ) : null}
-
-      {activeTab !== "overview" ? (
-        <div
-          className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
-          role="tabpanel"
-        >
-        {activeTab === "affected-areas" ? (
-          <DisasterAffectedAreasTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
+        <div className="shrink-0 border-b border-slate-100 px-3 py-2.5 lg:hidden">
+          <DisasterDetailTabNav
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+            tabCounts={tabCounts}
+            layout="horizontal"
           />
-        ) : null}
-        {activeTab === "shelter-network" ? (
-          <DisasterShelterNetworkTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            facilities={facilities}
-            facilityLocations={facilityLocations}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "relief-hubs" ? (
-          <DisasterReliefHubsNetworkTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            facilities={facilities}
-            facilityLocations={facilityLocations}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "support-facilities" ? (
-          <DisasterSupportFacilitiesTab
-            dashboard={dashboard}
-            facilities={facilities}
-          />
-        ) : null}
-        {activeTab === "agencies" ? (
-          <DisasterResponsibilitiesTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "incidents" ? (
-          <DisasterIncidentsTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "relief" ? (
-          <DisasterReliefTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
-        {activeTab === "timeline" ? (
-          <DisasterTimelineTab
-            disasterPublicUuid={disasterPublicUuid}
-            dashboard={dashboard}
-            isReadOnly={isReadOnly}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
         </div>
-      ) : null}
+
+        <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(12rem,14rem)_minmax(0,1fr)] lg:overflow-hidden">
+          <div className="hidden min-h-0 shrink-0 border-slate-100 lg:block lg:border-r lg:overflow-y-auto lg:overscroll-y-contain">
+            <DisasterDetailTabNav
+              activeTab={activeTab}
+              onSelect={setActiveTab}
+              tabCounts={tabCounts}
+              layout="vertical"
+            />
+          </div>
+
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 lg:p-4"
+            role="tabpanel"
+            aria-label={`${activeTab} section`}
+          >
+            <DisasterDetailTabPanel
+              activeTab={activeTab}
+              disasterPublicUuid={disasterPublicUuid}
+              dashboard={dashboard}
+              facilities={facilities}
+              facilityLocations={facilityLocations}
+              isReadOnly={isReadOnly}
+              onRefresh={handleRefresh}
+            />
+          </div>
+        </div>
+      </section>
 
       {lifecycleAction ? (
         <DisasterStatusActionDialog

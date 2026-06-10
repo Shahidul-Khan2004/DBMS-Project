@@ -45,10 +45,12 @@ export function AdminDashboardPage({
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      lockViewport={fillViewport}
+      contentClassName="flex min-h-0 flex-1 flex-col"
     >
       <SystemAdminShell
         fillViewport={fillViewport}
+        cancelContentPadding={false}
         className={`flex min-h-0 flex-1 flex-col ${
           scrollContent
             ? "overflow-y-auto lg:min-h-0 lg:py-2"

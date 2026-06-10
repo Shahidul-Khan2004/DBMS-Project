@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { AdminDashboardPage } from "@/components/admin/AdminDashboardPage";
 import { DeclareDisasterWizard } from "@/components/admin/disasters";
+import { NationalDisasterWorkspaceFrame } from "@/components/admin/national-disaster/NationalDisasterWorkspaceFrame";
 import { PageLoading } from "@/components/ui/StatusState";
 
 function DeclareDisasterPageContent() {
@@ -11,7 +12,9 @@ function DeclareDisasterPageContent() {
       loadingLabel="Loading declaration wizard"
       scrollContent
     >
-      <DeclareDisasterWizard />
+      <NationalDisasterWorkspaceFrame>
+        <DeclareDisasterWizard />
+      </NationalDisasterWorkspaceFrame>
     </AdminDashboardPage>
   );
 }

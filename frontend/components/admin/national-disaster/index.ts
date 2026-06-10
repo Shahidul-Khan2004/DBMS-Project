@@ -1,2 +1,6 @@
 export { NationalDisasterLandingWorkspace } from "./NationalDisasterLandingWorkspace";
-export { NationalDisasterSubnav } from "./NationalDisasterSubnav";
+export {
+  NationalDisasterSectionSwitch,
+  NationalDisasterSubnav,
+} from "./NationalDisasterSubnav";
+export { NationalDisasterWorkspaceFrame } from "./NationalDisasterWorkspaceFrame";

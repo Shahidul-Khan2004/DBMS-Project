@@ -9,8 +9,12 @@ import {
   nationalDisasterLandingPath,
 } from "@/lib/admin-national-disaster-routes";
 
-const SUBNAV_TABS = [
-  { label: "Disaster Command", href: nationalDisasterLandingPath(), isActive: isNationalDisasterLandingRoute },
+const SECTIONS = [
+  {
+    label: "Disaster Command",
+    href: nationalDisasterLandingPath(),
+    isActive: isNationalDisasterLandingRoute,
+  },
   {
     label: "Facility Registry",
     href: nationalDisasterFacilitiesPath(),
@@ -18,31 +22,37 @@ const SUBNAV_TABS = [
   },
 ] as const;
 
-export function NationalDisasterSubnav() {
+export function NationalDisasterSectionSwitch() {
   const pathname = usePathname();
 
   return (
-    <nav
+    <div
+      role="tablist"
       aria-label="National disaster sections"
-      className="flex shrink-0 flex-wrap gap-2"
+      className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-100/80 p-0.5"
     >
-      {SUBNAV_TABS.map((tab) => {
-        const active = tab.isActive(pathname);
+      {SECTIONS.map((section) => {
+        const active = section.isActive(pathname);
         return (
           <Link
-            key={tab.href}
-            href={tab.href}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              active
-                ? "bg-[#002D62] text-white shadow-sm"
-                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
+            key={section.href}
+            href={section.href}
+            role="tab"
+            aria-selected={active}
             aria-current={active ? "page" : undefined}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              active
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            {tab.label}
+            {section.label}
           </Link>
         );
       })}
-    </nav>
+    </div>
   );
 }
+
+/** @deprecated Use NationalDisasterSectionSwitch */
+export const NationalDisasterSubnav = NationalDisasterSectionSwitch;
