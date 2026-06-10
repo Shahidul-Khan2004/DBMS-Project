@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ApiError, ensureAuthSession } from "@/lib/api";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
@@ -303,7 +304,7 @@ export default function IncidentCommandPage() {
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
         <div className="flex w-full flex-col gap-2 py-2 sm:py-4 lg:min-h-0 lg:flex-1 lg:gap-3 lg:overflow-hidden lg:py-2">

@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { ApiError, ensureAuthSession } from "@/lib/api";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
@@ -245,7 +246,7 @@ export default function DispatcherServiceCaseDetailPage() {
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col xl:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col xl:h-full xl:min-h-0 xl:overflow-hidden">
         <div className="flex w-full min-h-0 flex-col gap-1 py-0 xl:flex-1 xl:min-h-0 xl:gap-1.5 xl:overflow-hidden">

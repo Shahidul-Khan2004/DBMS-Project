@@ -27,7 +27,9 @@ export function SystemAdminShell({
     <SystemAdminNavProvider>
       <div
         className={`-mx-4 ${cancelContentPadding ? "-mt-6" : ""} flex flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 2xl:-mx-10 ${
-          fillViewport ? "min-h-0 flex-1 lg:h-full" : ""
+          fillViewport
+            ? "min-h-0 flex-1 lg:h-full"
+            : "min-h-0 flex-1 lg:overflow-y-auto lg:overscroll-y-contain"
         }`}
       >
         <SystemAdminNav />

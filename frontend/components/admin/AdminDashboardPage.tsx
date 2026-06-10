@@ -9,6 +9,7 @@ import {
   ADMIN_DASHBOARD_SUBTITLE,
   ADMIN_DASHBOARD_TITLE,
 } from "@/lib/admin-dashboard";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
@@ -46,7 +47,7 @@ export function AdminDashboardPage({
       hideSidebar
       showHealthBadge={false}
       lockViewport={fillViewport}
-      contentClassName="flex min-h-0 flex-1 flex-col"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <SystemAdminShell
         fillViewport={fillViewport}

@@ -18,6 +18,7 @@ import { useActiveIncidentCardLocations } from "@/components/dispatcher/incident
 import { Button } from "@/components/ui/Button";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ensureAuthSession } from "@/lib/api";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
@@ -120,7 +121,7 @@ export default function ActiveIncidentsPage() {
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
         <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-hidden">

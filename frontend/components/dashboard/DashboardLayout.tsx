@@ -13,6 +13,7 @@ import { ProfileMenu } from "@/components/dashboard/ProfileMenu";
 import { CitizenNationalDisasterAlert } from "@/components/national-disaster/CitizenNationalDisasterAlert";
 import { OpsNationalDisasterAlertBar } from "@/components/national-disaster/OpsNationalDisasterAlertBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { isOpsDashboardRoute } from "@/lib/dashboard-viewport";
 
 interface DashboardLayoutProps {
   title: string;
@@ -27,6 +28,8 @@ interface DashboardLayoutProps {
   fillViewport?: boolean;
   /** Lock ops dashboard to viewport height on desktop; content scrolls internally. */
   lockViewport?: boolean;
+  /** Allow normal document scrolling on desktop ops dashboards (opt-out of lock). */
+  allowDocumentScroll?: boolean;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -39,6 +42,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   contentClassName = "",
   fillViewport = false,
   lockViewport = false,
+  allowDocumentScroll = false,
 }) => {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole>("citizen");
@@ -58,7 +62,18 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const isCitizenReportNewPage = pathname === "/dashboard/citizen/report-new";
   const showCitizenReportAction = !isCitizenReportNewPage;
   const useFillViewport = fillViewport && isCitizenDashboardShell;
-  const useOpsViewportLock = lockViewport && !isCitizenDashboardShell;
+  const isOpsRole =
+    role === "dispatcher" ||
+    role === "system_admin" ||
+    role === "agency_representative";
+  const autoLockOpsViewport =
+    isOpsRole &&
+    (isOpsDashboardRoute(pathname) ||
+      pathname === "/dashboard/notifications");
+  const useOpsViewportLock =
+    !isCitizenDashboardShell &&
+    !allowDocumentScroll &&
+    (lockViewport || autoLockOpsViewport);
   const useViewportFill = useFillViewport || useOpsViewportLock;
   const showCitizenDisasterAlert = isCitizenDashboardShell;
   const showOpsDisasterAlert =

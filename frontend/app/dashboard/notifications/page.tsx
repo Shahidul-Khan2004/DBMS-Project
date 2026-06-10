@@ -9,6 +9,7 @@ import { NotificationsFeedPanel } from "@/components/notifications/Notifications
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PageLoading } from "@/components/ui/StatusState";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession, getAuthSession, type UserRole } from "@/lib/auth-store";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
@@ -230,7 +231,7 @@ export default function NotificationsPage() {
         onLogout={handleLogout}
         hideSidebar
         showHealthBadge={false}
-        contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+        contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
       >
         <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0">
           {pageBody}
@@ -245,7 +246,7 @@ export default function NotificationsPage() {
       subtitle="Updates related to your reports, cases and incident activity."
       onLogout={handleLogout}
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       {pageBody}
     </DashboardLayout>

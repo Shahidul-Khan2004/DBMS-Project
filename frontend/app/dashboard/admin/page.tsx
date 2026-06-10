@@ -34,7 +34,7 @@ export default function AdminOverviewPage() {
       hideSidebar
       showHealthBadge={false}
     >
-      <SystemAdminShell>
+      <SystemAdminShell cancelContentPadding={false}>
         <AdminOverviewWorkspace />
       </SystemAdminShell>
     </DashboardLayout>

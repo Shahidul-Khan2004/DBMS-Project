@@ -9,15 +9,23 @@ import { DispatcherOpsNav } from "@/components/dispatcher/DispatcherOpsNav";
 interface DispatcherOpsShellProps {
   children: ReactNode;
   className?: string;
+  /**
+   * Pull the shell up to cancel DashboardLayout content padding (`py-6`).
+   * Disable when the parent uses `lockViewport` (content area has `pt-0`).
+   */
+  cancelContentPadding?: boolean;
 }
 
 export function DispatcherOpsShell({
   children,
   className = "",
+  cancelContentPadding = false,
 }: DispatcherOpsShellProps) {
   return (
     <DispatcherNavProvider>
-      <div className="-mx-4 -mt-6 flex min-h-[calc(100vh-8rem)] flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 2xl:-mx-10">
+      <div
+        className={`-mx-4 ${cancelContentPadding ? "-mt-6" : ""} flex min-h-0 flex-1 flex-col overflow-x-hidden sm:-mx-6 lg:-mx-8 lg:h-full 2xl:-mx-10`}
+      >
         <DispatcherAdminOversightBar />
         <DispatcherOpsNav />
         <DispatcherOpsDrawer />
