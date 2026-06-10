@@ -20,6 +20,7 @@ import {
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PageLoading } from "@/components/ui/StatusState";
 import { ensureAuthSession } from "@/lib/api";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import { useDispatcherWorkspaceGuard } from "@/lib/use-dispatcher-workspace-guard";
 import {
@@ -219,7 +220,7 @@ export default function CreateStandaloneIncidentPage() {
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2">
         <div className="flex w-full min-h-0 flex-1 flex-col gap-2.5 pb-2 pt-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-2 lg:pt-0">

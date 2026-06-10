@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { DispatcherOpsShell } from "@/components/dispatcher/DispatcherOpsShell";
 import { Gateway999Workspace } from "@/components/dispatcher/gateway-999";
 import { PageLoading } from "@/components/ui/StatusState";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import {
   DISPATCHER_DASHBOARD_SUBTITLE,
@@ -33,7 +34,7 @@ export default function Gateway999Page() {
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <DispatcherOpsShell className="flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 lg:py-2">
         <Gateway999Workspace />

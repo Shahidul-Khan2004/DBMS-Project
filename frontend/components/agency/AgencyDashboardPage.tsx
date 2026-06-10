@@ -14,6 +14,7 @@ import {
   getAgencyOperationsSubtitle,
   getAgencyWorkspaceTitle,
 } from "@/lib/agency-microcopy";
+import { OPS_DASHBOARD_CONTENT_CLASS } from "@/lib/dashboard-viewport";
 import { clearAuthSession } from "@/lib/auth-store";
 import { useAgencyWorkspaceGuard } from "@/lib/use-agency-workspace-guard";
 import { PageLoading } from "@/components/ui/StatusState";
@@ -67,9 +68,10 @@ export function AgencyDashboardPage({
       onLogout={handleLogout}
       hideSidebar
       showHealthBadge={false}
-      contentClassName="flex min-h-0 flex-col lg:h-[calc(100vh-11.5rem)]"
+      contentClassName={OPS_DASHBOARD_CONTENT_CLASS}
     >
       <AgencyOpsShell
+        cancelContentPadding={false}
         className={`flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:min-h-0 ${shellClassName}`.trim()}
       >
         {children}
