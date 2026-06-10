@@ -25,6 +25,8 @@ interface DashboardLayoutProps {
   contentClassName?: string;
   /** Fill remaining viewport below header/nav (citizen workspace pages). */
   fillViewport?: boolean;
+  /** Lock ops dashboard to viewport height on desktop; content scrolls internally. */
+  lockViewport?: boolean;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -36,6 +38,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   showHealthBadge = true,
   contentClassName = "",
   fillViewport = false,
+  lockViewport = false,
 }) => {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole>("citizen");
@@ -55,6 +58,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const isCitizenReportNewPage = pathname === "/dashboard/citizen/report-new";
   const showCitizenReportAction = !isCitizenReportNewPage;
   const useFillViewport = fillViewport && isCitizenDashboardShell;
+  const useOpsViewportLock = lockViewport && !isCitizenDashboardShell;
+  const useViewportFill = useFillViewport || useOpsViewportLock;
   const showCitizenDisasterAlert = isCitizenDashboardShell;
   const showOpsDisasterAlert =
     role === "dispatcher" ||
@@ -63,7 +68,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const shellWidthClass = "w-full";
   const shellClassName = isCitizenDashboardShell
     ? `${useFillViewport ? "h-dvh" : "min-h-dvh"} flex flex-col overflow-x-hidden bg-[#F6F9FE] text-[#002D62]`
-    : "min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200";
+    : useOpsViewportLock
+      ? "min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200 lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
+      : "min-h-screen bg-gradient-to-b from-emerald-50/40 via-[#EFF6FF] to-zinc-200";
   const headerClassName = isCitizenDashboardShell
     ? "border-b border-[#002D62]/10 bg-white shadow-sm"
     : "border-b border-[#002D62]/10 bg-zinc-200/95 shadow-sm backdrop-blur-md";
@@ -92,10 +99,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     ? useFillViewport
       ? `${shellWidthClass} flex min-h-0 w-full flex-1 flex-col px-4 pb-4 pt-3 sm:px-6 lg:px-8 2xl:px-10`
       : `${shellWidthClass} w-full px-4 py-3 sm:px-6 lg:px-8 2xl:px-10`
-    : `${shellWidthClass} w-full px-4 py-6 sm:px-6 lg:px-8 2xl:px-10`;
+    : useOpsViewportLock
+      ? `${shellWidthClass} flex min-h-0 w-full flex-1 flex-col px-4 pt-0 pb-6 sm:px-6 lg:px-8 lg:pb-4 2xl:px-10`
+      : `${shellWidthClass} w-full px-4 py-6 sm:px-6 lg:px-8 2xl:px-10`;
   const contentInnerClassName = [
     "min-w-0 w-full",
-    useFillViewport ? "flex min-h-0 flex-1 flex-col" : "",
+    useViewportFill ? "flex min-h-0 flex-1 flex-col" : "",
     contentClassName,
   ]
     .filter(Boolean)
@@ -131,7 +140,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const shellContent = (
     <>
-      <div className={`${headerClassName}${useFillViewport ? " shrink-0" : ""}`}>
+      <div className={`${headerClassName}${useViewportFill ? " shrink-0" : ""}`}>
         <div className={headerInnerClassName}>
           <div className={headerRowClassName}>
             <div className={headerTitleGroupClassName}>

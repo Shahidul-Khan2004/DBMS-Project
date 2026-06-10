@@ -3,6 +3,7 @@
 import { Suspense, use } from "react";
 import { AdminDashboardPage } from "@/components/admin/AdminDashboardPage";
 import { DisasterDetailWorkspace } from "@/components/admin/disasters";
+import { NationalDisasterWorkspaceFrame } from "@/components/admin/national-disaster/NationalDisasterWorkspaceFrame";
 import { PageLoading } from "@/components/ui/StatusState";
 
 function DisasterDetailPageContent({
@@ -14,7 +15,9 @@ function DisasterDetailPageContent({
 
   return (
     <AdminDashboardPage loadingLabel="Loading disaster command">
-      <DisasterDetailWorkspace disasterPublicUuid={disasterPublicUuid} />
+      <NationalDisasterWorkspaceFrame>
+        <DisasterDetailWorkspace disasterPublicUuid={disasterPublicUuid} />
+      </NationalDisasterWorkspaceFrame>
     </AdminDashboardPage>
   );
 }

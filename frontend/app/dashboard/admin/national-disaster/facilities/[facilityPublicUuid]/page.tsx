@@ -3,6 +3,7 @@
 import { Suspense, use } from "react";
 import { AdminDashboardPage } from "@/components/admin/AdminDashboardPage";
 import { FacilityDetailWorkspace } from "@/components/admin/facilities";
+import { NationalDisasterWorkspaceFrame } from "@/components/admin/national-disaster/NationalDisasterWorkspaceFrame";
 import { PageLoading } from "@/components/ui/StatusState";
 
 function FacilityDetailPageContent({
@@ -17,7 +18,9 @@ function FacilityDetailPageContent({
       loadingLabel="Loading facility"
       scrollContent
     >
-      <FacilityDetailWorkspace facilityPublicUuid={facilityPublicUuid} />
+      <NationalDisasterWorkspaceFrame>
+        <FacilityDetailWorkspace facilityPublicUuid={facilityPublicUuid} />
+      </NationalDisasterWorkspaceFrame>
     </AdminDashboardPage>
   );
 }

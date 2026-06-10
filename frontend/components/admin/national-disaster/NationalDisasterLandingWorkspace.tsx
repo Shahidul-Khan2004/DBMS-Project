@@ -3,9 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DisasterListRow } from "@/components/admin/disasters/DisasterListRow";
-import { NationalDisasterSubnav } from "@/components/admin/national-disaster/NationalDisasterSubnav";
 import { Button } from "@/components/ui/Button";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -71,48 +69,40 @@ export function NationalDisasterLandingWorkspace() {
   const readiness = computeFacilityReadinessStats(facilities);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 lg:overflow-hidden">
-      <AdminPageHeader
-        title="National Disaster Management"
-        subtitle="Coordinate declared disasters, affected areas, facilities, shelters, relief, and agency responsibilities."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void loadData()}
-              disabled={isLoading}
-              aria-label="Refresh"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-                aria-hidden
-              />
-              Refresh
-            </Button>
-            <Button
-              type="button"
-              variant="emergency"
-              size="sm"
-              onClick={() => router.push(nationalDisasterDeclarePath())}
-            >
-              + Declare Disaster
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                router.push(`${nationalDisasterFacilitiesPath()}?create=1`)
-              }
-            >
-              + Add Facility
-            </Button>
-          </div>
-        }
-      />
-
-      <NationalDisasterSubnav />
+    <div className="flex min-h-0 flex-1 flex-col gap-2 lg:overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => void loadData()}
+          disabled={isLoading}
+          aria-label="Refresh"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            aria-hidden
+          />
+          Refresh
+        </Button>
+        <Button
+          type="button"
+          variant="emergency"
+          size="sm"
+          onClick={() => router.push(nationalDisasterDeclarePath())}
+        >
+          + Declare Disaster
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() =>
+            router.push(`${nationalDisasterFacilitiesPath()}?create=1`)
+          }
+        >
+          + Add Facility
+        </Button>
+      </div>
 
       {error ? <ErrorAlert message={error} /> : null}
 

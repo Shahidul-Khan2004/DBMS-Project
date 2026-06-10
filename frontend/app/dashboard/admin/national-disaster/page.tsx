@@ -3,12 +3,15 @@
 import { Suspense } from "react";
 import { AdminDashboardPage } from "@/components/admin/AdminDashboardPage";
 import { NationalDisasterLandingWorkspace } from "@/components/admin/national-disaster/NationalDisasterLandingWorkspace";
+import { NationalDisasterWorkspaceFrame } from "@/components/admin/national-disaster/NationalDisasterWorkspaceFrame";
 import { PageLoading } from "@/components/ui/StatusState";
 
 function NationalDisasterLandingPageContent() {
   return (
     <AdminDashboardPage loadingLabel="Loading national disaster management">
-      <NationalDisasterLandingWorkspace />
+      <NationalDisasterWorkspaceFrame showSectionSwitch>
+        <NationalDisasterLandingWorkspace />
+      </NationalDisasterWorkspaceFrame>
     </AdminDashboardPage>
   );
 }

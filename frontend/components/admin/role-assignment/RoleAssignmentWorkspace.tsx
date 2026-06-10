@@ -81,7 +81,7 @@ export function RoleAssignmentWorkspace() {
         subtitle="Grant supported platform roles to existing users."
       />
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_minmax(16rem,22rem)] lg:overflow-hidden">
+      <div className="min-h-0 flex-1">
         <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <div>
@@ -149,20 +149,6 @@ export function RoleAssignmentWorkspace() {
             ) : null}
           </form>
         </section>
-
-        <aside className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm lg:overflow-y-auto">
-          <h3 className="text-sm font-semibold text-slate-900">Guidance</h3>
-          <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-slate-600">
-            <li>
-              Agency representatives are linked through Agencies →
-              Representatives, not through direct role assignment.
-            </li>
-            <li>Use this page for supported platform roles only.</li>
-            <li>
-              The backend requires the target user public UUID for this route.
-            </li>
-          </ul>
-        </aside>
       </div>
     </div>
   );

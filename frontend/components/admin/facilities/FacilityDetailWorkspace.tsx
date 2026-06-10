@@ -24,7 +24,6 @@ import {
 } from "@/lib/admin-facility-format";
 import { nationalDisasterFacilitiesPath } from "@/lib/admin-national-disaster-routes";
 import type { AdminFacility } from "@/types/admin-facility";
-import { NationalDisasterSubnav } from "@/components/admin/national-disaster/NationalDisasterSubnav";
 import { toast } from "sonner";
 
 const MAP_PREVIEW_HEIGHT_CLASS = "h-full min-h-[200px]";
@@ -143,15 +142,14 @@ export function FacilityDetailWorkspace({
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-y-auto">
-        <div className="shrink-0 space-y-3">
+        <div className="shrink-0 space-y-1">
           <Link
             href={nationalDisasterFacilitiesPath()}
             className="text-sm font-medium text-[#002D62] hover:underline"
           >
             ← Facility Registry
           </Link>
-          <NationalDisasterSubnav />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold text-slate-900">
               {facility.name}
             </h2>
@@ -161,8 +159,8 @@ export function FacilityDetailWorkspace({
             >
               {facility.isActive ? "Active" : "Inactive"}
             </Badge>
+            <span className="text-sm text-slate-600">{facility.facilityCode}</span>
           </div>
-          <p className="mt-0.5 text-sm text-slate-600">{facility.facilityCode}</p>
         </div>
 
         <CommandSectionCard

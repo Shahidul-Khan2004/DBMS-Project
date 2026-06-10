@@ -23,7 +23,6 @@ import {
   DISASTER_EVENT_TYPE_OPTIONS,
   DISASTER_SEVERITY_OPTIONS,
 } from "@/lib/disaster-operations-format";
-import { NationalDisasterSubnav } from "@/components/admin/national-disaster/NationalDisasterSubnav";
 import {
   nationalDisasterDetailPath,
   nationalDisasterLandingPath,
@@ -409,17 +408,14 @@ export function DeclareDisasterWizard() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="shrink-0">
+      <div className="shrink-0 space-y-1">
         <Link
           href={nationalDisasterLandingPath()}
           className="text-sm font-medium text-[#002D62] hover:underline"
         >
-          ← National Disaster Management
+          ← Disaster Command
         </Link>
-        <NationalDisasterSubnav />
-        <h2 className="mt-2 text-xl font-semibold text-slate-900">
-          Declare disaster
-        </h2>
+        <h2 className="text-xl font-semibold text-slate-900">Declare disaster</h2>
       </div>
 
       <nav
