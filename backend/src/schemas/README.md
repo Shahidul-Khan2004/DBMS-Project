@@ -8,10 +8,12 @@ The canonical database definition for Docker and fresh installs lives in **`dock
 4. `21_` — reference data seeds (roles, permissions, channels, …)  
 5. `22_` — Bangladesh `administrative_areas` hierarchy (from [nuhil/bangladesh-geocode](https://github.com/nuhil/bangladesh-geocode), MIT); emitted as **4 bulk inserts** (one per level) for fast Docker init  
 6. `24_`–`28_` — demo agencies, Dhaka/Kurigram master data, agency-rep incident  
-7. `29_`–`32_` — **showcase operational demo** (citizen locations, day-to-day intakes/incidents, case messages, reporter reliability demo)
+7. `29_`–`33_` — **showcase operational demo** (citizen locations, day-to-day intakes/incidents, case messages, reporter reliability demo, storyline video setup)
 
 The official MySQL image executes `/docker-entrypoint-initdb.d/*.sql` in **lexical** order; filenames use two-digit prefixes so sort order matches dependency order.
 
-**Showcase seeds (`29`–`32`):** On first Docker init, user-dependent rows are skipped (demo citizens do not exist yet). On backend startup, [`operationalDemoSeedService.js`](../services/operationalDemoSeedService.js) re-runs these files after [`demoCitizenBootstrapService.js`](../services/demoCitizenBootstrapService.js) creates citizens. All inserts are idempotent.
+**Showcase seeds (`29`–`33`):** On first Docker init, user-dependent rows are skipped (demo citizens do not exist yet). On backend startup, [`operationalDemoSeedService.js`](../services/operationalDemoSeedService.js) re-runs these files after [`demoCitizenBootstrapService.js`](../services/demoCitizenBootstrapService.js) creates citizens. All inserts are idempotent.
+
+**Storyline seed (`33`):** Prepares Puran Dhaka fire and Kurigram/Gaibandha flood demo data (areas, locations, intakes, agencies, units, facilities). Live incident/disaster steps are created in the UI during recording.
 
 The former monolithic `schema.sql` has been removed; use this directory only.

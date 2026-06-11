@@ -12,6 +12,7 @@ const SEED_FILES = [
   "30_seed_pre_disaster_operations_demo.sql",
   "31_seed_case_messages_notifications_demo.sql",
   "32_seed_reporter_risk_demo.sql",
+  "33_seed_storyline_demo.sql",
 ];
 
 const CITIZEN_GATE_EMAIL = "citizen.rahima@niers.test";
@@ -70,7 +71,7 @@ export async function runOperationalDemoSeeds() {
         await conn.query(`${statement};`);
       }
     }
-    console.log("Operational demo seeds applied (29–32).");
+    console.log("Operational demo seeds applied (29–33).");
   } catch (err) {
     console.error("Operational demo seed failed:", err.message);
     throw err;
