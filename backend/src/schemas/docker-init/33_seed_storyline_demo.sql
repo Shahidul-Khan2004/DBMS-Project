@@ -485,19 +485,24 @@ SET @agency_nat_rescue = (SELECT id FROM agencies WHERE agency_code = 'NAT-RESCU
 -- Agency memberships for demo representative dashboards
 INSERT INTO agency_memberships (public_uuid, user_id, agency_id, membership_role, membership_status)
 SELECT 'e9110001-0000-4000-8000-000000000001', @fire_rep_id, @agency_dhk_fire, 'representative', 'active'
-FROM DUAL WHERE @fire_rep_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agency_memberships WHERE public_uuid = 'e9110001-0000-4000-8000-000000000001');
+FROM DUAL WHERE @fire_rep_id IS NOT NULL AND @agency_dhk_fire IS NOT NULL
+ON DUPLICATE KEY UPDATE membership_status = 'active', membership_role = VALUES(membership_role), left_at = NULL;
 INSERT INTO agency_memberships (public_uuid, user_id, agency_id, membership_role, membership_status)
 SELECT 'e9110002-0000-4000-8000-000000000002', @police_rep_id, @agency_dhk_police, 'representative', 'active'
-FROM DUAL WHERE @police_rep_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agency_memberships WHERE public_uuid = 'e9110002-0000-4000-8000-000000000002');
+FROM DUAL WHERE @police_rep_id IS NOT NULL AND @agency_dhk_police IS NOT NULL
+ON DUPLICATE KEY UPDATE membership_status = 'active', membership_role = VALUES(membership_role), left_at = NULL;
 INSERT INTO agency_memberships (public_uuid, user_id, agency_id, membership_role, membership_status)
 SELECT 'e9110003-0000-4000-8000-000000000003', @medical_rep_id, @agency_dhk_medical, 'representative', 'active'
-FROM DUAL WHERE @medical_rep_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agency_memberships WHERE public_uuid = 'e9110003-0000-4000-8000-000000000003');
+FROM DUAL WHERE @medical_rep_id IS NOT NULL AND @agency_dhk_medical IS NOT NULL
+ON DUPLICATE KEY UPDATE membership_status = 'active', membership_role = VALUES(membership_role), left_at = NULL;
 INSERT INTO agency_memberships (public_uuid, user_id, agency_id, membership_role, membership_status)
 SELECT 'e9220001-0000-4000-8000-000000000001', @relief_rep_id, @agency_nat_dmr, 'coordinator', 'active'
-FROM DUAL WHERE @relief_rep_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agency_memberships WHERE public_uuid = 'e9220001-0000-4000-8000-000000000001');
+FROM DUAL WHERE @relief_rep_id IS NOT NULL AND @agency_nat_dmr IS NOT NULL
+ON DUPLICATE KEY UPDATE membership_status = 'active', membership_role = VALUES(membership_role), left_at = NULL;
 INSERT INTO agency_memberships (public_uuid, user_id, agency_id, membership_role, membership_status)
 SELECT 'e9220002-0000-4000-8000-000000000002', @shelter_rep_id, @agency_nat_shelter, 'coordinator', 'active'
-FROM DUAL WHERE @shelter_rep_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agency_memberships WHERE public_uuid = 'e9220002-0000-4000-8000-000000000002');
+FROM DUAL WHERE @shelter_rep_id IS NOT NULL AND @agency_nat_shelter IS NOT NULL
+ON DUPLICATE KEY UPDATE membership_status = 'active', membership_role = VALUES(membership_role), left_at = NULL;
 
 -- Emergency units for fire storyline
 SET @ut_fire_truck = (SELECT id FROM emergency_unit_types WHERE type_code = 'fire_truck' LIMIT 1);

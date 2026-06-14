@@ -5,6 +5,8 @@
   "scripts": {
     "dev:backend": "cd backend && node src/app.js",
     "dev:frontend": "next dev frontend",
+    "build:frontend": "next build frontend",
+    "start:frontend": "next start frontend",
     "generate:admin-areas": "node backend/scripts/generate-admin-areas-seed.mjs",
     "test": "env -u MYSQL_DATABASE -u DATABASE_URL -u MYSQL_HOST -u MYSQL_USER -u MYSQL_PASSWORD node --test --test-force-exit backend/test/*.test.js",
     "test:integration": "cd backend && node --import dotenv/config --test --test-force-exit test/integration/*.integration.test.js",
