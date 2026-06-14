@@ -89,7 +89,10 @@ export function DispatchUnitDialog({
     setLoadError(null);
 
     try {
-      const response = await getAvailableUnitsForIncident(incidentPublicUuid);
+      const response = await getAvailableUnitsForIncident(incidentPublicUuid, {
+        sort: "distance_asc",
+        includeDistance: true,
+      });
       setUnits(response.units ?? []);
     } catch (err) {
       if (process.env.NODE_ENV === "development") {
@@ -229,6 +232,11 @@ export function DispatchUnitDialog({
                           {unit.unit_name}
                         </p>
                         <Badge tone="available">Available</Badge>
+                        {unit.distance_km != null ? (
+                          <span className="text-xs text-slate-500">
+                            {unit.distance_km.toFixed(1)} km
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-xs text-slate-600">
                         {unit.unit_code} · {formatIncidentField(unit.unit_type_code)} ·{" "}

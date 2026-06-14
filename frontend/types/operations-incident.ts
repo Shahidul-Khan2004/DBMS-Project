@@ -124,6 +124,7 @@ export type AvailableIncidentUnit = {
   agency_public_uuid: string;
   agency_name: string;
   unit_type_code: string;
+  distance_km?: number | null;
 };
 
 export type AvailableIncidentUnitsResponse = {

@@ -55,8 +55,18 @@ export function assignAgencyToIncident(
   );
 }
 
-export function getAvailableUnitsForIncident(incidentPublicUuid: string) {
+export type GetAvailableUnitsForIncidentOptions = {
+  sort?: "distance_asc";
+  includeDistance?: boolean;
+};
+
+export function getAvailableUnitsForIncident(
+  incidentPublicUuid: string,
+  options?: GetAvailableUnitsForIncidentOptions,
+) {
   const query = new URLSearchParams({ incidentPublicUuid });
+  if (options?.sort) query.set("sort", options.sort);
+  if (options?.includeDistance) query.set("includeDistance", "true");
   return apiGet<AvailableIncidentUnitsResponse>(
     `/operations/units/available?${query.toString()}`,
   );
