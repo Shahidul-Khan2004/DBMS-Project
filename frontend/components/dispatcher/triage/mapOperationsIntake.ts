@@ -61,6 +61,7 @@ export function mapOperationsIntakeToQueueItem(
       addressText: formatLocationText(row),
       areaName: placeName,
       districtName: "",
+      adminAreaId: loc?.admin_area_id ?? null,
       ...(hasValidCoordinates
         ? { latitude: loc.latitude, longitude: loc.longitude }
         : {}),

@@ -3,6 +3,7 @@ export type IncidentLocation = {
   longitude: number;
   addressText: string | null;
   placeName: string | null;
+  adminAreaId: number | null;
 };
 
 export type IncidentListItem = {

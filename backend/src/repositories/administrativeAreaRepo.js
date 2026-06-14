@@ -72,3 +72,61 @@ export async function getAdministrativeAreaLabelById(pool, adminAreaId) {
   );
   return rows[0]?.adminAreaLabel ?? null;
 }
+
+function mapAreaNode(row) {
+  return {
+    id: Number(row.id),
+    name: String(row.name),
+    code: String(row.code),
+    areaType: String(row.area_type),
+  };
+}
+
+/**
+ * Full administrative hierarchy for a single area id (division → district → upazila → union).
+ * @param {import("mysql2/promise").Pool} pool
+ * @param {number} adminAreaId
+ */
+export async function getAdministrativeAreaDetailById(pool, adminAreaId) {
+  const [rows] = await pool.execute(
+    `
+      WITH RECURSIVE ancestors AS (
+        SELECT id, parent_area_id, area_type, name, code, 0 AS depth
+        FROM administrative_areas
+        WHERE id = ?
+        UNION ALL
+        SELECT aa.id, aa.parent_area_id, aa.area_type, aa.name, aa.code, a.depth + 1
+        FROM administrative_areas aa
+        INNER JOIN ancestors a ON aa.id = a.parent_area_id
+      )
+      SELECT id, parent_area_id, area_type, name, code, depth
+      FROM ancestors
+      ORDER BY depth DESC
+    `,
+    [adminAreaId],
+  );
+  if (!rows.length) {
+    return null;
+  }
+
+  const chain = rows.map(mapAreaNode);
+  const target = chain[chain.length - 1];
+  const byType = Object.fromEntries(chain.map((node) => [node.areaType, node]));
+  const hierarchyNames = chain
+    .filter((node) =>
+      ["division", "district", "upazila", "union"].includes(node.areaType),
+    )
+    .map((node) => node.name);
+
+  return {
+    id: target.id,
+    code: target.code,
+    name: target.name,
+    areaType: target.areaType,
+    hierarchyPath: hierarchyNames.join(", "),
+    division: byType.division ?? null,
+    district: byType.district ?? null,
+    upazila: byType.upazila ?? null,
+    union: byType.union ?? null,
+  };
+}

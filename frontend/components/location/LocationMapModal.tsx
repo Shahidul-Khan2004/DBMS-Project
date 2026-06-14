@@ -7,6 +7,7 @@ import {
   formatReportedCoordinates,
   getValidReportedCoordinates,
 } from "@/components/dispatcher/triage/reportedLocationCoords";
+import { AdminAreaInfo } from "@/components/location/AdminAreaInfo";
 import { Button } from "@/components/ui/Button";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 
@@ -42,6 +43,7 @@ export type LocationMapModalProps = {
   title?: string;
   addressText?: string;
   placeName?: string;
+  adminAreaId?: number | null;
   previewKey?: string;
 };
 
@@ -63,6 +65,7 @@ export function LocationMapModal({
   title = "Location map",
   addressText,
   placeName,
+  adminAreaId,
   previewKey,
 }: LocationMapModalProps) {
   const coordinates = getValidReportedCoordinates(latitude, longitude);
@@ -110,6 +113,7 @@ export function LocationMapModal({
               {subtitle ? (
                 <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
               ) : null}
+              <AdminAreaInfo adminAreaId={adminAreaId} className="mt-1" />
               {coordinates ? (
                 <p className="mt-1 text-xs text-slate-500">
                   {formatReportedCoordinates(
@@ -162,6 +166,7 @@ export type OpenLocationMapButtonProps = {
   title?: string;
   addressText?: string;
   placeName?: string;
+  adminAreaId?: number | null;
   label?: string;
   className?: string;
   disabled?: boolean;
@@ -174,6 +179,7 @@ export function OpenLocationMapButton({
   title,
   addressText,
   placeName,
+  adminAreaId,
   label = "Open map",
   className = DEFAULT_BUTTON_CLASS,
   disabled = false,
@@ -202,6 +208,7 @@ export function OpenLocationMapButton({
         title={title}
         addressText={addressText}
         placeName={placeName}
+        adminAreaId={adminAreaId}
       />
     </>
   );

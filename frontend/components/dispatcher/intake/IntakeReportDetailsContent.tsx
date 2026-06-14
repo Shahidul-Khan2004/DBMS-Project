@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { IntakeStatusBadge } from "@/components/dispatcher/triage/IntakeStatusBadge";
 import { ReportedLocationHistoryDialog } from "@/components/dispatcher/triage/ReportedLocationHistoryDialog";
+import { LocationInfoBlock } from "@/components/location/LocationInfoBlock";
 import { formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatBangladeshTime } from "@/lib/datetime";
@@ -219,7 +220,14 @@ export function IntakeReportDetailsContent({
           </h3>
           {locationText ? (
             <div className="mt-3 space-y-3">
-              <p className="text-sm text-slate-800">{locationText}</p>
+              <LocationInfoBlock
+                addressText={location?.address_text}
+                placeName={location?.place_name}
+                latitude={location?.latitude}
+                longitude={location?.longitude}
+                adminAreaId={location?.admin_area_id}
+                fallbackText={locationText}
+              />
               {location &&
               Number.isFinite(location.latitude) &&
               Number.isFinite(location.longitude) ? (

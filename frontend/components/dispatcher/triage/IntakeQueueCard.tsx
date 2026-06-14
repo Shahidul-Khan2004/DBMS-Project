@@ -1,6 +1,7 @@
 import { IntakeStatusBadge } from "@/components/dispatcher/triage/IntakeStatusBadge";
 import { getIntakeCardAccent } from "@/components/dispatcher/intake/intakeStatusStyles";
 import { getDispatcherSelectableRowClasses } from "@/components/dispatcher/listRowHoverStyles";
+import { AdminAreaInfo } from "@/components/location/AdminAreaInfo";
 import type { IntakeQueueItem } from "@/components/dispatcher/triage/types";
 
 interface IntakeQueueCardProps {
@@ -24,12 +25,18 @@ export function IntakeQueueCard({ item, selected, onSelect }: IntakeQueueCardPro
       <p className="mt-1.5 min-w-0 truncate text-sm font-semibold text-slate-900">
         {item.summary}
       </p>
-      <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-slate-600">
-        <span className="min-w-0 truncate">{item.category}</span>
-        <span className="shrink-0 text-slate-400" aria-hidden>
-          ·
+      <p className="mt-1 flex min-w-0 flex-col gap-0.5 text-xs text-slate-600">
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate">{item.category}</span>
+          <span className="shrink-0 text-slate-400" aria-hidden>
+            ·
+          </span>
+          <span className="min-w-0 flex-1 truncate">{item.location.addressText}</span>
         </span>
-        <span className="min-w-0 flex-1 truncate">{item.location.addressText}</span>
+        <AdminAreaInfo
+          adminAreaId={item.location.adminAreaId}
+          className="truncate"
+        />
       </p>
     </button>
   );

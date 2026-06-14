@@ -219,3 +219,11 @@ export const validateAdminAreaSearch = validate(
   }),
   "query",
 );
+
+export const validateAdminAreaIdParam = validate(
+  "adminAreaIdParam",
+  z.object({
+    adminAreaId: z.coerce.number().int().positive(),
+  }),
+  "params",
+);

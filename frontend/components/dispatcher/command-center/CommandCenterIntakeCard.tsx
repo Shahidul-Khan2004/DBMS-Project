@@ -3,6 +3,7 @@ import {
   getIntakeCardAccent,
   getIntakeStatusBadgeTone,
 } from "@/components/dispatcher/intake/intakeStatusStyles";
+import { AdminAreaInfo } from "@/components/location/AdminAreaInfo";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import type { OperationsIntakeReport } from "@/types/operations-intake";
@@ -14,7 +15,6 @@ interface CommandCenterIntakeCardProps {
   statusLabel: string;
   ageLabel: string;
   onProcessReport: (publicUuid: string) => void;
-  onViewDetails: (publicUuid: string) => void;
 }
 
 export function CommandCenterIntakeCard({
@@ -24,7 +24,6 @@ export function CommandCenterIntakeCard({
   statusLabel,
   ageLabel,
   onProcessReport,
-  onViewDetails,
 }: CommandCenterIntakeCardProps) {
   const intakeStatus = report.intake_status;
 
@@ -43,6 +42,10 @@ export function CommandCenterIntakeCard({
         <p className="mt-2 text-xs font-medium text-slate-500">{categoryLabel}</p>
         <p className="mt-1 text-sm font-semibold text-slate-900">{report.summary}</p>
         <p className="mt-1 text-xs text-slate-600">{locationLabel}</p>
+        <AdminAreaInfo
+          adminAreaId={report.location?.admin_area_id}
+          className="mt-0.5"
+        />
         <p className="mt-1.5 text-xs text-slate-500">
           {statusLabel} · {ageLabel}
         </p>
@@ -55,14 +58,6 @@ export function CommandCenterIntakeCard({
           onClick={() => onProcessReport(report.public_uuid)}
         >
           Process Report
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => onViewDetails(report.public_uuid)}
-        >
-          View Details
         </Button>
       </div>
     </article>

@@ -7,6 +7,10 @@ import { CitizenServiceCaseConversationPanel } from "@/components/citizen/servic
 import { getValidReportedCoordinates } from "@/components/dispatcher/triage/reportedLocationCoords";
 import { LocationMapModal } from "@/components/location/LocationMapModal";
 import {
+  getLocationPrimaryText,
+  LocationSummary,
+} from "@/components/location/LocationSummary";
+import {
   CitizenBackButton,
   CitizenPageContent,
 } from "@/components/citizen/CitizenPortal";
@@ -42,11 +46,6 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
       </p>
     </div>
   );
-}
-
-function formatLocation(location: CitizenServiceCase["location"] | null | undefined) {
-  if (!location) return "-";
-  return location.address_text || location.place_name || "Map location selected";
 }
 
 const terminalStatuses = new Set([
@@ -348,13 +347,18 @@ export default function CitizenServiceCaseDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="!p-4">
-                  <p className="break-words text-sm text-gray-800">
-                    {formatLocation(serviceCase!.location)}
-                    {serviceCase!.location_text &&
-                    serviceCase!.location_text !== formatLocation(serviceCase!.location)
-                      ? `, ${serviceCase!.location_text}`
-                      : ""}
-                  </p>
+                  <LocationSummary
+                    location={serviceCase!.location}
+                    addressClassName="break-words text-sm text-gray-800"
+                  />
+                  {serviceCase!.location_text &&
+                  serviceCase!.location_text !==
+                    getLocationPrimaryText(serviceCase!.location)
+                    ? (
+                      <p className="mt-1 break-words text-sm text-gray-600">
+                        {serviceCase!.location_text}
+                      </p>
+                    ) : null}
                 </CardContent>
               </Card>
             ) : null}
@@ -460,6 +464,7 @@ export default function CitizenServiceCaseDetailPage() {
           title="Location"
           addressText={serviceCase.location?.address_text ?? undefined}
           placeName={serviceCase.location?.place_name ?? undefined}
+          adminAreaId={serviceCase.location?.admin_area_id}
         />
       ) : null}
     </DashboardLayout>

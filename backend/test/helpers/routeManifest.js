@@ -614,6 +614,11 @@ export const ROUTE_MANIFEST = [
 
   {
     method: "GET",
+    path: "/reference/administrative-areas/1",
+    validationPersona: "citizen",
+  },
+  {
+    method: "GET",
     path: "/reference/administrative-areas/search",
     anyPermissions: ["disaster.read", "disaster.create", "disaster.manage_affected_areas"],
     validationPersona: "dispatcher",

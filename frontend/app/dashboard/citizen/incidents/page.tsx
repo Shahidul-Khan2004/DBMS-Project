@@ -11,6 +11,7 @@ import {
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
+import { LocationSummary } from "@/components/location/LocationSummary";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/Button";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
@@ -29,16 +30,6 @@ import {
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
 import type { IntakeLocation, IntakeReportListResponse } from "@/types/intake";
-
-function formatLocation(location: IntakeLocation | null | undefined) {
-  if (!location) return null;
-
-  return (
-    location.address_text ||
-    location.place_name ||
-    "Map location selected"
-  );
-}
 
 function getResponseSummary(incident: CitizenIncident) {
   if (incident.description?.trim()) {
@@ -158,10 +149,6 @@ export default function CitizenIncidentsPage() {
           {!isLoading && !error && incidents.length > 0 ? (
             <div className="grid gap-4">
               {incidentsWithSummaries.map(({ incident, linkedReportSummary }) => {
-                const locationText =
-                  formatLocation(incident.location) ||
-                  incident.location_text ||
-                  null;
                 const isFinal = isTerminalIncident(incident.status_code);
                 const responseSummary = getResponseSummary(incident);
 
@@ -211,7 +198,13 @@ export default function CitizenIncidentsPage() {
                             value={formatBangladeshTime(incident.last_updated)}
                           />
                           <div className="sm:col-span-2">
-                            <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
+                            <CitizenLocationPill>
+                              {incident.location ? (
+                                <LocationSummary location={incident.location} />
+                              ) : (
+                                incident.location_text || "-"
+                              )}
+                            </CitizenLocationPill>
                           </div>
                         </div>
                       </div>

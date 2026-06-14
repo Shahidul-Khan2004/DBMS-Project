@@ -11,6 +11,7 @@ import {
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
+import { LocationSummary } from "@/components/location/LocationSummary";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/Button";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
@@ -46,16 +47,6 @@ import type {
 
 function getReportStatus(report: IntakeReport): string {
   return report.intake_status;
-}
-
-function formatLocation(location: IntakeLocation | null | undefined) {
-  if (!location) return null;
-
-  return (
-    location.address_text ||
-    location.place_name ||
-    "Map location selected"
-  );
 }
 
 function getCitizenReportStatusLabel(status: string) {
@@ -266,9 +257,11 @@ export default function CitizenReportsPage() {
                           />
                           <div className="sm:col-span-2">
                             <CitizenLocationPill>
-                              {formatLocation(report.location) ||
-                                report.location_text ||
-                                "-"}
+                              {report.location ? (
+                                <LocationSummary location={report.location} />
+                              ) : (
+                                report.location_text || "-"
+                              )}
                             </CitizenLocationPill>
                           </div>
                         </div>

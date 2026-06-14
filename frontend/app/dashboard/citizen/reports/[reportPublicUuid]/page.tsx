@@ -24,6 +24,10 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState, PageLoading } from "@/components/ui/StatusState";
 import { OpenLocationMapButton } from "@/components/location/LocationMapModal";
+import {
+  getLocationPrimaryText,
+  LocationSummary,
+} from "@/components/location/LocationSummary";
 import type {
   LocationPickerSelectionDetails,
   LocationPickerValue,
@@ -130,13 +134,8 @@ function ReportDetailMetric({
   );
 }
 
-function formatLocation(location: IntakeLocation | null | undefined) {
-  if (!location) return "-";
-  return (
-    location.address_text ||
-    location.place_name ||
-    "Map location selected"
-  );
+function getLocationDisplayText(location: IntakeLocation | null | undefined) {
+  return getLocationPrimaryText(location);
 }
 
 function getActorDisplayName(item: IntakeLocationHistoryItem) {
@@ -171,15 +170,18 @@ function LocationHistory({ history }: { history: IntakeLocationHistoryItem[] }) 
                 {formatBadgeLabel(item.change_kind)}
               </p>
               <div className="mt-1 grid gap-1 text-sm text-gray-700">
-                <p className="truncate" title={formatLocation(item.location)}>
+                <p className="truncate" title={getLocationDisplayText(item.location)}>
                   <span className="font-medium text-gray-900">Now:</span>{" "}
-                  {formatLocation(item.location)}
+                  {getLocationDisplayText(item.location)}
                 </p>
-                <p className="truncate" title={formatLocation(item.previous_location)}>
+                <p
+                  className="truncate"
+                  title={getLocationDisplayText(item.previous_location)}
+                >
                   <span className="font-medium text-gray-900">
                     Previous:
                   </span>{" "}
-                  {formatLocation(item.previous_location)}
+                  {getLocationDisplayText(item.previous_location)}
                 </p>
               </div>
             </div>
@@ -773,16 +775,20 @@ export default function CitizenReportDetailPage() {
                           Location updates are no longer available because this report has already been resolved.
                         </div>
                         {report.location ? (
-                          <OpenLocationMapButton
-                            latitude={report.location.latitude}
-                            longitude={report.location.longitude}
-                            previewKey={report.public_uuid}
-                            title="Reported location"
-                            addressText={report.location.address_text ?? undefined}
-                            placeName={report.location.place_name ?? undefined}
-                            label="Open location in map"
-                            className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
-                          />
+                          <div className="space-y-2">
+                            <LocationSummary location={report.location} />
+                            <OpenLocationMapButton
+                              latitude={report.location.latitude}
+                              longitude={report.location.longitude}
+                              previewKey={report.public_uuid}
+                              title="Reported location"
+                              addressText={report.location.address_text ?? undefined}
+                              placeName={report.location.place_name ?? undefined}
+                              adminAreaId={report.location.admin_area_id}
+                              label="Open location in map"
+                              className="inline-flex text-sm font-semibold text-[#006747] hover:text-[#002D62]"
+                            />
+                          </div>
                         ) : null}
                       </div>
                     ) : null}

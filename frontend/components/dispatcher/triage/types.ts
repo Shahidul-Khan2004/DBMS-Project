@@ -2,6 +2,7 @@ export type IntakeLocation = {
   addressText: string;
   areaName: string;
   districtName: string;
+  adminAreaId?: number | null;
   latitude?: number;
   longitude?: number;
 };

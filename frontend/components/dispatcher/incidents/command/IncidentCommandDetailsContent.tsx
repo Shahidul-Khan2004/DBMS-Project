@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { formatBadgeLabel } from "@/components/ui/Badge";
 import { formatBangladeshTime } from "@/lib/datetime";
 import { formatIncidentStatus } from "@/lib/incident-status";
+import { LocationInfoBlock } from "@/components/location/LocationInfoBlock";
 import type { IncidentDetailResponse } from "@/types/incident-command";
 
 const ReportedLocationMapPreview = dynamic(
@@ -107,9 +108,15 @@ export function IncidentCommandDetailsContent({
             </div>
           ) : null}
         </div>
-        <p className="mt-2 text-sm text-slate-800">
-          {overview.locationText?.trim() || "No location recorded"}
-        </p>
+        <LocationInfoBlock
+          addressText={overview.locationText}
+          placeName={location?.placeName}
+          latitude={location?.latitude}
+          longitude={location?.longitude}
+          adminAreaId={location?.adminAreaId}
+          fallbackText="No location recorded"
+          className="mt-2"
+        />
         {location ? (
           <div className="mt-3 max-h-36 overflow-hidden rounded-lg">
             <ReportedLocationMapPreview

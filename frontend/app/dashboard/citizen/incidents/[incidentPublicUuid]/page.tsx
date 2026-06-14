@@ -11,6 +11,7 @@ import {
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
+import { LocationSummary } from "@/components/location/LocationSummary";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -26,17 +27,7 @@ import {
 } from "@/lib/incident-status";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import type { CitizenIncident } from "@/types/citizen-incident";
-import type { IntakeLocation, IntakeReportListResponse } from "@/types/intake";
-
-function formatLocation(location: IntakeLocation | null | undefined) {
-  if (!location) return null;
-
-  return (
-    location.address_text ||
-    location.place_name ||
-    "Map location selected"
-  );
-}
+import type { IntakeReportListResponse } from "@/types/intake";
 
 function getFinalTimeLabel(incident: CitizenIncident) {
   if (incident.resolved_at) {
@@ -132,10 +123,6 @@ export default function CitizenIncidentDetailPage() {
 
   const isFinal = incident ? isTerminalIncident(incident.status_code) : false;
   const finalTime = incident ? getFinalTimeLabel(incident) : null;
-  const locationText =
-    formatLocation(incident?.location) ||
-    incident?.location_text ||
-    null;
 
   return (
     <DashboardLayout
@@ -246,7 +233,13 @@ export default function CitizenIncidentDetailPage() {
             </CitizenSectionCard>
 
             <CitizenSectionCard title="Location">
-              <CitizenLocationPill>{locationText ?? "-"}</CitizenLocationPill>
+              <CitizenLocationPill>
+                {incident?.location ? (
+                  <LocationSummary location={incident.location} />
+                ) : (
+                  incident?.location_text || "-"
+                )}
+              </CitizenLocationPill>
             </CitizenSectionCard>
           </div>
         )}

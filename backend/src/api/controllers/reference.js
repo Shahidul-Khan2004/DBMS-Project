@@ -9,3 +9,9 @@ export async function getAdministrativeAreaSearch(req, res) {
   });
   res.status(200).json({ areas });
 }
+
+export async function getAdministrativeAreaById(req, res) {
+  const params = req.validated?.params ?? req.params;
+  const adminArea = await referenceService.getAdminAreaById(params.adminAreaId);
+  res.status(200).json({ adminArea });
+}

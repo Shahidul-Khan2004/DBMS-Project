@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
+import { AdminAreaInfo } from "@/components/location/AdminAreaInfo";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { formatIncidentStatus } from "@/lib/incident-status";
 import { getSeverityBadgeTone } from "@/components/dispatcher/incidents/severityStyles";
@@ -72,12 +73,18 @@ export function IncidentCommandSummaryCard({
       </div>
 
       <div className="flex flex-col gap-1.5 pt-0.5 sm:flex-row sm:items-center sm:gap-3">
-        <p className="flex min-w-0 flex-1 items-center gap-1 text-sm text-slate-600">
-          <MapPin
-            className="h-3.5 w-3.5 shrink-0 text-slate-400"
-            aria-hidden
+        <p className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm text-slate-600">
+          <span className="flex min-w-0 items-center gap-1">
+            <MapPin
+              className="h-3.5 w-3.5 shrink-0 text-slate-400"
+              aria-hidden
+            />
+            <span className="min-w-0 truncate">{locationText}</span>
+          </span>
+          <AdminAreaInfo
+            adminAreaId={detail.overview.location?.adminAreaId}
+            className="pl-5"
           />
-          <span className="min-w-0 truncate">{locationText}</span>
         </p>
         <div
           className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 sm:justify-end"

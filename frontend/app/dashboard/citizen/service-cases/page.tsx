@@ -11,6 +11,10 @@ import {
   CitizenSectionCard,
   getCitizenFriendlyError,
 } from "@/components/citizen/CitizenPortal";
+import {
+  getLocationPrimaryText,
+  LocationSummary,
+} from "@/components/location/LocationSummary";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -29,11 +33,6 @@ import type {
   CitizenServiceCase,
   CitizenServiceCaseListResponse,
 } from "@/types/service-case";
-
-function formatLocation(location: CitizenServiceCase["location"] | null | undefined) {
-  if (!location) return null;
-  return location.address_text || location.place_name || "Map location selected";
-}
 
 export default function CitizenServiceCasesPage() {
   const router = useRouter();
@@ -162,9 +161,11 @@ export default function CitizenServiceCasesPage() {
                       />
                       <div className="sm:col-span-2">
                         <CitizenLocationPill>
-                          {formatLocation(serviceCase.location) ||
-                            serviceCase.location_text ||
-                            "-"}
+                          {serviceCase.location ? (
+                            <LocationSummary location={serviceCase.location} />
+                          ) : (
+                            serviceCase.location_text || "-"
+                          )}
                         </CitizenLocationPill>
                       </div>
                     </div>

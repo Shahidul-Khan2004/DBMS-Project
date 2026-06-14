@@ -503,7 +503,6 @@ export default function DispatcherDashboard() {
                     statusLabel={formatIntakeStatusLabel(report.intake_status)}
                     ageLabel={formatRelativeAge(report.reported_at)}
                     onProcessReport={openReviewDrawer}
-                    onViewDetails={openReviewDrawer}
                   />
                 ))}
               </ColumnBody>

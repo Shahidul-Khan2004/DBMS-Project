@@ -166,10 +166,10 @@ export function CitizenLocationPill({ children }: { children: ReactNode }) {
   return (
     <div className="flex gap-2 rounded-xl bg-[#F0F7F4] px-3 py-2 text-sm leading-6 text-[#42547A]">
       <MapPin className="mt-1 h-4 w-4 shrink-0 text-[#006747]" aria-hidden />
-      <p className="min-w-0">
+      <div className="min-w-0">
         <span className="font-semibold text-slate-800">Location:</span>{" "}
-        <span className="break-words">{children || "-"}</span>
-      </p>
+        <div className="break-words">{children || "-"}</div>
+      </div>
     </div>
   );
 }

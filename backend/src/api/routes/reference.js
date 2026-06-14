@@ -1,7 +1,13 @@
 import express from "express";
-import { getAdministrativeAreaSearch } from "../controllers/reference.js";
+import {
+  getAdministrativeAreaById,
+  getAdministrativeAreaSearch,
+} from "../controllers/reference.js";
 import { requireAuth as defaultRequireAuth, requireAnyPermission } from "../middlewares/auth.js";
-import { validateAdminAreaSearch } from "../validators/disaster.js";
+import {
+  validateAdminAreaIdParam,
+  validateAdminAreaSearch,
+} from "../validators/disaster.js";
 
 export function createReferenceRouter({ requireAuth = defaultRequireAuth } = {}) {
   const router = express.Router();
@@ -11,6 +17,11 @@ export function createReferenceRouter({ requireAuth = defaultRequireAuth } = {})
     requireAnyPermission("disaster.read", "disaster.create", "disaster.manage_affected_areas"),
     validateAdminAreaSearch,
     getAdministrativeAreaSearch,
+  );
+  router.get(
+    "/administrative-areas/:adminAreaId",
+    validateAdminAreaIdParam,
+    getAdministrativeAreaById,
   );
   return router;
 }

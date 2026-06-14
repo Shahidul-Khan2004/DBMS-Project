@@ -2,10 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { IntakeLocation } from "@/components/dispatcher/triage/types";
-import {
-  formatReportedCoordinates,
-  getValidReportedCoordinates,
-} from "@/components/dispatcher/triage/reportedLocationCoords";
+import { LocationInfoBlock } from "@/components/location/LocationInfoBlock";
 import { Button } from "@/components/ui/Button";
 
 const MAP_PREVIEW_HEIGHT_CLASS = "h-48 max-h-56 min-h-40";
@@ -50,13 +47,6 @@ export function ReportedLocationDisplay({
   onEditLocation,
   onViewHistory,
 }: ReportedLocationDisplayProps) {
-  const coordinates = getValidReportedCoordinates(
-    location.latitude,
-    location.longitude,
-  );
-  const placeName = location.areaName?.trim() ?? "";
-  const showPlaceName =
-    placeName.length > 0 && placeName !== location.addressText?.trim();
   const showActions =
     onEditLocation || (showViewHistory && onViewHistory);
 
@@ -84,18 +74,13 @@ export function ReportedLocationDisplay({
         className={`${compact ? "mt-1" : "mt-1.5"} flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between`}
       >
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-slate-900">{location.addressText}</p>
-          {showPlaceName ? (
-            <p className="mt-0.5 text-xs text-slate-500">{placeName}</p>
-          ) : null}
-          {coordinates ? (
-            <p className="mt-0.5 text-xs text-slate-500">
-              {formatReportedCoordinates(
-                coordinates.latitude,
-                coordinates.longitude,
-              )}
-            </p>
-          ) : null}
+          <LocationInfoBlock
+            addressText={location.addressText}
+            placeName={location.areaName}
+            latitude={location.latitude}
+            longitude={location.longitude}
+            adminAreaId={location.adminAreaId}
+          />
         </div>
         {showActions ? (
           <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">

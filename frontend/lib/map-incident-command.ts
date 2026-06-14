@@ -37,6 +37,7 @@ function mapLocation(
     longitude: location.longitude,
     addressText: location.address_text,
     placeName: location.place_name,
+    adminAreaId: location.admin_area_id ?? null,
   };
 }
 
@@ -178,6 +179,7 @@ export function mapIncidentDetailToLocationEditItem(
       addressText: location?.addressText?.trim() || "",
       areaName: location?.placeName?.trim() || "",
       districtName: "",
+      adminAreaId: location?.adminAreaId ?? null,
       latitude: location?.latitude,
       longitude: location?.longitude,
     },

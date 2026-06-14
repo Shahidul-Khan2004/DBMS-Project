@@ -55,6 +55,7 @@ export function mapIntakeLocationToIncidentLocation(
     longitude: location.longitude,
     addressText: location.address_text,
     placeName: location.place_name,
+    adminAreaId: location.admin_area_id ?? null,
   };
 }
 
