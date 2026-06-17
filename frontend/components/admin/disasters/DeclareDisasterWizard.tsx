@@ -539,10 +539,12 @@ export function DeclareDisasterWizard() {
                 disabled={isSubmitting}
               />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" isLoading={isSubmitting}>
-                Continue to affected areas
-              </Button>
+            <div className="sticky bottom-0 -mx-5 border-t border-slate-100 bg-white px-5 py-4 sm:-mx-6 sm:px-6">
+              <div className="flex justify-end">
+                <Button type="submit" isLoading={isSubmitting}>
+                  Continue to affected areas
+                </Button>
+              </div>
             </div>
           </form>
         ) : null}
@@ -828,18 +830,20 @@ export function DeclareDisasterWizard() {
               </div>
             </div>
 
-            <div className="flex justify-between gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => handleStepNavigate(0)}
-                disabled={isSubmitting}
-              >
-                Back
-              </Button>
-              <Button type="submit" isLoading={isSubmitting}>
-                Continue to declaration
-              </Button>
+            <div className="sticky bottom-0 -mx-5 border-t border-slate-100 bg-white px-5 py-4 sm:-mx-6 sm:px-6">
+              <div className="flex justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleStepNavigate(0)}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </Button>
+                <Button type="submit" isLoading={isSubmitting}>
+                  Continue to declaration
+                </Button>
+              </div>
             </div>
           </form>
         ) : null}
@@ -896,18 +900,20 @@ export function DeclareDisasterWizard() {
                 disabled={isSubmitting}
               />
             </div>
-            <div className="flex justify-between gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => handleStepNavigate(1)}
-                disabled={isSubmitting}
-              >
-                Back
-              </Button>
-              <Button type="submit" variant="emergency" isLoading={isSubmitting}>
-                Issue declaration
-              </Button>
+            <div className="sticky bottom-0 -mx-5 border-t border-slate-100 bg-white px-5 py-4 sm:-mx-6 sm:px-6">
+              <div className="flex justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleStepNavigate(1)}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </Button>
+                <Button type="submit" variant="emergency" isLoading={isSubmitting}>
+                  Issue declaration
+                </Button>
+              </div>
             </div>
           </form>
         ) : null}
