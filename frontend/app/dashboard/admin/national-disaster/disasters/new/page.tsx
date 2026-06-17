@@ -11,8 +11,9 @@ function DeclareDisasterPageContent() {
     <AdminDashboardPage
       loadingLabel="Loading declaration wizard"
       scrollContent
+      fillViewport={false}
     >
-      <NationalDisasterWorkspaceFrame>
+      <NationalDisasterWorkspaceFrame scrollable>
         <DeclareDisasterWizard />
       </NationalDisasterWorkspaceFrame>
     </AdminDashboardPage>
