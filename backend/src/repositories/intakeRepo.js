@@ -15,10 +15,15 @@ import { insertLocationInTransaction } from "./locationRepo.js";
 import { findStatusIdByCode } from "../lib/statusWorkflow.js";
 
 function isDuplicateIntakeIdentityError(error) {
+  const pgDup =
+    error?.code === "23505" &&
+    (error.constraint?.includes("uq_intake_reports") ||
+      error.message?.includes("uq_intake_reports"));
   return (
-    error?.code === "ER_DUP_ENTRY" &&
-    (error.message.includes("uq_intake_reports_public_uuid") ||
-      error.message.includes("uq_intake_reports_report_code"))
+    pgDup ||
+    (error?.code === "ER_DUP_ENTRY" &&
+      (error.message.includes("uq_intake_reports_public_uuid") ||
+        error.message.includes("uq_intake_reports_report_code")))
   );
 }
 
@@ -414,7 +419,7 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         COUNT(*) AS total_reports,
         SUM(
           CASE
-            WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = FALSE, 1, 0)
+            WHEN ei.id IS NOT NULL THEN CASE WHEN ist.is_terminal = FALSE THEN 1 ELSE 0 END
             WHEN ints.status_code IN ('received', 'under_review', 'linked_to_case', 'linked_to_incident')
             THEN 1
             ELSE 0
@@ -422,7 +427,7 @@ export async function getIntakeReportStatsByReporterUserId(reporterUserId) {
         ) AS pending_reports,
         SUM(
           CASE
-            WHEN ei.id IS NOT NULL THEN IF(ist.is_terminal = TRUE, 1, 0)
+            WHEN ei.id IS NOT NULL THEN CASE WHEN ist.is_terminal = TRUE THEN 1 ELSE 0 END
             WHEN ints.status_code IN ('duplicate', 'false_report', 'closed')
             THEN 1
             ELSE 0

@@ -153,7 +153,9 @@ function createPostgresPool() {
       process.env.PGSSLMODE === "disable"
         ? false
         : { rejectUnauthorized: false },
-    max: 20,
+    max: Number(process.env.PG_POOL_MAX || 5),
+    idleTimeoutMillis: Number(process.env.PG_POOL_IDLE_MS || 30_000),
+    connectionTimeoutMillis: Number(process.env.PG_POOL_CONNECT_MS || 10_000),
   });
 
   return {
