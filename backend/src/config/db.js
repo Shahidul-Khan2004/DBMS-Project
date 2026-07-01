@@ -6,8 +6,18 @@ function isInsert(sql) {
   return /^\s*INSERT\b/i.test(sql);
 }
 
+function insertTargetTable(sql) {
+  const match = sql.match(/INSERT\s+INTO\s+(?:ONLY\s+)?(?:public\.)?["']?(\w+)["']?/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
 function withReturningId(sql) {
   if (!isPostgres() || !isInsert(sql) || /\bRETURNING\b/i.test(sql)) {
+    return sql;
+  }
+  const table = insertTargetTable(sql);
+  // No surrogate `id` column — callers do not need insertId for these inserts.
+  if (table === "user_profiles") {
     return sql;
   }
   return `${sql.replace(/;\s*$/, "")} RETURNING id`;
@@ -19,7 +29,7 @@ function normalizeResult(driverResult, sql) {
     const rows = result.rows ?? [];
     return {
       rows,
-      insertId: rows[0]?.id ?? null,
+      insertId: rows[0]?.id ?? rows[0]?.user_id ?? null,
       affectedRows: result.rowCount ?? 0,
     };
   }

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findUserByEmail } from "../repositories/userRepo.js";
-import pool, { isPostgres } from "../config/db.js";
+import pool, { isPostgres, query } from "../config/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_DIR = join(__dirname, "../schemas/docker-init");
@@ -48,15 +48,39 @@ async function citizensReady() {
   return Boolean(user);
 }
 
+async function showcaseDataAlreadySeeded() {
+  if (!isPostgres()) {
+    return false;
+  }
+  const result = await query(
+    "SELECT 1 AS ok FROM intake_reports WHERE report_code = 'IR-KUR-SHOW-001' LIMIT 1",
+  );
+  return Boolean(result.rows[0]);
+}
+
 export async function runOperationalDemoSeeds() {
   const password = process.env.DEMO_CITIZEN_PASSWORD;
   if (!password || password.length < 8) {
     return;
   }
 
+  if (process.env.SKIP_OPERATIONAL_DEMO_SEEDS === "true") {
+    console.log(
+      "Skipping operational demo seeds (SKIP_OPERATIONAL_DEMO_SEEDS=true).",
+    );
+    return;
+  }
+
   if (!(await citizensReady())) {
     console.warn(
       "Skipping operational demo seeds. Demo citizens not found; ensure DEMO_CITIZEN_PASSWORD bootstrap ran.",
+    );
+    return;
+  }
+
+  if (await showcaseDataAlreadySeeded()) {
+    console.log(
+      "Skipping operational demo seeds (showcase data already present in database).",
     );
     return;
   }
@@ -76,8 +100,10 @@ export async function runOperationalDemoSeeds() {
     }
     console.log("Operational demo seeds applied (29–33).");
   } catch (err) {
-    console.error("Operational demo seed failed:", err.message);
-    throw err;
+    console.warn(
+      "Operational demo seed skipped after error (non-fatal on deploy):",
+      err.message,
+    );
   } finally {
     conn.release();
   }
