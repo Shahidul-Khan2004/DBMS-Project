@@ -71,10 +71,18 @@ function wrapClient(client) {
       }
     },
     async commit() {
-      await client.commit();
+      if (isPostgres()) {
+        await client.query("COMMIT");
+      } else {
+        await client.commit();
+      }
     },
     async rollback() {
-      await client.rollback();
+      if (isPostgres()) {
+        await client.query("ROLLBACK");
+      } else {
+        await client.rollback();
+      }
     },
     release() {
       client.release();
