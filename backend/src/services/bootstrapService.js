@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
-import { createUser, findUserByEmail, updateUserPasswordHash } from "../repositories/userRepo.js";
+import { createUser, findUserByEmail } from "../repositories/userRepo.js";
 import {
   assignRoleToUser,
   ensurePermission,
@@ -14,6 +13,13 @@ import { bootstrapDemoAgencyRepresentatives } from "./demoRepBootstrapService.js
 import { bootstrapDemoDispatcher } from "./demoDispatcherBootstrapService.js";
 import { bootstrapDemoCitizens } from "./demoCitizenBootstrapService.js";
 import { runOperationalDemoSeeds } from "./operationalDemoSeedService.js";
+import {
+  hashBootstrapPassword,
+  readBootstrapPassword,
+  syncBootstrapPassword,
+} from "./bootstrapPasswordSync.js";
+
+const LEGACY_SYSTEM_ADMIN_EMAIL = "admin@niers.test";
 
 const DEFAULT_PERMISSIONS = [
   {
@@ -294,10 +300,13 @@ export async function bootstrapDevelopmentSystemAdmin() {
   await bootstrapDemoDispatcher();
   await runOperationalDemoSeeds();
 
-  const email = process.env.SYSTEM_ADMIN__EMAIL;
-  const password = process.env.SYSTEM_ADMIN_PASSWORD;
-  const fullName = process.env.SYSTEM_ADMIN_NAME;
-  const phoneNumber = process.env.SYSTEM_ADMIN_PHONE;
+  const email = process.env.SYSTEM_ADMIN__EMAIL?.trim().toLowerCase();
+  const password = readBootstrapPassword(
+    process.env.SYSTEM_ADMIN_PASSWORD,
+    "SYSTEM_ADMIN_PASSWORD",
+  );
+  const fullName = process.env.SYSTEM_ADMIN_NAME?.trim();
+  const phoneNumber = process.env.SYSTEM_ADMIN_PHONE?.trim();
 
   if (!email || !password || !fullName || !phoneNumber) {
     console.warn(
@@ -313,7 +322,7 @@ export async function bootstrapDevelopmentSystemAdmin() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashBootstrapPassword(password);
   let adminUser = await findUserByEmail(email);
 
   if (!adminUser) {
@@ -326,11 +335,9 @@ export async function bootstrapDevelopmentSystemAdmin() {
       phoneNumber,
       passwordHash,
     });
-
-    adminUser = await findUserByEmail(email);
-  } else {
-    await updateUserPasswordHash(adminUser.id, passwordHash);
   }
+
+  adminUser = await syncBootstrapPassword(email, password, passwordHash);
 
   if (!adminUser) {
     console.warn(`Skipping system admin bootstrap. Could not load user ${email}.`);
@@ -354,6 +361,26 @@ export async function bootstrapDevelopmentSystemAdmin() {
       roleId: systemAdminRole.id,
       assignedByUserId: null,
     });
+  }
+
+  if (email !== LEGACY_SYSTEM_ADMIN_EMAIL) {
+    const legacyAdmin = await findUserByEmail(LEGACY_SYSTEM_ADMIN_EMAIL);
+    if (legacyAdmin) {
+      const legacyHasRole = await hasRoleAssignment({
+        userId: legacyAdmin.id,
+        roleCode: ROLE_CODES.SYSTEM_ADMIN,
+      });
+      if (legacyHasRole) {
+        await syncBootstrapPassword(
+          LEGACY_SYSTEM_ADMIN_EMAIL,
+          password,
+          passwordHash,
+        );
+        console.log(
+          `Synced legacy system admin password: ${LEGACY_SYSTEM_ADMIN_EMAIL}`,
+        );
+      }
+    }
   }
 
   console.log(`Bootstrapped system admin: ${email}`);

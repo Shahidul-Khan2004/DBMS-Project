@@ -23,7 +23,10 @@ const userSelect = `
 `;
 
 export async function findUserByEmail(email) {
-  const result = await query(`${userSelect} WHERE u.email = ?`, [email]);
+  const normalizedEmail = email.trim().toLowerCase();
+  const result = await query(`${userSelect} WHERE LOWER(u.email) = ?`, [
+    normalizedEmail,
+  ]);
   return result.rows[0] || null;
 }
 
@@ -75,11 +78,15 @@ export async function updateUserProfile(userId, { fullName, phoneNumber, seconda
 }
 
 export async function updateUserPasswordHash(userId, passwordHash) {
-  const [result] = await pool.execute(
+  const result = await query(
     `UPDATE users SET password_hash = ? WHERE id = ?`,
     [passwordHash, userId],
   );
-  return result.affectedRows > 0;
+  const affectedRows = result.affectedRows ?? 0;
+  if (affectedRows === 0) {
+    throw new Error(`password_hash update affected 0 rows for user id ${userId}`);
+  }
+  return true;
 }
 
 export async function createUser({ publicUuid, email, fullName, phoneNumber, passwordHash }) {

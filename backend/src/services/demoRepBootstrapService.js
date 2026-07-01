@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
 import pool from "../config/db.js";
 import {
   createUser,
   findUserByEmail,
-  updateUserPasswordHash,
 } from "../repositories/userRepo.js";
 import {
   assignRoleToUser,
@@ -13,6 +11,11 @@ import {
   hasRoleAssignment,
 } from "../repositories/rbacRepo.js";
 import { ROLE_CODES } from "./rbacService.js";
+import {
+  hashBootstrapPassword,
+  readBootstrapPassword,
+  syncBootstrapPassword,
+} from "./bootstrapPasswordSync.js";
 
 const DEMO_REPS = [
   {
@@ -117,13 +120,11 @@ async function upsertMembership(conn, { userId, agencyId, membershipPublicUuid }
 }
 
 export async function bootstrapDemoAgencyRepresentatives() {
-  const password = process.env.DEMO_REP_PASSWORD;
+  const password = readBootstrapPassword(
+    process.env.DEMO_REP_PASSWORD,
+    "DEMO_REP_PASSWORD",
+  );
   if (!password) {
-    return;
-  }
-
-  if (password.length < 8) {
-    console.warn("Skipping demo rep bootstrap. DEMO_REP_PASSWORD must be at least 8 characters.");
     return;
   }
 
@@ -135,7 +136,7 @@ export async function bootstrapDemoAgencyRepresentatives() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashBootstrapPassword(password);
   const conn = await pool.getConnection();
 
   try {
@@ -150,9 +151,9 @@ export async function bootstrapDemoAgencyRepresentatives() {
           phoneNumber: rep.phoneNumber,
           passwordHash,
         });
-        user = await findUserByEmail(rep.email);
+        user = await syncBootstrapPassword(rep.email, password, passwordHash);
       } else {
-        await updateUserPasswordHash(user.id, passwordHash);
+        user = await syncBootstrapPassword(rep.email, password, passwordHash);
       }
 
       if (!user) {

@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
 import {
   createUser,
   findUserByEmail,
-  updateUserPasswordHash,
 } from "../repositories/userRepo.js";
 import {
   assignRoleToUser,
@@ -11,6 +9,11 @@ import {
   hasRoleAssignment,
 } from "../repositories/rbacRepo.js";
 import { ROLE_CODES } from "./rbacService.js";
+import {
+  hashBootstrapPassword,
+  readBootstrapPassword,
+  syncBootstrapPassword,
+} from "./bootstrapPasswordSync.js";
 
 const DEMO_DISPATCHER = {
   email: "dispatcher@niers.test",
@@ -19,15 +22,11 @@ const DEMO_DISPATCHER = {
 };
 
 export async function bootstrapDemoDispatcher() {
-  const password = process.env.DEMO_DISPATCHER_PASSWORD;
+  const password = readBootstrapPassword(
+    process.env.DEMO_DISPATCHER_PASSWORD,
+    "DEMO_DISPATCHER_PASSWORD",
+  );
   if (!password) {
-    return;
-  }
-
-  if (password.length < 8) {
-    console.warn(
-      "Skipping demo dispatcher bootstrap. DEMO_DISPATCHER_PASSWORD must be at least 8 characters.",
-    );
     return;
   }
 
@@ -37,7 +36,7 @@ export async function bootstrapDemoDispatcher() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashBootstrapPassword(password);
   let user = await findUserByEmail(DEMO_DISPATCHER.email);
 
   if (!user) {
@@ -48,9 +47,9 @@ export async function bootstrapDemoDispatcher() {
       phoneNumber: DEMO_DISPATCHER.phoneNumber,
       passwordHash,
     });
-    user = await findUserByEmail(DEMO_DISPATCHER.email);
+    user = await syncBootstrapPassword(DEMO_DISPATCHER.email, password, passwordHash);
   } else {
-    await updateUserPasswordHash(user.id, passwordHash);
+    user = await syncBootstrapPassword(DEMO_DISPATCHER.email, password, passwordHash);
   }
 
   if (!user) {
