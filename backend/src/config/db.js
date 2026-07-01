@@ -25,11 +25,24 @@ function normalizeResult(driverResult, sql) {
   }
 
   const [rows, fields] = driverResult;
+  const header =
+    rows && typeof rows === "object" && !Array.isArray(rows) ? rows : fields;
   return {
     rows: Array.isArray(rows) ? rows : [],
-    insertId: fields?.insertId,
-    affectedRows: fields?.affectedRows,
+    insertId: header?.insertId ?? null,
+    affectedRows: header?.affectedRows ?? 0,
   };
+}
+
+/** mysql2 returns OkPacket as 1st element for INSERT; repos read `result.insertId`. */
+function executeFirstTuple(normalized, sql) {
+  if (isInsert(sql) && normalized.insertId != null) {
+    return {
+      insertId: normalized.insertId,
+      affectedRows: normalized.affectedRows,
+    };
+  }
+  return normalized.rows;
 }
 
 async function runOnClient(client, text, params) {
@@ -45,7 +58,7 @@ function wrapClient(client) {
     async execute(text, params) {
       const driverResult = await runOnClient(client, text, params);
       const normalized = normalizeResult(driverResult, text);
-      return [normalized.rows, normalized];
+      return [executeFirstTuple(normalized, text), normalized];
     },
     async query(text, params) {
       return runOnClient(client, text, params);
@@ -98,7 +111,7 @@ function createMysqlPool() {
     async execute(text, params) {
       const driverResult = await mysqlPool.query(text, params);
       const normalized = normalizeResult(driverResult, text);
-      return [normalized.rows, normalized];
+      return [executeFirstTuple(normalized, text), normalized];
     },
     async getConnection() {
       const conn = await mysqlPool.getConnection();
@@ -139,7 +152,7 @@ function createPostgresPool() {
     async execute(text, params) {
       const driverResult = await runOnClient(pgPool, text, params);
       const normalized = normalizeResult(driverResult, text);
-      return [normalized.rows, normalized];
+      return [executeFirstTuple(normalized, text), normalized];
     },
     async getConnection() {
       const client = await pgPool.connect();

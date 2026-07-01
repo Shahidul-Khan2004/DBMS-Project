@@ -52,10 +52,14 @@ export async function registerUser({ email, fullName, phoneNumber, password }) {
       passwordHash,
     });
   } catch (error) {
-    if (
-      error.code === "ER_DUP_ENTRY" &&
-      error.message.includes("uq_users_email")
-    ) {
+    const isDuplicateEmail =
+      (error.code === "ER_DUP_ENTRY" &&
+        error.message.includes("uq_users_email")) ||
+      (error.code === "23505" &&
+        (error.constraint === "uq_users_email" ||
+          error.message?.includes("uq_users_email")));
+
+    if (isDuplicateEmail) {
       throw new BackendError(409, "EXISTING_EMAIL", "Email already in use");
     }
 
@@ -73,7 +77,7 @@ export async function registerUser({ email, fullName, phoneNumber, password }) {
         assignedByUserId: null,
       });
     } catch (error) {
-      if (error.code !== "ER_DUP_ENTRY") {
+      if (error.code !== "ER_DUP_ENTRY" && error.code !== "23505") {
         throw error;
       }
     }
