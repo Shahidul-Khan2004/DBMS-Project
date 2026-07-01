@@ -291,9 +291,9 @@ async function ensureRolesAndPermissions() {
 export async function bootstrapDevelopmentSystemAdmin() {
   await ensureRolesAndPermissions();
   await bootstrapDemoCitizens();
-  await runOperationalDemoSeeds();
   await bootstrapDemoAgencyRepresentatives();
   await bootstrapDemoDispatcher();
+  await runOperationalDemoSeeds();
 
   const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);
 

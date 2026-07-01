@@ -1,4 +1,5 @@
 import { query } from "../config/db.js";
+import { ageMinutesSql } from "../config/sqlDialect.js";
 
 const OPEN_CASE_JOIN = `
   FROM service_cases sc
@@ -39,7 +40,7 @@ export async function listRecentOpenServiceCasesForOperations(limit) {
         cs.status_code AS status_code,
         rc.category_code AS category_code,
         sc.created_at AS created_at,
-        TIMESTAMPDIFF(MINUTE, sc.created_at, CURRENT_TIMESTAMP) AS age_minutes
+        ${ageMinutesSql("sc.created_at")} AS age_minutes
       ${OPEN_CASE_JOIN}
       ${OPEN_CASE_WHERE}
       ORDER BY sc.created_at DESC

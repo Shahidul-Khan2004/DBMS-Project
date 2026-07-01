@@ -1,4 +1,5 @@
 import { query } from "../config/db.js";
+import { deleteUserRoleSql, upsertSuffix } from "../config/sqlDialect.js";
 
 export async function findRoleByCode(roleCode) {
   const result = await query(
@@ -58,11 +59,11 @@ export async function assignRoleToUser({ userId, roleId, assignedByUserId = null
 }
 
 export async function removeRoleFromUser({ userId, roleCode, conn = null }) {
-  const sql = `
+  const sql = deleteUserRoleSql(`
     DELETE ur FROM user_roles ur
     INNER JOIN roles r ON r.id = ur.role_id
     WHERE ur.user_id = ? AND r.role_code = ?
-  `;
+  `);
   const params = [userId, roleCode];
   if (conn) {
     await conn.execute(sql, params);
@@ -78,15 +79,15 @@ export async function ensureRole({
   isSystemRole = false,
 }) {
   await query(
-    `
+    upsertSuffix(`
       INSERT INTO roles (role_code, name, description, is_system_role)
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         name = VALUES(name),
         description = VALUES(description),
         is_system_role = VALUES(is_system_role)
-    `,
-    [roleCode, name, description, isSystemRole]
+    `),
+    [roleCode, name, description, isSystemRole],
   );
 }
 
@@ -96,28 +97,28 @@ export async function ensurePermission({
   description = null,
 }) {
   await query(
-    `
+    upsertSuffix(`
       INSERT INTO permissions (permission_code, module_name, description)
       VALUES (?, ?, ?)
       ON DUPLICATE KEY UPDATE
         module_name = VALUES(module_name),
         description = VALUES(description)
-    `,
-    [permissionCode, moduleName, description]
+    `),
+    [permissionCode, moduleName, description],
   );
 }
 
 export async function grantPermissionToRole({ roleCode, permissionCode }) {
   await query(
-    `
+    upsertSuffix(`
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id
       FROM roles r
       INNER JOIN permissions p ON p.permission_code = ?
       WHERE r.role_code = ?
       ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)
-    `,
-    [permissionCode, roleCode]
+    `),
+    [permissionCode, roleCode],
   );
 }
 

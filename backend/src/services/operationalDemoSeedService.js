@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import mysql from "mysql2/promise";
 import { findUserByEmail } from "../repositories/userRepo.js";
+import pool, { isPostgres } from "../config/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_DIR = join(__dirname, "../schemas/docker-init");
+const PG_SEED_DIR = join(
+  __dirname,
+  "../../../supabase-postgres-migration/converted-sql",
+);
 
 const SEED_FILES = [
   "29_seed_citizen_reporting_demo.sql",
@@ -30,6 +34,9 @@ function stripLeadingSqlComments(sql) {
 }
 
 function splitSqlStatements(sql) {
+  if (/^DO\s+\$\$/im.test(sql.trim())) {
+    return [sql.trim()];
+  }
   return sql
     .split(/;\s*\n/)
     .map((statement) => stripLeadingSqlComments(statement))
@@ -54,21 +61,17 @@ export async function runOperationalDemoSeeds() {
     return;
   }
 
-  const conn = await mysql.createConnection({
-    user: process.env.MYSQL_USER,
-    host: process.env.MYSQL_HOST,
-    database: process.env.MYSQL_DATABASE,
-    password: process.env.MYSQL_PASSWORD,
-    port: Number(process.env.MYSQL_PORT || 3306),
-    multipleStatements: false,
-  });
+  const conn = await pool.getConnection();
 
   try {
     for (const file of SEED_FILES) {
-      const sql = readFileSync(join(SEED_DIR, file), "utf8");
+      const path = isPostgres()
+        ? join(PG_SEED_DIR, file.replace(".sql", ".pg.sql"))
+        : join(SEED_DIR, file);
+      const sql = readFileSync(path, "utf8");
       const statements = splitSqlStatements(sql);
       for (const statement of statements) {
-        await conn.query(`${statement};`);
+        await conn.execute(isPostgres() ? statement : `${statement};`);
       }
     }
     console.log("Operational demo seeds applied (29–33).");
@@ -76,6 +79,6 @@ export async function runOperationalDemoSeeds() {
     console.error("Operational demo seed failed:", err.message);
     throw err;
   } finally {
-    await conn.end();
+    conn.release();
   }
 }

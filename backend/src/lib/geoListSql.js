@@ -1,4 +1,8 @@
-import { distanceKmSql, orderByDistanceAscSql } from "./geoDistance.js";
+import {
+  distanceKmSql,
+  orderByDistanceAscSql,
+  referenceGeoCrossJoinSql,
+} from "../config/sqlDialect.js";
 
 /**
  * @typedef {{ locationId: number | null, latitude: number, longitude: number }} GeoReference
@@ -17,10 +21,9 @@ export function buildReferenceJoin(ref) {
     };
   }
   return {
-    joinSql:
-      "CROSS JOIN (SELECT ST_GeomFromText(CONCAT('POINT(', ?, ' ', ?, ')'), 4326) AS geo_point) ref_geom",
+    joinSql: referenceGeoCrossJoinSql(),
     params: [ref.longitude, ref.latitude],
-    distanceExpr: "ST_Distance_Sphere(ref_geom.geo_point, entity_loc.geo_point) / 1000",
+    distanceExpr: distanceKmSql("ref_geom", "entity_loc"),
   };
 }
 

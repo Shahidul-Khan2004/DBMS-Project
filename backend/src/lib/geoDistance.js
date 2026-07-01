@@ -1,22 +1,9 @@
-/**
- * MySQL distance helpers using locations.geo_point (SRID 4326).
- */
+import {
+  distanceKmSql,
+  orderByDistanceAscSql,
+} from "../config/sqlDialect.js";
 
-/**
- * @param {string} refAlias SQL table alias for reference location
- * @param {string} entityAlias SQL table alias for entity location
- */
-export function distanceKmSql(refAlias, entityAlias) {
-  return `ST_Distance_Sphere(${refAlias}.geo_point, ${entityAlias}.geo_point) / 1000`;
-}
-
-/**
- * @param {string} distanceExpr SQL expression (e.g. from distanceKmSql)
- * @param {string} [entityLocIdExpr] expression that is NULL when entity has no location
- */
-export function orderByDistanceAscSql(distanceExpr, entityLocIdExpr = "entity_loc.id") {
-  return `(${entityLocIdExpr} IS NULL), ${distanceExpr} ASC`;
-}
+export { distanceKmSql, orderByDistanceAscSql };
 
 /**
  * @param {unknown} value

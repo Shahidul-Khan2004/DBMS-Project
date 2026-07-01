@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev:backend": "cd backend && node src/app.js",
+    "start:backend": "cd backend && node src/app.js",
     "dev:frontend": "next dev frontend",
     "build:frontend": "next build frontend",
     "start:frontend": "next start frontend",
@@ -27,6 +28,7 @@
     "mysql2": "^3.20.0",
     "next": "^16.0.0",
     "nodemailer": "^8.0.7",
+    "pg": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.51.4",

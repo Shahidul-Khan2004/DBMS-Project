@@ -1,8 +1,7 @@
 /**
- * Convert ISO-ish timestamp input to UTC MySQL DATETIME literal (`YYYY-MM-DD HH:MM:SS`).
- * Returns null when value is falsy or not parseable as a date.
+ * Timestamp helpers for SQL-bound parameters (works for MySQL and PostgreSQL).
  */
-export function toMySqlDateTimeOrNull(value) {
+export function toSqlDateTimeOrNull(value) {
   if (!value) return null;
 
   const date = new Date(value);
@@ -12,3 +11,6 @@ export function toMySqlDateTimeOrNull(value) {
 
   return date.toISOString().slice(0, 19).replace("T", " ");
 }
+
+/** @deprecated use toSqlDateTimeOrNull */
+export const toMySqlDateTimeOrNull = toSqlDateTimeOrNull;

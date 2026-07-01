@@ -1,5 +1,6 @@
 import BackendError from "../lib/BackendError.js";
 import { query } from "../config/db.js";
+import { ageMinutesSql } from "../config/sqlDialect.js";
 import { buildDistanceSortClause } from "../lib/geoListSql.js";
 import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 
@@ -248,7 +249,7 @@ export async function listRecentIntakeReportsPendingClassification(limit) {
   const { rows } = await query(
     `
       ${INTAKE_SELECT},
-      TIMESTAMPDIFF(MINUTE, ir.reported_at, CURRENT_TIMESTAMP) AS age_minutes
+      ${ageMinutesSql("ir.reported_at")} AS age_minutes
       ${INTAKE_FROM}
       WHERE ${PENDING_CLASSIFICATION_CLAUSE}
       ORDER BY ir.reported_at DESC

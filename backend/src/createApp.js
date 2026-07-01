@@ -29,9 +29,10 @@ export function createApp(options = {}) {
 
   const app = express();
 
+  const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3000";
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: corsOrigin.split(",").map((value) => value.trim()),
     }),
   );
   app.use(express.json());

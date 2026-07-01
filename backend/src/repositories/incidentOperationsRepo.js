@@ -4,6 +4,7 @@ import { assertStatusTransitionAllowed } from "../lib/statusWorkflow.js";
 import { insertAuditLog } from "../lib/auditLog.js";
 import pool from "../config/db.js";
 import { query } from "../config/db.js";
+import { ageMinutesSql } from "../config/sqlDialect.js";
 import { buildDistanceSortClause } from "../lib/geoListSql.js";
 import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { toMySqlDateTimeOrNull } from "../lib/mysqlDateTime.js";
@@ -872,7 +873,7 @@ export async function listRecentActiveIncidentsForOverview(limit) {
         ist.status_code AS status_code,
         rcat.category_code AS category_code,
         ei.reported_at AS reported_at,
-        TIMESTAMPDIFF(MINUTE, ei.reported_at, CURRENT_TIMESTAMP) AS age_minutes
+        ${ageMinutesSql("ei.reported_at")} AS age_minutes
       ${ACTIVE_INCIDENT_BASE}
       WHERE ist.is_terminal = FALSE
       ORDER BY ei.reported_at DESC

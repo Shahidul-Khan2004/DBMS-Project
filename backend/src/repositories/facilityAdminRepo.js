@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import BackendError from "../lib/BackendError.js";
 import { generateCode } from "../lib/generateCode.js";
 import pool from "../config/db.js";
+import { upsertSuffix } from "../config/sqlDialect.js";
 import { buildDistanceSortClause } from "../lib/geoListSql.js";
 import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 import { requireAdministrativeAreaInTransaction } from "../domain/locationAccess.js";
@@ -211,11 +212,11 @@ export async function setFacilityCapabilities(facilityPublicUuid, capabilityCode
         throw new BackendError(422, "CAPABILITY_NOT_FOUND", `Unknown capability: ${code}`);
       }
       await conn.execute(
-        `
+        upsertSuffix(`
           INSERT INTO facility_capabilities (facility_id, capability_id, is_active)
           VALUES (?, ?, TRUE)
           ON DUPLICATE KEY UPDATE is_active = TRUE
-        `,
+        `),
         [facility.id, cap[0].id],
       );
     }
@@ -236,11 +237,11 @@ export async function setFacilityDefaultCapacities(facilityPublicUuid, capacitie
     const facility = await loadFacilityId(conn, facilityPublicUuid);
     for (const cap of capacities) {
       await conn.execute(
-        `
+        upsertSuffix(`
           INSERT INTO facility_default_capacities (facility_id, capacity_type, total_capacity)
           VALUES (?, ?, ?)
           ON DUPLICATE KEY UPDATE total_capacity = VALUES(total_capacity)
-        `,
+        `),
         [facility.id, cap.capacityType, cap.totalCapacity],
       );
     }

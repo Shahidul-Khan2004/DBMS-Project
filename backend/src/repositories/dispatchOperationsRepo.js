@@ -5,6 +5,7 @@ import {
   findStatusIdByCode,
 } from "../lib/statusWorkflow.js";
 import pool from "../config/db.js";
+import { distanceKmSql } from "../config/sqlDialect.js";
 import { buildDistanceSortClause } from "../lib/geoListSql.js";
 import { mapRowWithOptionalDistance } from "../lib/geoSortMap.js";
 
@@ -562,7 +563,7 @@ export async function listAvailableUnitsForIncident(incidentPublicUuid, options 
       `
       : "";
     const distanceSelect = useDistance
-      ? ", ST_Distance_Sphere(ref_loc.geo_point, entity_loc.geo_point) / 1000 AS distance_km_sort"
+      ? `, ${distanceKmSql("ref_loc", "entity_loc")} AS distance_km_sort`
       : "";
     const orderSql = useDistance
       ? "(entity_loc.id IS NULL), distance_km_sort ASC"
