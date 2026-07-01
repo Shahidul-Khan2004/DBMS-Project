@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import pool from "../config/db.js";
-import { createUser, findUserByEmail } from "../repositories/userRepo.js";
+import {
+  createUser,
+  findUserByEmail,
+  updateUserPasswordHash,
+} from "../repositories/userRepo.js";
 import {
   assignRoleToUser,
   findRoleByCode,
@@ -147,6 +151,8 @@ export async function bootstrapDemoAgencyRepresentatives() {
           passwordHash,
         });
         user = await findUserByEmail(rep.email);
+      } else {
+        await updateUserPasswordHash(user.id, passwordHash);
       }
 
       if (!user) {

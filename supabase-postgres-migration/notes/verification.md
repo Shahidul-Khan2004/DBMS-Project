@@ -20,13 +20,19 @@
 |-------|------:|-------|
 | `roles` | 4 | Reference seed (chunk 01) |
 | `blood_groups` | 8 | Reference seed |
-| `administrative_areas` | 3,000+ | Bangladesh hierarchy; re-apply skips duplicates |
+| `administrative_areas` | 5,118 | Full Bangladesh hierarchy (chunks 02_01–02_12); 4,540 unions |
 | `users` | 12 | Demo citizens, dispatcher, agency reps (chunk 03) |
 | `agencies` | 13 | Demo + storyline agencies (chunks 03–04) |
 | `facilities` | 14 | Includes `SHELTER-KUR-01` and other storyline shelters |
 | `intake_reports` | 16+ | Pre-disaster, risk, fire (6), and flood intakes |
 | `emergency_incidents` | 4 | Operational showcase incidents (chunk 03) |
 | `emergency_units` | 20 | Dhaka + national demo units |
+
+## Chunk 02 (admin areas) — applied
+
+- **Chunks:** `004_seed_data_chunk02_01` … `004_seed_data_chunk02_12` via Supabase MCP
+- **Count:** 5,118 rows (10 divisions, 67 districts, 500 upazilas, 4,540 unions, 1 area)
+- **Idempotent:** `ON CONFLICT DO NOTHING` on division/district/upazila inserts in chunk 01
 
 ## Chunk 03 + 04 — applied
 

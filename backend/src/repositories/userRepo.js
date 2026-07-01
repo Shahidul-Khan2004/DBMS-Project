@@ -74,6 +74,14 @@ export async function updateUserProfile(userId, { fullName, phoneNumber, seconda
   return findUserById(userId);
 }
 
+export async function updateUserPasswordHash(userId, passwordHash) {
+  const [result] = await pool.execute(
+    `UPDATE users SET password_hash = ? WHERE id = ?`,
+    [passwordHash, userId],
+  );
+  return result.affectedRows > 0;
+}
+
 export async function createUser({ publicUuid, email, fullName, phoneNumber, passwordHash }) {
   const conn = await pool.getConnection();
   try {

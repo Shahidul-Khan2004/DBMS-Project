@@ -1,13 +1,12 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
-import { createUser, findUserByEmail } from "../repositories/userRepo.js";
+import { createUser, findUserByEmail, updateUserPasswordHash } from "../repositories/userRepo.js";
 import {
   assignRoleToUser,
   ensurePermission,
   ensureRole,
   findRoleByCode,
   grantPermissionToRole,
-  hasAnyUserWithRole,
   hasRoleAssignment,
 } from "../repositories/rbacRepo.js";
 import { ROLE_CODES } from "./rbacService.js";
@@ -295,12 +294,6 @@ export async function bootstrapDevelopmentSystemAdmin() {
   await bootstrapDemoDispatcher();
   await runOperationalDemoSeeds();
 
-  const adminExists = await hasAnyUserWithRole(ROLE_CODES.SYSTEM_ADMIN);
-
-  if (adminExists) {
-    return;
-  }
-
   const email = process.env.SYSTEM_ADMIN__EMAIL;
   const password = process.env.SYSTEM_ADMIN_PASSWORD;
   const fullName = process.env.SYSTEM_ADMIN_NAME;
@@ -320,11 +313,11 @@ export async function bootstrapDevelopmentSystemAdmin() {
     return;
   }
 
+  const passwordHash = await bcrypt.hash(password, 10);
   let adminUser = await findUserByEmail(email);
 
   if (!adminUser) {
     const publicUuid = randomUUID();
-    const passwordHash = await bcrypt.hash(password, 10);
 
     await createUser({
       publicUuid,
@@ -335,6 +328,13 @@ export async function bootstrapDevelopmentSystemAdmin() {
     });
 
     adminUser = await findUserByEmail(email);
+  } else {
+    await updateUserPasswordHash(adminUser.id, passwordHash);
+  }
+
+  if (!adminUser) {
+    console.warn(`Skipping system admin bootstrap. Could not load user ${email}.`);
+    return;
   }
 
   const systemAdminRole = await findRoleByCode(ROLE_CODES.SYSTEM_ADMIN);
@@ -356,6 +356,6 @@ export async function bootstrapDevelopmentSystemAdmin() {
     });
   }
 
-  console.log(`Bootstrapped system admin: ${fullName}`);
+  console.log(`Bootstrapped system admin: ${email}`);
 }
 
