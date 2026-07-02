@@ -2,11 +2,13 @@
 
 ## Database (Docker)
 
-MySQL 8 is defined in [docker-compose.yml](docker-compose.yml). On **first start** with an **empty** data volume, the image runs every `*.sql` file in [src/schemas/docker-init/](src/schemas/docker-init/) in **lexical order** (see [src/schemas/README.md](src/schemas/README.md)).
+MySQL 8 is defined in [docker-compose.yml](docker-compose.yml). Copy [`backend/.env.example`](.env.example) to `backend/.env` **before** starting Compose — Docker reads `MYSQL_*` from that file.
+
+On **first start** with an **empty** data volume, the image runs every `*.sql` file in [src/schemas/docker-init/](src/schemas/docker-init/) in **lexical order** (see [src/schemas/README.md](src/schemas/README.md)).
 
 ```bash
-cd backend
-docker compose up --build
+cp .env.example .env   # from backend/
+docker compose up -d
 ```
 
 After changing any file under `src/schemas/docker-init/`, reset the DB volume so init runs again:
@@ -49,8 +51,9 @@ npm run test:integration
 
 **Integration prerequisites**
 
-- MySQL running (`cd backend && docker compose up`)
-- [`backend/.env`](.env) with `MYSQL_*`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
+- `backend/.env` copied from [`.env.example`](.env.example) (or equivalent `MYSQL_*` + demo passwords)
+- MySQL running (`cd backend && docker compose up -d`)
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
 - `SYSTEM_ADMIN__EMAIL` / `SYSTEM_ADMIN_PASSWORD` for admin/operations smoke tests
 - `DEMO_REP_PASSWORD` for agency rep smoke tests (`fire.rep@niers.test` seed user)
 - `DEMO_DISPATCHER_PASSWORD` for dispatcher smoke tests (`dispatcher@niers.test` seed user)

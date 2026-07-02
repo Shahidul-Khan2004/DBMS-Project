@@ -40,7 +40,7 @@ NIERS connects citizens, dispatchers, response agencies, and system administrato
 |-------|--------------|
 | **Frontend** | [Next.js 16](https://nextjs.org/), React 19, TypeScript, Tailwind CSS 4, Leaflet |
 | **Backend** | [Node.js](https://nodejs.org/) (ES modules), [Express 5](https://expressjs.com/), Zod validation |
-| **Database** | MySQL 8 (Docker), ordered SQL init fragments |
+| **Database** | MySQL 8 (local Docker), PostgreSQL/Supabase (deploy); ordered SQL init fragments |
 | **Queue / cache** | Redis 7, BullMQ |
 | **Auth** | JWT (access + refresh), bcrypt |
 | **Integrations** | Barikoi reverse geocoding (optional), Nodemailer (SMTP) |
@@ -85,6 +85,7 @@ Frontend pages live under `frontend/app/` with role-specific dashboards. The API
 │   ├── components/             # UI by role (citizen, dispatcher, agency, admin)
 │   └── lib/                    # API client, hooks, utilities
 ├── docs/                       # API reference, demo accounts, dependencies
+├── supabase-postgres-migration/  # PostgreSQL SQL for Supabase/Render deploy
 └── package.json                # root scripts & shared dependencies
 ```
 
@@ -98,7 +99,25 @@ Frontend pages live under `frontend/app/` with role-specific dashboards. The API
 - **Docker** and Docker Compose (for MySQL and Redis)
 - **npm**
 
-### 1. Clone and install
+### Quick start (local showcase)
+
+Copy-paste from a fresh clone — no manual env editing required:
+
+```bash
+git clone https://github.com/Shahidul-Khan2004/DBMS-Project.git
+cd DBMS-Project
+npm install
+cp backend/.env.example backend/.env
+cd backend && docker compose up -d && cd ..
+npm run dev:backend   # terminal 1 — http://localhost:8080
+npm run dev:frontend  # terminal 2 — http://localhost:3000
+```
+
+First Docker start may take a few minutes while MySQL loads schema and Bangladesh admin-area seeds (~5k rows). Demo accounts and showcase data are created automatically on backend startup.
+
+### Step-by-step
+
+**1. Clone and install**
 
 ```bash
 git clone https://github.com/Shahidul-Khan2004/DBMS-Project.git
@@ -106,12 +125,22 @@ cd DBMS-Project
 npm install
 ```
 
-### 2. Start database services
+**2. Configure environment** (before Docker)
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+[`backend/.env.example`](backend/.env.example) ships with working local defaults (`MYSQL_*`, JWT secrets, demo passwords). You only need to edit it for production deploy, custom credentials, Barikoi GPS, or SMTP.
+
+**3. Start database services**
 
 ```bash
 cd backend
 docker compose up -d
 ```
+
+Compose reads `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_DATABASE` from `backend/.env`.
 
 On first start with an empty volume, MySQL runs every `*.sql` file in `backend/src/schemas/docker-init/` in lexical order. See [backend/src/schemas/README.md](backend/src/schemas/README.md) for the seed layout.
 
@@ -122,15 +151,7 @@ docker compose down -v
 docker compose up -d
 ```
 
-### 3. Configure environment
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Edit `backend/.env` with your MySQL credentials (matching `docker-compose.yml`), JWT secrets, and demo passwords. Optional: `BARIKOI_API_KEY` for GPS → admin-area resolution, and SMTP settings for outbound email.
-
-### 4. Run the application
+**4. Run the application**
 
 From the repository root, in separate terminals:
 
@@ -144,18 +165,24 @@ npm run dev:frontend
 
 On backend startup, RBAC seeds and demo accounts are bootstrapped when the corresponding env vars are set.
 
-### Demo accounts
+### Showcase login credentials
 
-Pre-configured development users (dispatcher, citizens, agency reps, system admin) are created at startup — not in SQL seeds. See [docs/demo-accounts.md](docs/demo-accounts.md) for emails, roles, and password variables.
+Use these with a default [`backend/.env.example`](backend/.env.example) copy. Full role list: [docs/demo-accounts.md](docs/demo-accounts.md).
 
-Quick examples (default passwords from `.env.example`):
+| Email | Role | Password |
+|-------|------|----------|
+| `admin@example.com` | System admin | `ChangeMeAdmin123` |
+| `dispatcher@niers.test` | Dispatcher | `ChangeMeDispatcher123` |
+| `citizen.rahima@niers.test` | Citizen | `ChangeMeCitizen123` |
+| `fire.rep@niers.test` | Agency rep | `ChangeMeDemoRep123` |
 
-| Email | Role | Password env var |
-|-------|------|------------------|
-| `admin@example.com` | System admin | `SYSTEM_ADMIN_PASSWORD` |
-| `dispatcher@niers.test` | Dispatcher | `DEMO_DISPATCHER_PASSWORD` |
-| `citizen.rahima@niers.test` | Citizen | `DEMO_CITIZEN_PASSWORD` |
-| `fire.rep@niers.test` | Agency rep | `DEMO_REP_PASSWORD` |
+**What works without extra setup:** all dashboards, seeded incidents and service cases, disaster admin flows, Bangladesh geography, and reporter-risk demo data.
+
+**Optional (not required for showcase):** `BARIKOI_API_KEY` for live GPS → admin-area resolution; SMTP + `EMAIL_QUEUE_ENABLED=true` for outbound email.
+
+### Deployed demo (Supabase / Render)
+
+Local development uses **MySQL in Docker**. For a hosted demo, apply PostgreSQL SQL from [`supabase-postgres-migration/`](supabase-postgres-migration/) to Supabase and set `DB_DIALECT=postgres` plus `DATABASE_URL` on the backend. See that folder’s README for apply order and env vars.
 
 ---
 
@@ -187,6 +214,7 @@ Integration tests require MySQL running, a configured `backend/.env`, and demo p
 | [docs/demo-accounts.md](docs/demo-accounts.md) | Bootstrap demo accounts & showcase seed |
 | [docs/backend-external-dependencies.md](docs/backend-external-dependencies.md) | Barikoi, geocode data, SMTP |
 | [backend/README.md](backend/README.md) | Database Docker setup, admin-area regeneration |
+| [supabase-postgres-migration/README.md](supabase-postgres-migration/README.md) | PostgreSQL deploy to Supabase/Render |
 
 ---
 
