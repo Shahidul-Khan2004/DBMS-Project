@@ -84,8 +84,8 @@ export default function LoginPage() {
   return (
     <LoginCard>
       <div className="space-y-5">
-        <DemoAccountsPanel onUseAccount={setPrefill} />
         <LoginForm onSuccess={handleLoginSuccess} prefill={prefill} />
+        <DemoAccountsPanel onUseAccount={setPrefill} />
 
         <div className="border-t border-[#002D62]/10 pt-4 text-center text-sm text-slate-600">
           Don&apos;t have an account?{" "}

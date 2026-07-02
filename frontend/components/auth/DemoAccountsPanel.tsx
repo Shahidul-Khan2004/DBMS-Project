@@ -19,7 +19,7 @@ function formatRoleLabel(role: string) {
 export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
   onUseAccount,
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [data, setData] = useState<DemoAccountsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +83,7 @@ export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
       </button>
 
       {expanded ? (
-        <div className="space-y-4 border-t border-[#C9D6E3] px-4 py-4">
+        <div className="max-h-64 space-y-4 overflow-y-auto border-t border-[#C9D6E3] px-4 py-4">
           {data.groups.map((group) => (
             <div key={group.role} className="space-y-2">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
