@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
+import { DemoAccountsPanel } from "../../../components/auth/DemoAccountsPanel";
 import { LoginCard } from "../../../components/auth/LoginCard";
 import { LoginForm } from "../../../components/auth/LoginForm";
 import {
@@ -18,6 +19,9 @@ import { Badge, formatBadgeLabel } from "@/components/ui/Badge";
 export default function LoginPage() {
   const router = useRouter();
   const [loggedInUser, setLoggedInUser] = useState<LoginResponse | null>(null);
+  const [prefill, setPrefill] = useState<{ email: string; password: string } | null>(
+    null,
+  );
 
   const handleLoginSuccess = (data: LoginResponse) => {
     setLoggedInUser(data);
@@ -80,7 +84,8 @@ export default function LoginPage() {
   return (
     <LoginCard>
       <div className="space-y-5">
-        <LoginForm onSuccess={handleLoginSuccess} />
+        <DemoAccountsPanel onUseAccount={setPrefill} />
+        <LoginForm onSuccess={handleLoginSuccess} prefill={prefill} />
 
         <div className="border-t border-[#002D62]/10 pt-4 text-center text-sm text-slate-600">
           Don&apos;t have an account?{" "}

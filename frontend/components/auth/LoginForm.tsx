@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { loginSchema, LoginInput } from "@/lib/validations";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +17,7 @@ import type { LoginResponse } from "@/types/auth";
 
 interface LoginFormProps {
   onSuccess?: (data: LoginResponse) => void;
+  prefill?: { email: string; password: string } | null;
 }
 
 type LoginFieldName = keyof LoginInput;
@@ -51,7 +52,7 @@ function loginInputClass(hasError: boolean) {
   return [base, hasError && err].filter(Boolean).join(" ");
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, prefill }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<LoginErrorDisplay | null>(null);
   const [genericError, setGenericError] = useState<string | null>(null);
@@ -62,12 +63,23 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     register,
     handleSubmit,
     reset,
+    setValue,
   } = useForm<LoginInput>({
     defaultValues: {
       email: "",
       password: "",
     },
   });
+
+  useEffect(() => {
+    if (!prefill) return;
+
+    setValue("email", prefill.email, { shouldValidate: false });
+    setValue("password", prefill.password, { shouldValidate: false });
+    setFieldErrors({});
+    setLoginError(null);
+    setGenericError(null);
+  }, [prefill, setValue]);
 
   async function onSubmit(data: LoginInput) {
     const validation = loginSchema.safeParse(data);
