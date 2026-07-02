@@ -46,7 +46,7 @@ function getBackendFieldErrors(details: unknown): LoginFieldErrors {
 
 function loginInputClass(hasError: boolean) {
   const base =
-    "rounded-2xl border border-[#B8C7D6] bg-[#FDFEFF] px-4 py-3 text-[#0F172A] placeholder:text-[#7A8CA3] shadow-sm focus:border-[#002D62] focus:outline-none focus:ring-4 focus:ring-[#002D62]/10";
+    "rounded-2xl border border-[#B8C7D6] bg-[#FDFEFF] px-4 py-2.5 text-[#0F172A] placeholder:text-[#7A8CA3] shadow-sm focus:border-[#002D62] focus:outline-none focus:ring-4 focus:ring-[#002D62]/10";
   const err =
     "border-[#DA291C] bg-[#FDECEC] focus:border-[#DA291C] focus:ring-4 focus:ring-[#DA291C]/10";
   return [base, hasError && err].filter(Boolean).join(" ");
@@ -152,7 +152,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, prefill }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
       {loginError ? (
         <MessageBanner tone="error" title={loginError.title} description={loginError.description}>
           {loginError.details.length > 0 ? (
@@ -209,9 +209,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, prefill }) => {
         type="submit"
         variant="primary"
         fullWidth
-        size="lg"
+        size="md"
         isLoading={isLoading}
-        className="mt-2 bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] disabled:cursor-not-allowed disabled:bg-[#7F96B3] disabled:opacity-100 disabled:shadow-none"
+        className="bg-[#002D62] text-white shadow-lg shadow-[#002D62]/20 hover:bg-[#001F4A] disabled:cursor-not-allowed disabled:bg-[#7F96B3] disabled:opacity-100 disabled:shadow-none"
       >
         Sign In
       </Button>

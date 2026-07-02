@@ -33,18 +33,10 @@ export const LoginCard: React.FC<LoginCardProps> = ({ children }) => {
             animate={stepMotion.animate}
             transition={stepMotion.transition}
           >
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-[#002D62] sm:text-2xl">
-                Welcome back
-              </h2>
-              <p className="mt-1 text-sm text-[#64748B] sm:text-base">
-                Use your registered email and password to continue.
-              </p>
-            </div>
             {children}
           </motion.div>
         </div>
-        <p className="mt-5 text-center text-xs text-[#64748B]">
+        <p className="mt-3 hidden text-center text-xs text-[#64748B] min-[800px]:block">
           Official NIERS access portal | 2026
         </p>
       </section>

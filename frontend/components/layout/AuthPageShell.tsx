@@ -23,7 +23,11 @@ export function AuthPageShell({
   const isRegister = variant === "register";
 
   return (
-    <div className="niers-auth-bg min-h-[100svh]">
+    <div
+      className={`niers-auth-bg min-h-[100svh] ${
+        variant === "login" ? "niers-auth-bg--login" : ""
+      }`}
+    >
       <NiersNavbar ctaHref={cta.href} ctaLabel={cta.label} />
       <main
         className={`niers-auth-main w-full ${
@@ -39,7 +43,9 @@ export function AuthPageShell({
         >
           <h1
             className={`niers-auth-title font-extrabold tracking-tight text-[#002D62] ${
-              isRegister ? "niers-auth-title--register" : ""
+              isRegister
+                ? "niers-auth-title--register"
+                : "niers-auth-title--login"
             }`}
           >
             {heading.title}
@@ -48,13 +54,13 @@ export function AuthPageShell({
             className={`max-w-2xl text-slate-600 ${
               isRegister
                 ? "mt-2 text-sm leading-6 lg:mt-1"
-                : "mt-3 text-base leading-7"
+                : "mt-1.5 text-sm leading-5 max-[699px]:hidden"
             }`}
           >
             {heading.subtitle}
           </p>
         </header>
-        <div className={`w-full ${variant === "login" ? "mt-6" : ""}`}>
+        <div className={`w-full ${variant === "login" ? "mt-3" : ""}`}>
           {children}
         </div>
       </main>

@@ -83,11 +83,11 @@ export default function LoginPage() {
 
   return (
     <LoginCard>
-      <div className="space-y-5">
+      <div className="space-y-3">
         <LoginForm onSuccess={handleLoginSuccess} prefill={prefill} />
         <DemoAccountsPanel onUseAccount={setPrefill} />
 
-        <div className="border-t border-[#002D62]/10 pt-4 text-center text-sm text-slate-600">
+        <div className="border-t border-[#002D62]/10 pt-3 text-center text-sm text-slate-600">
           Don&apos;t have an account?{" "}
           <Link
             href="/auth/register"

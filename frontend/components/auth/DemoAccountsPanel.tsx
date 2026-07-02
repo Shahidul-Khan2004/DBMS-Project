@@ -46,7 +46,7 @@ export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-[#C9D6E3] bg-[#F7F9FC] px-4 py-3 text-sm text-[#64748B]">
+      <div className="rounded-xl border border-[#C9D6E3] bg-[#F7F9FC] px-3 py-2 text-xs text-[#64748B]">
         {error}
       </div>
     );
@@ -57,23 +57,18 @@ export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
   }
 
   return (
-    <section className="rounded-2xl border border-[#C9D6E3] bg-[#F7F9FC]">
+    <section className="rounded-xl border border-[#C9D6E3] bg-[#F7F9FC]">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
         aria-expanded={expanded}
       >
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#002D62]/10 text-[#002D62]">
-            <KeyRound className="h-4 w-4" aria-hidden />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-[#002D62]">Demo accounts</p>
-            <p className="text-xs text-[#64748B]">
-              Explore NIERS with pre-configured roles and passwords.
-            </p>
-          </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <KeyRound className="h-4 w-4 shrink-0 text-[#002D62]" aria-hidden />
+          <p className="truncate text-sm font-semibold text-[#002D62]">
+            Demo accounts
+          </p>
         </div>
         {expanded ? (
           <ChevronUp className="h-4 w-4 shrink-0 text-[#64748B]" aria-hidden />
@@ -83,32 +78,35 @@ export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
       </button>
 
       {expanded ? (
-        <div className="max-h-64 space-y-4 overflow-y-auto border-t border-[#C9D6E3] px-4 py-4">
+        <div className="max-h-[22svh] space-y-2 overflow-y-auto border-t border-[#C9D6E3] px-3 py-2">
+          <p className="text-xs text-[#64748B]">
+            Explore NIERS with pre-configured roles and passwords.
+          </p>
           {data.groups.map((group) => (
-            <div key={group.role} className="space-y-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#002D62]">
+            <div key={group.role} className="space-y-1.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-1">
+                <h3 className="text-[0.65rem] font-semibold uppercase tracking-wide text-[#002D62]">
                   {group.roleLabel || formatRoleLabel(group.role)}
                 </h3>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-[0.65rem] text-[#64748B]">
                   Password:{" "}
                   <span className="font-mono text-[#0F172A]">{group.password}</span>
                 </p>
               </div>
 
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {group.accounts.map((account) => (
                   <li
                     key={account.email}
-                    className="flex flex-col gap-2 rounded-xl border border-[#C9D6E3] bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-[#C9D6E3] bg-white px-2 py-1.5"
                   >
                     <div className="min-w-0">
                       {account.label ? (
-                        <p className="text-sm font-medium text-[#0F172A]">
+                        <p className="truncate text-xs font-medium text-[#0F172A]">
                           {account.label}
                         </p>
                       ) : null}
-                      <p className="truncate font-mono text-xs text-[#64748B] sm:text-sm">
+                      <p className="truncate font-mono text-[0.65rem] text-[#64748B]">
                         {account.email}
                       </p>
                     </div>
@@ -120,9 +118,9 @@ export const DemoAccountsPanel: React.FC<DemoAccountsPanelProps> = ({
                           password: account.password,
                         })
                       }
-                      className="shrink-0 rounded-lg border border-[#002D62]/20 bg-[#002D62]/5 px-3 py-1.5 text-xs font-semibold text-[#002D62] transition-colors hover:bg-[#002D62]/10"
+                      className="shrink-0 rounded-md border border-[#002D62]/20 bg-[#002D62]/5 px-2 py-1 text-[0.65rem] font-semibold text-[#002D62] transition-colors hover:bg-[#002D62]/10"
                     >
-                      Use account
+                      Use
                     </button>
                   </li>
                 ))}

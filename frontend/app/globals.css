@@ -11,7 +11,7 @@
   --card-p: clamp(28px, 3vw, 48px);
   --card-p-register: clamp(20px, 2vw, 32px);
   --card-p-register-desktop: clamp(14px, 1.2vw, 20px);
-  --card-p-login: clamp(32px, 3vw, 48px);
+  --card-p-login: clamp(16px, 2vw, 24px);
   --auth-top-gap: clamp(32px, 4vh, 56px);
   --auth-block-y-register: clamp(16px, 2vh, 28px);
   --auth-block-y-login: clamp(16px, 2vh, 28px);
@@ -89,24 +89,26 @@ html {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100svh;
-  padding-top: calc(var(--nav-h) + clamp(24px, 3vh, 36px));
-  padding-bottom: clamp(16px, 2vh, 28px);
+  min-height: 100svh;
+  padding-top: calc(var(--nav-h) + 12px);
+  padding-bottom: 12px;
   overflow-y: auto;
+}
+
+.niers-auth-bg--login {
+  --nav-h: clamp(64px, 7vh, 80px);
 }
 
 @media (max-width: 1023px) {
   .niers-auth-main--login {
     height: auto;
     min-height: 100svh;
-    overflow-y: auto;
   }
 }
 
-@media (min-width: 1024px) {
-  .niers-auth-main--login {
-    overflow: hidden;
-  }
+.niers-auth-title--login {
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  line-height: 1.15;
 }
 
 .niers-auth-main--register {
