@@ -4,6 +4,8 @@
 
 A full-stack platform for centralized citizen reporting, 999 call intake, and coordinated emergency and disaster response — built as a DBMS course project with production-oriented patterns.
 
+**[Watch the demo on YouTube](https://youtu.be/jeReSWqZ61Y?si=yUixp27D8HSAoPUM)**
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
